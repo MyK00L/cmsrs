@@ -1,0 +1,8 @@
+version: "3.3"
+services:
+  rpc-server:
+    build:
+      context: .
+      dockerfile: ./rpctest-server/Dockerfile
+    ports:
+      - "50051:50051"

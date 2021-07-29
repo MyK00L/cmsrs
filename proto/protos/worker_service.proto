@@ -6,6 +6,12 @@ import "common.proto";
 import "submission.proto";
 import "evaluation_info.proto";
 
+message TestRequest {
+	string name = 1;
+}
+message TestResponse {
+	string message = 1;
+}
 message WorkerRequest {
 	uint32 problem_id = 1;
 	common.Source source = 2;
@@ -25,6 +31,7 @@ message WorkerUpdateSourceRequest {
 message WorkerUpdateSourceResponse {}
 
 service WorkerService {
+	rpc test_worker(TestRequest) returns (TestResponse);
 	rpc evaluate_submission(WorkerRequest) returns (WorkerResponse);
 	rpc update_testcase(WorkerUpdateTestcaseRequest) returns (WorkerUpdateTestcaseResponse);
 	rpc update_source(WorkerUpdateSourceRequest) returns (WorkerUpdateSourceResponse);

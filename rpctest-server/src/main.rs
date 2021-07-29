@@ -12,6 +12,18 @@ pub struct MyWorker {}
 // for the Greeter service (SayHello...)
 #[tonic::async_trait]
 impl WorkerService for MyWorker {
+    async fn test_worker(
+        &self,
+        request: tonic::Request<TestRequest>,
+    ) -> Result<tonic::Response<TestResponse>, tonic::Status> {
+        println!("Got a request: {:?}", request);
+
+        let reply = TestResponse {
+            message: format!("Hello {}!", request.into_inner().name).into(), // We must use .into_inner() as the fields of gRPC requests and responses are private
+        };
+
+        Ok(Response::new(reply))
+    }
     async fn evaluate_submission(
         &self,
         request: tonic::Request<WorkerRequest>,
@@ -35,7 +47,7 @@ impl WorkerService for MyWorker {
 // Use the tokio runtime to run our server
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let addr = "[::1]:50051".parse()?;
+    let addr = "0.0.0.0:50051".parse()?;
     let greeter = MyWorker::default();
 
     println!("Starting gRPC Server...");
