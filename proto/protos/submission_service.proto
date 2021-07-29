@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package submission_service;
+
+import "common.proto";
+import "submission.proto";
+
+// Submission service
+message SubmissionRequest {
+	submission.Submission sub = 1;
+}
+message SubmissionResponse {
+	submission.EvaluateResult res = 1;
+	common.Id submission_id = 2;
+	uint64 timestamp = 3;
+}
+message SubmissionListRequest {
+	optional uint32 limit = 1;
+	optional string user = 2;
+	optional uint32 problem_id = 3;
+}
+message SubmissionListResponse {
+	message Item {
+		common.Id sub_id = 1;
+		string user = 2;
+		uint32 problem_id = 3;
+		uint64 timestamp = 5;
+		optional double score = 6;
+	}
+	repeated Item list = 1;
+}
+message SubmissionDetailsRequest {
+	common.Id submission_id = 1;
+}
+message SubmissionDetailsResponse {
+	submission.Submission sub = 1;
+	uint64 timestamp = 2;
+}
+service SubmissionService {
+	rpc evaluate_submission(SubmissionRequest) returns (SubmissionResponse);
+	rpc get_submission_list(SubmissionListRequest) returns (SubmissionListResponse);
+	rpc get_submission_details(SubmissionDetailsRequest) returns (SubmissionDetailsResponse);
+}
+

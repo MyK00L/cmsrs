@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package user_info;
+
+import "common.proto";
+
+message UserProblemInfo {
+	uint32 id = 1;
+	string name = 2;
+	string description = 3; // long name
+	repeated uint32 testcases_per_subtask = 4;
+	common.Resources runtime_limits = 5;
+	uint64 source_size_limit = 6;
+	string type = 7; // unsure about this
+	// available languages ...
+	// statements & various files ...
+}
+
+message UserContestInfo {
+	string name = 1;
+	string description = 2;
+	uint64 start_time = 3;
+	uint64 end_time = 4;
+	optional uint32 submission_limit = 5;
+	//uint32 problem_count;
+	repeated UserProblemInfo problem_infos = 6; // this better?
+}
+
+message Message { // questions and announcements are the same
+	string subject = 1;
+	optional uint32 problem_id = 2;
+	string text = 3;
+	optional string user = 4;
+	uint64 timestamp = 5;
+}
+
+

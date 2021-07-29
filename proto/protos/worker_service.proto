@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package worker_service;
+
+import "common.proto";
+import "submission.proto";
+import "evaluation_info.proto";
+
+message WorkerRequest {
+	uint32 problem_id = 1;
+	common.Source source = 2;
+}
+message WorkerResponse {
+	submission.CompilationResult compilation_result = 1;
+	repeated submission.TestcaseResult testcase_results = 2;
+}
+
+message WorkerUpdateTestcaseRequest {
+	evaluation_info.Testcase tc = 1;
+}
+message WorkerUpdateTestcaseResponse {}
+message WorkerUpdateSourceRequest {
+	evaluation_info.ProblemSource tc = 1;
+}
+message WorkerUpdateSourceResponse {}
+
+service WorkerService {
+	rpc evaluate_submission(WorkerRequest) returns (WorkerResponse);
+	rpc update_testcase(WorkerUpdateTestcaseRequest) returns (WorkerUpdateTestcaseResponse);
+	rpc update_source(WorkerUpdateSourceRequest) returns (WorkerUpdateSourceResponse);
+}
+

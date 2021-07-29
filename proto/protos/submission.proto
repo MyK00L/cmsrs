@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package submission;
+
+import "common.proto";
+
+message Submission {
+	string user = 1;
+	uint32 problem_id = 2;
+	common.Source source = 3;
+}
+message TestcaseResult {
+	enum Outcome {
+		NONE = 0; // something went wrong
+		OK = 1;
+		TLE = 2; // time limit exceeded
+		MLE = 3; // memory limit exceeded
+		RTE = 4; // runtime error
+		CE = 5; // compilation error
+		CHECKER_ERROR = 6; // separate different errors?
+	}
+	Outcome outcome = 1;
+	oneof verdict {
+		bool ac = 2;
+		double score = 3;
+	}
+	common.Resources used_resources = 4;
+}
+message CompilationResult {
+	enum Outcome {
+		NONE = 0;
+		SUCCESS = 1;
+		REJECTED = 2; // could be useful for checks on source code (eg: no pragmas)
+		TLE = 3;
+		MLE = 4;
+		RTE = 5; // bad stuff but could happen
+	}
+	Outcome outcome = 1;
+	common.Resources used_resources = 2;
+	optional string error_message = 3;
+}
+message EvaluateResult {
+	CompilationResult compilation_result = 1;
+	repeated TestcaseResult testcase_results = 2;
+	oneof score {
+		bool bool_score = 3;
+		double double_score = 4;
+	}
+}
+

@@ -1,0 +1,316 @@
+syntax = "proto3";
+
+message Id {
+	bytes mongo_id = 1;
+}
+message Id { // maybe this so that the length is fixed (and we know that if id exists it must have 12 bytes)?
+	fixed32 timestamp = 1;
+	fixed64 randinc = 2;
+}
+
+message Resources {
+	uint64 time_ms = 1;
+	uint64 memory_bytes = 2;
+}
+
+
+//message TestcaseScoringInfo {} // this is the checker
+message SubtaskScoringInfo {
+	enum Method {
+		MIN = 0; // min score among all testcases
+		SUM = 1; // sum of all testcases
+	}
+	Method method = 1;
+	double max_score = 2; // calculated score gets transformed linearly in [0,max_score]
+}
+// message SubmissionScoringInfo {} // no, just use ProblemScoringInfo, considering only the single submission
+message ProblemScoringInfo {
+	enum Method {
+		SUM_MAX = 0; // sum maximum of each subtask across submissions
+		MAX_SUM = 1; // max sum of all subtasks for each submission
+	}
+	Method method = 1;
+}
+message UserScoringInfo {
+	message Method {
+	// total score for a single element will be sum/max among problems of score_weight*score, wrong_submission_count_weight*non_ac_subs, time_secs_weight*last_score_changing_sub
+		enum Aggregation {
+			SUM = 0;
+			MAX = 1;
+		}
+		Aggregation aggregation_method = 1;
+		double score_weight = 2;
+		double wrong_submission_count_weight = 3;
+		double time_secs_weight = 4;
+	}
+	Method main = 1; // users will be ranked by decreasing (main,tiebreakers[0],tiebreakers[1],...)
+	repeated Method tiebreakers = 2;
+}
+
+message EvaluationContestInfo {
+	message ProblemScoringRule { // single problem score
+		double score_weight = 1;
+		double wrong_submissions_weight = 2;
+		double time_sec_weight = 3;
+		UserScoringMethod method = 4;
+		optional string description = 5;
+	}
+	enum UserScoringMethod {
+		SUM = 0;
+		MAX = 1;
+	}
+	Id id = 1;
+	repeated Problem problems = 2;
+	ProblemScoringRule score_rule = 3;
+	optional repeated ProblemScoringRule tiebreak_rules = 4;
+}
+
+message UserContestInfo { // also add problem names?
+	string name;
+	uint64 start_time;
+	uint64 end_time;
+	uint32 problem_count;
+	optional uint32 submission_limit;
+}
+
+message SubtaskInfo {
+	uint32 testcase_count;
+}
+message ProblemInfo {
+	enum Type {
+		BATCH = 0;
+		OO = 1;
+		GRADER = 2;
+	}
+	uint64 id = 1; // 0,1,2,3,...
+	string name = 2;
+	Resources runtime_limits = 3;
+	Resuorces compilation_limits = 4; // maybe not
+	uint64 source_size_limit = 5;
+	repeated SubtaskInfo subtasks = 6;
+	Type type = 7;
+	repeated Language available_languages = 8; // available programming languages for it
+	repeated ProblemStatement.Type available_statements = 9;
+}
+
+enum ProgrammingLanguage {
+	NONE = 0;
+	RUST = 1;
+	CPP = 2;
+	// ...
+}
+message Source {
+	ProgrammingLanguage lang = 1;
+	bytes code = 2;
+}
+message Submission {
+	Id user_id = 2;
+	uint64 problem_id = 3;
+	Source source = 4;
+}
+message TestcaseResult {
+	enum Outcome {
+		NONE = 0; // something went wrong
+		OK = 1;
+		TLE = 2; // time limit exceeded
+		MLE = 3; // memory limit exceeded
+		RTE = 4; // runtime error
+		CE = 5; // compilation error
+		CHECKER_ERROR = 6; // separate different errors?
+	}
+	Outcome outcome = 1;
+	oneof verdict = {
+		bool ac = 2;
+		double score = 3;
+	}
+	Resources used_resources = 4;
+}
+message CompilationResult {
+	enum Outcome {
+		NONE = 0;
+		SUCCESS = 1;
+		REJECTED = 2; // could be useful for checks on source code (eg: no pragmas)
+		TLE = 2;
+		MLE = 3;
+		RTE = 4; // bad stuff but could happen
+	}
+	Outcome outcome = 1;
+	Resources used_resources = 2;
+	optional string error_message = 3;
+}
+message EvaluateResult {
+	CompilationResult compilation_result = 1; // should this also represent mutliple compilations?
+	repeated TestcaseResult = 2;
+	oneof verdict = {
+		bool verdict = 3;
+		double score = 4;
+	}
+}
+
+
+message Message { // questions and announcements are the same?
+	string title = 1;
+	string body = 2;
+	optional Id problem_id = 3;
+	optional Id user_id = 4;
+}
+
+message Testcase {
+	uint32 index = 1;
+	optional bytes input = 2;
+	optional bytes output = 3;
+}
+message EvaluationProblemInfo {
+	uint64 time_limit_millis = 1; // millis? idk, later I'll search what others use
+	uint64 memory_limit_bytes = 2;
+	uint64 compiler_time_limit_millis = 3;
+	uint64 compiler_memory_limit_bytes = 4;
+	uint64 testcase_number = 5;
+}
+message EvaluationFileId {
+	Id problem_id = 1;
+	oneof file {
+		uint32 testcase = 2;
+		void info = 3;
+		void checker = 4;
+		void interactor = 5;
+		void grader = 6;
+	}
+}
+message EvaluationFile {
+	Id problem_id = 1;
+	oneof file {
+		Testcase testcase = 1;
+		EvaluationProblemInfo info = 2;
+		Source checker = 3;
+		Source interactor = 4;
+		Source grader = 5;
+	}
+}
+
+
+// Services
+
+// Worker service
+message WorkerRequest {
+	Submission sub = 1;
+	// repeated uint32 tc = 2; // testcases to evaluate
+}
+message WorkerResponse {
+	CompilationResult compilation_result = 1;
+	repeated TestcaseResult testcase_result = 2;
+}
+message WorkerUpdateFileRequest {
+	EvaluationFile file = 1;
+}
+message WorkerUpdateFileResponse {}
+service WorkerService {
+	// rpc evaluate_submission_on_testcases(WorkerRequest) returns (WorkerResponse);
+	rpc evaluate_submission(WorkerRequest) returns (WorkerResponse);
+	rpc update_file(WorkerUpdateFileRequest) returns (WorkerUpdateFileResponse);
+}
+
+// Dispatcher service
+message DispatcherRequest {
+	Submission sub;
+}
+message DispatcherResponse {
+	EvaluateResult res;
+}
+service DispatcherService {
+	rpc evaluate_submission(DispatcherRequest) returns (DispatcherResponse);
+}
+
+// Submission service
+message SubmissionRequest {
+	Submission sub = 1;
+}
+message SubmissionResponse {
+	EvaluateResult res = 1;
+	Id submission_id = 2;
+	uint64 timestamp = 3;
+}
+message SubmissionListRequest {
+	optional uint32 limit = 1;
+	optional Id user_id = 2;
+	optional Id problem_id = 3;
+}
+message SubmissionListResponse {
+	message Item {
+		Id sub_id = 1;
+		Id user_id = 2;
+		Id problem_id = 3;
+		uint64 timestamp = 5;
+		optional double score = 6;
+	}
+	repeated Item = 1;
+}
+message SubmissionDetailsRequest {
+	Id submission_id;
+}
+message SubmissionDetailsResponse {
+	Submission sub;
+	uint64 timestamp;
+}
+service SubmissionService {
+	rpc evaluate_submission(SubmissionRequest) returns (SubmissionResponse);
+	rpc get_submission_list(SubmissionListRequest) returns (SubmissionListResponse);
+	rpc get_submission_details(SubmissionDetailsRequest) returns (SubmissionDetailsResponse);
+}
+
+
+// Contest service
+message AuthUserRequest {
+	string name = 1;
+	string passw = 2;
+}
+massage AuthUserResponse {
+	optional uint32 user_id = 1;
+	optional bytes token token = 2;
+}
+
+message ProblemRequest {
+	Id problem_id;
+}
+message ProblemResponse {
+	ProblemInfo info = 1;
+	bytes statement = 2;
+}
+
+message AnnouncementListResponse {
+	repeated Message = 1;
+}
+message QuestionListResponse {
+	repeated Message = 1;
+}
+message PostQuestionRequest {
+	Message = 1;
+}
+message PostAnnouncementRequest {
+	Message = 1;
+}
+service ContestService {
+	rpc auth_user(AuthUserRequest) returns (AuthUserResponse);
+	rpc get_contest_info() returns (ContestInfo);
+	rpc get_problem(ProblemRequest) returns (ProblemResponse);
+	rpc get_announcement_list() returns (AnnouncementListResponse);
+	rpc get_question_list() returns (QuestionListResponse);
+	rpc post_question(PostQuestionRequest);
+	rpc post_announcement(PostAnnouncementRequest);
+}
+
+// EvaluationFiles service
+message PostEvaluationFileRequest {
+	EvaluationFile file = 1;
+}
+message GetEvaluationFileRequest {
+	EvaluationFileId id = 1;
+}
+message GetEvaluationFileResponse {
+	EvaluationFile file = 1;
+}
+service EvaluationFilesService {
+	rpc post_file(PostEvaluationFileRequest) returns ();
+	rpc get_file(GetEvaluationFireRequest) returns (GetEvaluationFileResponse);
+}
+

@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package common;
+
+/*
+message Id {
+	bytes mongo_id = 1;
+}
+*/
+
+message Id { // maybe this so that the length is fixed (and we know that if id exists it must have 12 bytes)?
+	fixed32 timestamp = 1;
+	fixed64 randinc = 2;
+}
+
+message Resources {
+	uint64 time_ms = 1;
+	uint64 memory_bytes = 2;
+}
+
+enum ProgrammingLanguage {
+	NONE = 0;
+	RUST = 1;
+	CPP = 2;
+	// ...
+}
+message Source {
+	ProgrammingLanguage lang = 1;
+	bytes code = 2;
+}
+

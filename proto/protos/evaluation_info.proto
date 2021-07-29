@@ -1,0 +1,69 @@
+syntax = "proto3";
+
+package evaluation_info;
+
+import "common.proto";
+
+// scoring info messages
+
+//message TestcaseScoringInfo {} // this is the checker
+
+message SubtaskScoringInfo {
+	enum Method {
+		MIN = 0; // min score among all testcases
+		SUM = 1; // sum of all testcases
+	}
+	Method method = 1;
+	double max_score = 2; // calculated score gets transformed linearly in [0,max_score]
+}
+
+// message SubmissionScoringInfo {} // no, just use ProblemScoringInfo, considering only the single submission
+
+message ProblemScoringInfo {
+	enum Method {
+		SUM_MAX = 0; // sum maximum of each subtask across submissions
+		MAX_SUM = 1; // max sum of all subtasks for each submission
+	}
+	Method method = 1;
+}
+
+message UserScoringInfo {
+	message Method {
+	// total score for a single element will be sum/max among problems of score_weight*score, wrong_submission_count_weight*non_ac_subs, time_secs_weight*last_score_changing_sub
+		enum Aggregation {
+			SUM = 0;
+			MAX = 1;
+		}
+		Aggregation aggregation_method = 1;
+		double score_weight = 2;
+		double wrong_submission_count_weight = 3;
+		double time_secs_weight = 4;
+	}
+	Method main = 1; // users will be ranked by decreasing (main,tiebreakers[0],tiebreakers[1],...)
+	repeated Method tiebreakers = 2;
+}
+
+
+// stuff for workers
+message WorkerProblemInfo {
+	uint32 problem_id = 1;
+	common.Resources compilation_limits = 2;
+	common.Resources runtime_limits = 3;
+}
+message Testcase {
+	uint32 problem_id = 1;
+	uint32 testcase_id = 2;
+	optional bytes testcase = 3; // None for delete?
+}
+message ProblemSource { // sources needed by workers
+	enum Type {
+		NONE = 0;
+		INTERACTOR = 1;
+		CHEKCER = 2;
+		// GRADER = ;
+	}
+	uint32 problem_id = 1;
+	Type type = 2;
+	optional common.Source source = 3;
+}
+

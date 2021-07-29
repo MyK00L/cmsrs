@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package evaluation_files_service;
+
+import "common.proto";
+import "evaluation_info.proto";
+
+// stuff for scorer
+message ScorerProblemInfo {
+	uint32 problem_id = 1;
+	repeated evaluation_info.SubtaskScoringInfo subtask_scoring = 2;
+	evaluation_info.ProblemScoringInfo submission_scoring = 3; // not really needed rn as all of these are just sum of subtasks for a single sub
+}
+
+message ScorerInfoRequest {}
+message ScorerInfoResponse {
+	repeated ScorerProblemInfo info = 1;	
+}
+message ScoreboardInfoRequest {}
+message ScoreboardInfoResponse {
+	repeated evaluation_info.ProblemScoringInfo problems_scoring = 1;
+	evaluation_info.UserScoringInfo user_scoring = 2;
+}
+
+service EvaluationFilesService {
+	rpc get_scorer_info(ScorerInfoRequest) returns (ScorerInfoResponse);
+	rpc get_scoreboard_info(ScoreboardInfoRequest) returns (ScoreboardInfoResponse);
+}
+

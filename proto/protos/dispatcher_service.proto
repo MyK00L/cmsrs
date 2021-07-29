@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package dispatcher_service;
+
+import "common.proto";
+import "submission.proto";
+
+message DispatcherRequest {
+	submission.Submission sub = 1;
+}
+message DispatcherResponse {
+	submission.EvaluateResult res = 1;
+}
+service DispatcherService {
+	rpc evaluate_submission(DispatcherRequest) returns (DispatcherResponse);
+}
+

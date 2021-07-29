@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package contest_service;
+
+import "common.proto";
+import "user_info.proto";
+
+// Contest service
+message AuthUserRequest {
+	string name = 1;
+	string passw = 2;
+}
+message AuthUserResponse {
+	optional string error = 1;
+	optional string username = 2;
+	optional string fullname = 3;
+	optional bytes token = 4;
+}
+
+message UserProblemRequest {
+	uint32 problem_id = 1;
+}
+message UserProblemResponse {
+	user_info.UserProblemInfo info = 1;
+	bytes statement = 2;
+}
+
+message UserContestRequest {}
+message UserContestResponse {
+	user_info.UserContestInfo info = 1;
+}
+
+message AnnouncementListRequest {
+	optional uint32 problem_id = 1;
+}
+message AnnouncementListResponse {
+	repeated user_info.Message announcements = 1;
+}
+message QuestionListRequest {
+	optional uint32 problem_id = 1;
+	optional uint32 user_id = 2;
+}
+message QuestionListResponse {
+	repeated user_info.Message questions = 1;
+}
+message PostQuestionRequest {
+	user_info.Message question = 1;
+}
+message PostQuestionResponse {}
+message PostAnnouncementRequest {
+	user_info.Message announcement = 1;
+}
+message PostAnnouncementResponse {}
+service ContestService {
+	rpc auth_user(AuthUserRequest) returns (AuthUserResponse);
+	rpc get_contest_info(UserContestRequest) returns (UserContestResponse);
+	rpc get_problem(UserProblemRequest) returns (UserProblemResponse);
+	rpc get_announcement_list(AnnouncementListRequest) returns (AnnouncementListResponse);
+	rpc get_question_list(QuestionListRequest) returns (QuestionListResponse);
+	rpc post_question(PostQuestionRequest) returns (PostQuestionResponse);
+	rpc post_announcement(PostAnnouncementRequest) returns (PostAnnouncementResponse);
+}
+
