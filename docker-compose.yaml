@@ -6,3 +6,7 @@ services:
       dockerfile: ./rpctest-server/Dockerfile
     ports:
       - "50051:50051"
+  rpc-client:
+    build:
+      context: .
+      dockerfile: ./rpctest-client/Dockerfile
