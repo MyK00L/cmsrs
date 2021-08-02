@@ -10,5 +10,5 @@ path = "src/main.rs"
 
 [dependencies]
 tonic = "0.5"
-protos = { path = "../proto" }
+protos = { path = "../protos" }
 tokio = { version = "1.9", features = ["macros", "rt-multi-thread"] }

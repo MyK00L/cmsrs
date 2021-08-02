@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package service.test;
+
+message StringRequest {
+	string str = 1;
+}
+message StringResponse {
+	string str = 1;
+}
+
+service Test {
+	rpc test_string(StringRequest) returns (StringResponse);
+}

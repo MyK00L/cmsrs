@@ -1,16 +1,16 @@
 syntax = "proto3";
 
-package submission_service;
+package service.submission;
 
 import "common.proto";
-import "submission.proto";
+import "evaluation.proto";
 
 // Submission service
 message SubmissionRequest {
-	submission.Submission sub = 1;
+	evaluation.Submission sub = 1;
 }
 message SubmissionResponse {
-	submission.EvaluateResult res = 1;
+	evaluation.EvaluationResult res = 1;
 	common.Id submission_id = 2;
 	uint64 timestamp = 3;
 }
@@ -33,12 +33,11 @@ message SubmissionDetailsRequest {
 	common.Id submission_id = 1;
 }
 message SubmissionDetailsResponse {
-	submission.Submission sub = 1;
+	evaluation.Submission sub = 1;
 	uint64 timestamp = 2;
 }
-service SubmissionService {
+service Submission {
 	rpc evaluate_submission(SubmissionRequest) returns (SubmissionResponse);
 	rpc get_submission_list(SubmissionListRequest) returns (SubmissionListResponse);
 	rpc get_submission_details(SubmissionDetailsRequest) returns (SubmissionDetailsResponse);
 }
-

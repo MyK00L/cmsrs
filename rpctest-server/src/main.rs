@@ -1,46 +1,24 @@
-use tonic::{transport::Server, Request, Response, Status};
-use protos::worker_service::worker_service_client::*;
-use protos::worker_service::worker_service_server::*;
-use protos::worker_service::*;
-use tonic;
-use tokio;
+use protos::service::test::{test_server::*, *};
+use tonic::{transport::Server, Response};
 
 #[derive(Debug, Default)]
-pub struct MyWorker {}
+pub struct MyTest {}
 
 // Implement the service function(s) defined in the proto
 // for the Greeter service (SayHello...)
 #[tonic::async_trait]
-impl WorkerService for MyWorker {
-    async fn test_worker(
+impl Test for MyTest {
+    async fn test_string(
         &self,
-        request: tonic::Request<TestRequest>,
-    ) -> Result<tonic::Response<TestResponse>, tonic::Status> {
-        println!("Got a request: {:?}", request);
-
-        let reply = TestResponse {
-            message: format!("Hello {}!", request.into_inner().name).into(), // We must use .into_inner() as the fields of gRPC requests and responses are private
+        request: tonic::Request<StringRequest>,
+    ) -> Result<tonic::Response<StringResponse>, tonic::Status> {
+        let addr = request.remote_addr();
+        let inner = request.into_inner();
+        eprintln!("received request with value {:?} from {:?}", inner, addr,);
+        let reply = StringResponse {
+            str: format!("Hello {}", inner.str),
         };
-
         Ok(Response::new(reply))
-    }
-    async fn evaluate_submission(
-        &self,
-        request: tonic::Request<WorkerRequest>,
-    ) -> Result<tonic::Response<WorkerResponse>, tonic::Status> {
-        Ok(Response::new(WorkerResponse::default()))
-    }
-    async fn update_testcase(
-        &self,
-        request: tonic::Request<WorkerUpdateTestcaseRequest>,
-    ) -> Result<tonic::Response<WorkerUpdateTestcaseResponse>, tonic::Status> {
-        Ok(Response::new(WorkerUpdateTestcaseResponse::default()))
-    }
-    async fn update_source(
-        &self,
-        request: tonic::Request<WorkerUpdateSourceRequest>,
-    ) -> Result<tonic::Response<WorkerUpdateSourceResponse>, tonic::Status> {
-        Ok(Response::new(WorkerUpdateSourceResponse::default()))
     }
 }
 
@@ -48,13 +26,12 @@ impl WorkerService for MyWorker {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = "0.0.0.0:50051".parse()?;
-    let greeter = MyWorker::default();
+    let greeter = MyTest::default();
 
     println!("Starting gRPC Server...");
     Server::builder()
-        .add_service(WorkerServiceServer::new(greeter))
+        .add_service(TestServer::new(greeter))
         .serve(addr)
         .await?;
-
     Ok(())
 }

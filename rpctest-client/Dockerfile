@@ -1,6 +1,6 @@
 FROM rust as builder
 WORKDIR /src
-COPY proto proto
+COPY protos protos
 WORKDIR /src/client
 COPY rpctest-client/dummy.rs .
 COPY rpctest-client/Cargo.toml .

@@ -1,9 +1,8 @@
 syntax = "proto3";
 
-package contest_service;
+package service.contest;
 
-import "common.proto";
-import "user_info.proto";
+import "user.proto";
 
 // Contest service
 message AuthUserRequest {
@@ -21,37 +20,37 @@ message UserProblemRequest {
 	uint32 problem_id = 1;
 }
 message UserProblemResponse {
-	user_info.UserProblemInfo info = 1;
+ 	user.Problem info = 1;
 	bytes statement = 2;
 }
 
 message UserContestRequest {}
 message UserContestResponse {
-	user_info.UserContestInfo info = 1;
+	user.Contest info = 1;
 }
 
 message AnnouncementListRequest {
 	optional uint32 problem_id = 1;
 }
 message AnnouncementListResponse {
-	repeated user_info.Message announcements = 1;
+	repeated user.Message announcements = 1;
 }
 message QuestionListRequest {
 	optional uint32 problem_id = 1;
 	optional uint32 user_id = 2;
 }
 message QuestionListResponse {
-	repeated user_info.Message questions = 1;
+	repeated user.Message questions = 1;
 }
 message PostQuestionRequest {
-	user_info.Message question = 1;
+	user.Message question = 1;
 }
 message PostQuestionResponse {}
 message PostAnnouncementRequest {
-	user_info.Message announcement = 1;
+	user.Message announcement = 1;
 }
 message PostAnnouncementResponse {}
-service ContestService {
+service Contest {
 	rpc auth_user(AuthUserRequest) returns (AuthUserResponse);
 	rpc get_contest_info(UserContestRequest) returns (UserContestResponse);
 	rpc get_problem(UserProblemRequest) returns (UserProblemResponse);
@@ -60,4 +59,3 @@ service ContestService {
 	rpc post_question(PostQuestionRequest) returns (PostQuestionResponse);
 	rpc post_announcement(PostAnnouncementRequest) returns (PostAnnouncementResponse);
 }
-
