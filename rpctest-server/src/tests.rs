@@ -10,6 +10,7 @@ impl Test for MockTest {
         &self,
         request: tonic::Request<StringRequest>,
     ) -> Result<tonic::Response<StringResponse>, tonic::Status> {
+        let inner = request.into_inner();
         eprintln!("Mock test_string");
         Ok(Response::new(StringResponse {
             str: format!("Mock {}", inner.str),
