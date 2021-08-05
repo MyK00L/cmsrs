@@ -4,10 +4,11 @@ use protos::ChannelTrait;
 use std::{thread, time};
 
 async fn not_main<C: ChannelTrait>(
-    mut client: TestClient<C>,
+    main_client: TestClient<C>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut index = 1u32;
     loop {
+        let mut client = main_client.clone();
         let request = tonic::Request::new(StringRequest {
             str: format!("Request#{}", index),
         });
