@@ -1,29 +1,7 @@
-use protos::service::test::{test_client::*, test_server::*, *};
+use protos::service::test::{test_client::*, *};
 use protos::ChannelTrait;
 
 use std::{thread, time};
-use tonic::Response;
-
-#[derive(Debug, Default)]
-pub struct MockTest {}
-
-// Implement the service function(s) defined in the proto
-// for the Greeter service (SayHello...)
-#[tonic::async_trait]
-impl Test for MockTest {
-    async fn test_string(
-        &self,
-        request: tonic::Request<StringRequest>,
-    ) -> Result<tonic::Response<StringResponse>, tonic::Status> {
-        let addr = request.remote_addr();
-        let inner = request.into_inner();
-        eprintln!("received request with value {:?} from {:?}", inner, addr,);
-        let reply = StringResponse {
-            str: format!("Mock {}", inner.str),
-        };
-        Ok(Response::new(reply))
-    }
-}
 
 async fn not_main<C: ChannelTrait>(
     mut client: TestClient<C>,
@@ -55,8 +33,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use protos::service::test::test_server::*;
     use tokio_test::block_on;
+    use tonic::Response;
     use tower::ServiceBuilder;
+
+    #[derive(Debug, Default)]
+    pub struct MockTest {}
+    #[tonic::async_trait]
+    impl Test for MockTest {
+        async fn test_string(
+            &self,
+            request: tonic::Request<StringRequest>,
+        ) -> Result<tonic::Response<StringResponse>, tonic::Status> {
+            let addr = request.remote_addr();
+            let inner = request.into_inner();
+            eprintln!("received request with value {:?} from {:?}", inner, addr,);
+            let reply = StringResponse {
+                str: format!("Mock {}", inner.str),
+            };
+            Ok(Response::new(reply))
+        }
+    }
+
     #[test]
     // not an actual test, since not_main runs infinitely, but you get the point
     fn test_test() {
