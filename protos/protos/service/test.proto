@@ -9,6 +9,12 @@ message StringResponse {
 	string str = 1;
 }
 
+message LogRequest {
+	string str = 1;
+}
+message LogResponse {}
+
 service Test {
 	rpc test_string(StringRequest) returns (StringResponse);
+	rpc log_string(LogRequest) returns (LogResponse);
 }
