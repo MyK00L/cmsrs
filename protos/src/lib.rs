@@ -36,7 +36,7 @@ pub mod service {
     }
 }
 
-pub trait ChannelTrait = tonic::client::GrpcService<tonic::body::BoxBody>+'static+Sync+std::fmt::Debug+Clone where
+pub trait ChannelTrait = tonic::client::GrpcService<tonic::body::BoxBody>+'static+Sync+Send+std::fmt::Debug+Clone where
 <Self as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody: Send + Sync + 'static,
     <<Self as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody as tonic::codegen::Body>::Error:
         Into<Box<(dyn std::error::Error + Send + Sync + 'static)>> + Send,

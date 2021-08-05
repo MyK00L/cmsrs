@@ -13,7 +13,7 @@ async fn not_main<C: ChannelTrait>(
         });
 
         println!("Sending request to gRPC Server...");
-        let response = client.test_string(request).await?;
+        let response = client.test_string(request).await;
 
         println!("RESPONSE={:?}", response);
 
@@ -25,7 +25,9 @@ async fn not_main<C: ChannelTrait>(
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let client = TestClient::connect("http://rpc-server:50051").await?;
+    let channel =
+        tonic::transport::Channel::from_static("http://rpc-server:50051").connect_lazy()?;
+    let client = TestClient::new(channel);
     not_main(client).await?;
     Ok(())
 }

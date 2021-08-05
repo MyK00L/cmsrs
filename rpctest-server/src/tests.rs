@@ -31,7 +31,7 @@ fn nope() {
     let channel = ServiceBuilder::new().service(TestServer::new(MockTest::default()));
     let client = TestClient::new(channel);
     let t = MyTest {
-        test_client: Some(client),
+        test_client: client,
     };
     let request = tonic::Request::new(StringRequest { str: format!("a") });
     eprintln!("{:?}", block_on(t.test_string(request)));
