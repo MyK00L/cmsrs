@@ -1,6 +1,5 @@
-use protos::service::test::{test_client::*, test_server::*, *};
-use protos::ChannelTrait;
-use protos::ADDR;
+use protos::service::test::{test_server::*, *};
+use protos::utils::*;
 use tonic::{transport::*, Response};
 
 #[cfg(test)]
@@ -8,29 +7,14 @@ mod tests;
 
 #[derive(Debug)]
 pub struct MyTest<T: ChannelTrait> {
-    test_client: TestClient<T>,
+    client_manager: ClientManager<T>,
 }
 
-impl<T: ChannelTrait> MyTest<T> {
-    fn from_channels(channels: &[T]) -> Self {
-        MyTest {
-            test_client: TestClient::new(channels[0].clone()),
-        }
-    }
-}
-impl MyTest<Channel> {
-    fn from_addresses(addresses: &'static [&str]) -> Self {
-        Self::from_channels(
-            &(addresses
-                .iter()
-                .map(|x| Channel::from_static(x).connect_lazy().unwrap())
-                .collect::<Vec<Channel>>()),
-        )
-    }
-}
 impl Default for MyTest<Channel> {
     fn default() -> Self {
-        Self::from_addresses(&[ADDR.test_client])
+        Self {
+            client_manager: ClientManager::default(),
+        }
     }
 }
 
@@ -42,7 +26,7 @@ impl<T: ChannelTrait> Test for MyTest<T> {
         &self,
         request: tonic::Request<StringRequest>,
     ) -> Result<tonic::Response<StringResponse>, tonic::Status> {
-        let mut test_client = self.test_client.clone();
+        let mut test_client = self.client_manager.test_client.clone();
         let addr = request.remote_addr();
         let inner = request.into_inner();
         test_client
@@ -69,7 +53,7 @@ impl<T: ChannelTrait> Test for MyTest<T> {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //let addr = "[::1]:50051".parse()?;
-    let addr = ADDR.test_server.parse()?;
+    let addr = get_local_address(Service::TEST).parse()?;
     let greeter = MyTest::<Channel>::default();
 
     println!("Starting gRPC Server...");
