@@ -1,4 +1,4 @@
-FROM rust as builder
+FROM rustlang/rust:nightly as builder
 WORKDIR /src
 COPY protos protos
 WORKDIR /src/server
@@ -11,7 +11,7 @@ RUN sed -i 's#dummy.rs#src/main.rs#' Cargo.toml
 COPY rpctest-server .
 RUN cargo build --release
 
-FROM rust as runtime
+FROM rustlang/rust:nightly as runtime
 COPY --from=builder /src/server/target/release/rpctest-server /usr/local/bin
 EXPOSE 50051
 ENTRYPOINT ["/usr/local/bin/rpctest-server"]
