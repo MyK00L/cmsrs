@@ -1,5 +1,6 @@
 use protos::service::test::{test_client::*, test_server::*, *};
 use protos::ChannelTrait;
+use protos::ADDR;
 use tonic::{transport::*, Response};
 
 #[cfg(test)]
@@ -29,7 +30,7 @@ impl MyTest<Channel> {
 }
 impl Default for MyTest<Channel> {
     fn default() -> Self {
-        Self::from_addresses(&["http://rpc-server:50051"])
+        Self::from_addresses(&[ADDR.test_client])
     }
 }
 
@@ -68,7 +69,7 @@ impl<T: ChannelTrait> Test for MyTest<T> {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //let addr = "[::1]:50051".parse()?;
-    let addr = "0.0.0.0:50051".parse()?;
+    let addr = ADDR.test_server.parse()?;
     let greeter = MyTest::<Channel>::default();
 
     println!("Starting gRPC Server...");

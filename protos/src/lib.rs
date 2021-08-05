@@ -41,3 +41,20 @@ pub trait ChannelTrait = tonic::client::GrpcService<tonic::body::BoxBody>+'stati
     <<Self as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody as tonic::codegen::Body>::Error:
         Into<Box<(dyn std::error::Error + Send + Sync + 'static)>> + Send,
 <Self as tonic::client::GrpcService<tonic::body::BoxBody>>::Future: Send;
+
+pub struct AddressList {
+    pub test_server: &'static str,
+    pub test_client: &'static str,
+}
+
+#[cfg(feature = "loopback")]
+pub const ADDR: AddressList = AddressList {
+    test_server: "127.0.0.1:50051",
+    test_client: "http://127.0.0.1:50051",
+};
+
+#[cfg(not(feature = "loopback"))]
+pub const ADDR: AddressList = AddressList {
+    test_server: "0.0.0.0:50051",
+    test_client: "http://rpc-server:50051",
+};

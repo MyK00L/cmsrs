@@ -14,3 +14,6 @@ tonic = "0.5"
 protos = { path = "../protos" }
 tokio = { version = "1.9", features = ["macros", "rt-multi-thread"] }
 tokio-test = "0.4"
+
+[features]
+loopback = ["protos/loopback"]

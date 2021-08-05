@@ -11,3 +11,6 @@ prost = "0.8"
 
 [build-dependencies]
 tonic-build = "0.5"
+
+[features]
+loopback = []

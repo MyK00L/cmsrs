@@ -1,5 +1,6 @@
 use protos::service::test::{test_client::*, *};
 use protos::ChannelTrait;
+use protos::ADDR;
 
 use std::{thread, time};
 
@@ -26,8 +27,7 @@ async fn not_main<C: ChannelTrait>(
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let channel =
-        tonic::transport::Channel::from_static("http://rpc-server:50051").connect_lazy()?;
+    let channel = tonic::transport::Channel::from_static(ADDR.test_client).connect_lazy()?;
     let client = TestClient::new(channel);
     not_main(client).await?;
     Ok(())
