@@ -38,10 +38,10 @@ pub mod service {
 
 pub mod utils {
     pub trait ChannelTrait = tonic::client::GrpcService<tonic::body::BoxBody>+'static+Sync+Send+std::fmt::Debug+Clone where
-<Self as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody: Send + Sync + 'static,
-    <<Self as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody as tonic::codegen::Body>::Error:
-        Into<Box<(dyn std::error::Error + Send + Sync + 'static)>> + Send,
-<Self as tonic::client::GrpcService<tonic::body::BoxBody>>::Future: Send;
+    <Self as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody: Send + Sync + 'static,
+        <<Self as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody as tonic::codegen::Body>::Error:
+            Into<Box<(dyn std::error::Error + Send + Sync + 'static)>> + Send,
+    <Self as tonic::client::GrpcService<tonic::body::BoxBody>>::Future: Send;
 
     pub enum Service {
         CONTEST,
@@ -81,6 +81,20 @@ pub mod utils {
                     Service::WORKER,
                 )),
                 test_client: test::test_client::TestClient::new(get_new_channel(Service::TEST)),
+            }
+        }
+    }
+    impl<T: ChannelTrait> ClientManager<T> {
+        pub fn from_single_channel(c: T) -> Self {
+            Self {
+                contest_client: contest::contest_client::ContestClient::new(c.clone()),
+                dispatcher_client: dispatcher::dispatcher_client::DispatcherClient::new(c.clone()),
+                evaluation_client: evaluation_files::evaluation_client::EvaluationClient::new(
+                    c.clone(),
+                ),
+                submission_client: submission::submission_client::SubmissionClient::new(c.clone()),
+                worker_client: worker::worker_client::WorkerClient::new(c.clone()),
+                test_client: test::test_client::TestClient::new(c),
             }
         }
     }

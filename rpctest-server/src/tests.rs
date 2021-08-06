@@ -29,10 +29,8 @@ impl Test for MockTest {
 #[test]
 fn nope() {
     let channel = ServiceBuilder::new().service(TestServer::new(MockTest::default()));
-    let client = TestClient::new(channel);
-    let t = MyTest {
-        test_client: client,
-    };
+    let client_manager = ClientManager::from_single_channel(channel);
+    let t = MyTest { client_manager };
     let request = tonic::Request::new(StringRequest { str: format!("a") });
     eprintln!("{:?}", block_on(t.test_string(request)));
 }

@@ -9,10 +9,12 @@ path = "src/main.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tower = "0.4"
 tonic = "0.5"
 protos = { path = "../protos" }
 tokio = { version = "1.9", features = ["macros", "rt-multi-thread"] }
+
+[dev-dependencies]
+tower = "0.4"
 tokio-test = "0.4"
 
 [features]
