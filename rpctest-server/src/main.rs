@@ -1,4 +1,4 @@
-use protos::service::test::{test_server::*, *};
+use protos::service::test::{test_client::*, test_server::*, *};
 use protos::utils::*;
 use tonic::{transport::*, Response};
 
@@ -6,14 +6,14 @@ use tonic::{transport::*, Response};
 mod tests;
 
 #[derive(Debug)]
-pub struct MyTest<T: ChannelTrait> {
-    client_manager: ClientManager<T>,
+pub struct MyTest<TC: ChannelTrait> {
+    test_client: TestClient<TC>,
 }
 
 impl Default for MyTest<Channel> {
     fn default() -> Self {
         Self {
-            client_manager: ClientManager::default(),
+            test_client: TestClient::new(get_new_channel(Service::TEST)),
         }
     }
 }
@@ -26,7 +26,7 @@ impl<T: ChannelTrait> Test for MyTest<T> {
         &self,
         request: tonic::Request<StringRequest>,
     ) -> Result<tonic::Response<StringResponse>, tonic::Status> {
-        let mut test_client = self.client_manager.test_client.clone();
+        let mut test_client = self.test_client.clone();
         let addr = request.remote_addr();
         let inner = request.into_inner();
         test_client
@@ -52,7 +52,6 @@ impl<T: ChannelTrait> Test for MyTest<T> {
 // Use the tokio runtime to run our server
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    //let addr = "[::1]:50051".parse()?;
     let addr = get_local_address(Service::TEST).parse()?;
     let greeter = MyTest::<Channel>::default();
 

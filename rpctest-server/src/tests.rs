@@ -11,7 +11,7 @@ impl Test for MockTest {
         request: tonic::Request<StringRequest>,
     ) -> Result<tonic::Response<StringResponse>, tonic::Status> {
         let inner = request.into_inner();
-        eprintln!("Mock test_string");
+        eprintln!("MockTest.test_string({:?})", inner);
         Ok(Response::new(StringResponse {
             str: format!("Mock {}", inner.str),
         }))
@@ -21,16 +21,21 @@ impl Test for MockTest {
         request: tonic::Request<LogRequest>,
     ) -> Result<tonic::Response<LogResponse>, tonic::Status> {
         let inner = request.into_inner();
-        eprintln!("Mock log_string received {:?}", inner);
+        eprintln!("MockTest.log_string({:?})", inner);
         Ok(Response::new(LogResponse {}))
     }
 }
 
 #[test]
-fn nope() {
+fn string_test() {
     let channel = ServiceBuilder::new().service(TestServer::new(MockTest::default()));
-    let client_manager = ClientManager::from_single_channel(channel);
-    let t = MyTest { client_manager };
-    let request = tonic::Request::new(StringRequest { str: format!("a") });
-    eprintln!("{:?}", block_on(t.test_string(request)));
+    let test_client = TestClient::new(channel);
+    let t = MyTest { test_client };
+    let request = tonic::Request::new(StringRequest { str: format!("42") });
+    assert_eq!(
+        StringResponse {
+            str: String::from("Hello 42")
+        },
+        block_on(t.test_string(request)).unwrap().into_inner()
+    );
 }
