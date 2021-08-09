@@ -4,7 +4,6 @@ package service.contest;
 
 import "user.proto";
 
-// Contest service
 message AuthUserRequest {
 	string name = 1;
 	string passw = 2;
@@ -16,46 +15,74 @@ message AuthUserResponse {
 	optional bytes token = 4;
 }
 
-message UserProblemRequest {
+message GetContestRequest {}
+message GetContestResponse {
+	user.Contest info = 1;
+}
+
+message GetProblemRequest {
 	uint32 problem_id = 1;
 }
-message UserProblemResponse {
+message GetProblemResponse {
  	user.Problem info = 1;
 	bytes statement = 2;
 }
 
-message UserContestRequest {}
-message UserContestResponse {
-	user.Contest info = 1;
-}
-
-message AnnouncementListRequest {
+message GetAnnouncementListRequest {
 	optional uint32 problem_id = 1;
 }
-message AnnouncementListResponse {
+message GetAnnouncementListResponse {
 	repeated user.Message announcements = 1;
 }
-message QuestionListRequest {
+
+message GetQuestionListRequest {
 	optional uint32 problem_id = 1;
 	optional uint32 user_id = 2;
 }
-message QuestionListResponse {
+message GetQuestionListResponse {
 	repeated user.Message questions = 1;
 }
-message PostQuestionRequest {
+
+
+message AddUserRequest {
+	string name = 1;
+	string passw = 2;
+}
+message AddUserResponse {
+}
+
+message SetContestRequest {
+	user.Contest info = 1;
+}
+message SetContestResponse {}
+
+message SetProblemRequest {
+	uint32 problem_id = 1;
+	optional user.Problem info = 2;
+ 	optional bytes statement = 3;
+}
+message SetProblemResponse {}
+
+message AddQuestionRequest {
 	user.Message question = 1;
 }
-message PostQuestionResponse {}
-message PostAnnouncementRequest {
+message AddQuestionResponse {}
+
+message AddAnnouncementRequest {
 	user.Message announcement = 1;
 }
-message PostAnnouncementResponse {}
+message AddAnnouncementResponse {}
+
 service Contest {
 	rpc auth_user(AuthUserRequest) returns (AuthUserResponse);
-	rpc get_contest_info(UserContestRequest) returns (UserContestResponse);
-	rpc get_problem(UserProblemRequest) returns (UserProblemResponse);
-	rpc get_announcement_list(AnnouncementListRequest) returns (AnnouncementListResponse);
-	rpc get_question_list(QuestionListRequest) returns (QuestionListResponse);
-	rpc post_question(PostQuestionRequest) returns (PostQuestionResponse);
-	rpc post_announcement(PostAnnouncementRequest) returns (PostAnnouncementResponse);
+	rpc get_contest(GetContestRequest) returns (GetContestResponse);
+	rpc get_problem(GetProblemRequest) returns (GetProblemResponse);
+	rpc get_announcement_list(GetAnnouncementListRequest) returns (GetAnnouncementListResponse);
+	rpc get_question_list(GetQuestionListRequest) returns (GetQuestionListResponse);
+
+	rpc add_user(AddUserRequest) returns (AddUserResponse);
+	rpc set_contest(SetContestRequest) returns (SetContestResponse);
+	rpc set_problem(SetProblemRequest) returns (SetProblemResponse);
+	rpc add_question(AddQuestionRequest) returns (AddQuestionResponse);
+	rpc add_announcement(AddAnnouncementRequest) returns (AddAnnouncementResponse);
 }
