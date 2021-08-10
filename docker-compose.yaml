@@ -1,12 +1,20 @@
 version: "3.3"
+
 services:
-  rpc-server:
+  contest_service:
     build:
       context: .
-      dockerfile: ./rpctest-server/Dockerfile
-    ports:
-      - "50051:50051"
-  rpc-client:
-    build:
-      context: .
-      dockerfile: ./rpctest-client/Dockerfile
+      dockerfile: ./contest_service/Dockerfile
+    ports: 
+      - 50051:50051
+  contest_service_db:
+    image: mongo
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+    volumes:
+      - contest_service_db_volume:/data/db
+
+volumes:
+  contest_service_db_volume:
