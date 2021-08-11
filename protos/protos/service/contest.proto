@@ -44,11 +44,16 @@ message GetQuestionListResponse {
 }
 
 
-message AddUserRequest {
+message SetUserRequest {
 	string name = 1;
 	string passw = 2;
 }
-message AddUserResponse {
+message SetUserResponse {
+	enum Code {
+		ADD = 0;
+		UPDATE = 1;
+	}
+	Code code = 1;
 }
 
 message SetContestRequest {
@@ -80,7 +85,7 @@ service Contest {
 	rpc get_announcement_list(GetAnnouncementListRequest) returns (GetAnnouncementListResponse);
 	rpc get_question_list(GetQuestionListRequest) returns (GetQuestionListResponse);
 
-	rpc add_user(AddUserRequest) returns (AddUserResponse);
+	rpc set_user(SetUserRequest) returns (SetUserResponse);
 	rpc set_contest(SetContestRequest) returns (SetContestResponse);
 	rpc set_problem(SetProblemRequest) returns (SetProblemResponse);
 	rpc add_question(AddQuestionRequest) returns (AddQuestionResponse);

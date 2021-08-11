@@ -1,3 +1,8 @@
+use mongodb::{
+    bson::{doc, Document},
+    options::ClientOptions,
+    Client,
+};
 use protos::service::contest::{contest_server::*, *};
 use protos::utils::*;
 use tonic::{transport::*, Request, Response, Status};
@@ -5,12 +10,18 @@ use tonic::{transport::*, Request, Response, Status};
 #[cfg(test)]
 mod tests;
 
-#[derive(Debug)]
-pub struct ContestService {}
+const CONNECTION_STRING: &str = "mongodb://root:example@contest_service_db:27017/";
 
-impl Default for ContestService {
-    fn default() -> Self {
-        Self {}
+#[derive(Debug)]
+pub struct ContestService {
+    client: Client,
+}
+
+impl ContestService {
+    async fn new() -> Result<Self, Box<dyn std::error::Error>> {
+        Ok(Self {
+            client: Client::with_options(ClientOptions::parse(CONNECTION_STRING).await?)?,
+        })
     }
 }
 
@@ -46,11 +57,69 @@ impl Contest for ContestService {
     ) -> Result<Response<GetQuestionListResponse>, Status> {
         todo!();
     }
-    async fn add_user(
+    async fn set_user(
         &self,
-        request: Request<AddUserRequest>,
-    ) -> Result<Response<AddUserResponse>, Status> {
-        todo!();
+        request: Request<SetUserRequest>,
+    ) -> Result<Response<SetUserResponse>, Status> {
+        let db = self.client.database("contestdb");
+        let contests = db.collection::<Document>("contests");
+
+        let default_contest = contests
+            .find_one(None, None)
+            .await
+            .unwrap() // TODO fix with error conversion
+            .ok_or(Status::not_found("Default contest not found"))?;
+
+        let default_contest_id = default_contest.get_object_id("_id").unwrap();
+
+        let users = default_contest.get_array("users").unwrap(); // TODO fix with filter
+        let new_user = request.into_inner();
+
+        for user in users {
+            let user = user.as_document().unwrap();
+            if user.get_str("username").unwrap() == new_user.name {
+                contests
+                    .update_one(
+                        doc! {
+                            "_id": default_contest_id,
+                            "users.username": new_user.name
+                        },
+                        doc! {
+                            "$set": doc! {
+                                "users.$.password": new_user.passw
+                            }
+                        },
+                        None,
+                    )
+                    .await
+                    .unwrap();
+                return Ok(Response::new(SetUserResponse {
+                    code: set_user_response::Code::Update as i32,
+                }));
+            }
+        }
+
+        contests
+            .update_one(
+                doc! {
+                    "_id": default_contest_id
+                },
+                doc! {
+                    "$push": doc! {
+                        "users": doc! {
+                            "username": new_user.name,
+                            "password": new_user.passw
+                        }
+                    }
+                },
+                None,
+            )
+            .await
+            .unwrap();
+
+        Ok(Response::new(SetUserResponse {
+            code: set_user_response::Code::Add as i32,
+        }))
     }
     async fn set_contest(
         &self,
@@ -81,7 +150,7 @@ impl Contest for ContestService {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = get_local_address(Service::CONTEST).parse()?;
-    let greeter = ContestService::default();
+    let greeter = ContestService::new().await?;
 
     println!("Starting contest server");
     Server::builder()

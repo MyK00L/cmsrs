@@ -7,9 +7,6 @@ COPY contest_service/Cargo.toml .
 RUN rustup component add rustfmt
 
 FROM base as test
-RUN sed -i 's#src/main.rs#dummy.rs#' Cargo.toml
-RUN cargo build
-RUN sed -i 's#dummy.rs#src/main.rs#' Cargo.toml
 COPY contest_service .
 CMD [ "cargo", "test" ]
 
