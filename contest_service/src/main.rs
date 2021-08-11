@@ -68,7 +68,7 @@ impl Contest for ContestService {
             .find_one(None, None)
             .await
             .map_err(|x| Status::internal(format!("{}", x)))? // TODO fix with error conversion
-            .ok_or_else (|| Status::not_found("Default contest not found"))?;
+            .ok_or_else(|| Status::not_found("Default contest not found"))?;
 
         let default_contest_id = default_contest
             .get_object_id("_id")
