@@ -19,8 +19,8 @@ message Problem {
 message Contest {
 	string name = 1;
 	string description = 2;
-	uint64 start_time = 3;
-	uint64 end_time = 4;
+	google.protobuf.Timestamp start_time = 3;
+	google.protobuf.Timestamp end_time = 4;
 	optional uint32 submission_limit = 5;
 	//uint32 problem_count;
 	repeated Problem problem_infos = 6; // this better?
@@ -31,5 +31,5 @@ message Message { // questions and announcements are the same
 	optional uint32 problem_id = 2;
 	string text = 3;
 	optional string user = 4;
-	uint64 timestamp = 5;
+	google.protobuf.Timestamp timestamp = 5;
 }
