@@ -29,31 +29,31 @@ impl ContestService {
 impl Contest for ContestService {
     async fn auth_user(
         &self,
-        request: Request<AuthUserRequest>,
+        _request: Request<AuthUserRequest>,
     ) -> Result<Response<AuthUserResponse>, Status> {
         todo!();
     }
     async fn get_contest(
         &self,
-        request: Request<GetContestRequest>,
+        _request: Request<GetContestRequest>,
     ) -> Result<Response<GetContestResponse>, Status> {
         todo!();
     }
     async fn get_problem(
         &self,
-        request: Request<GetProblemRequest>,
+        _request: Request<GetProblemRequest>,
     ) -> Result<Response<GetProblemResponse>, Status> {
         todo!();
     }
     async fn get_announcement_list(
         &self,
-        request: Request<GetAnnouncementListRequest>,
+        _request: Request<GetAnnouncementListRequest>,
     ) -> Result<Response<GetAnnouncementListResponse>, Status> {
         todo!();
     }
     async fn get_question_list(
         &self,
-        request: Request<GetQuestionListRequest>,
+        _request: Request<GetQuestionListRequest>,
     ) -> Result<Response<GetQuestionListResponse>, Status> {
         todo!();
     }
@@ -67,17 +67,27 @@ impl Contest for ContestService {
         let default_contest = contests
             .find_one(None, None)
             .await
-            .unwrap() // TODO fix with error conversion
-            .ok_or(Status::not_found("Default contest not found"))?;
+            .map_err(|x| Status::internal(format!("{}", x)))? // TODO fix with error conversion
+            .ok_or_else(|| Status::not_found("Default contest not found"))?;
 
-        let default_contest_id = default_contest.get_object_id("_id").unwrap();
+        let default_contest_id = default_contest
+            .get_object_id("_id")
+            .map_err(|x| Status::internal(format!("{}", x)))?;
 
-        let users = default_contest.get_array("users").unwrap(); // TODO fix with filter
+        let users = default_contest
+            .get_array("users")
+            .map_err(|x| Status::internal(format!("{}", x)))?; // TODO fix with filter
         let new_user = request.into_inner();
 
         for user in users {
-            let user = user.as_document().unwrap();
-            if user.get_str("username").unwrap() == new_user.name {
+            let user = user
+                .as_document()
+                .ok_or_else(|| Status::internal("Could not convert to document"))?;
+            if user
+                .get_str("username")
+                .map_err(|x| Status::internal(format!("{}", x)))?
+                == new_user.name
+            {
                 contests
                     .update_one(
                         doc! {
@@ -92,7 +102,7 @@ impl Contest for ContestService {
                         None,
                     )
                     .await
-                    .unwrap();
+                    .map_err(|x| Status::internal(format!("{}", x)))?;
                 return Ok(Response::new(SetUserResponse {
                     code: set_user_response::Code::Update as i32,
                 }));
@@ -115,7 +125,7 @@ impl Contest for ContestService {
                 None,
             )
             .await
-            .unwrap();
+            .map_err(|x| Status::internal(format!("{}", x)))?;
 
         Ok(Response::new(SetUserResponse {
             code: set_user_response::Code::Add as i32,
@@ -123,25 +133,25 @@ impl Contest for ContestService {
     }
     async fn set_contest(
         &self,
-        request: Request<SetContestRequest>,
+        _request: Request<SetContestRequest>,
     ) -> Result<Response<SetContestResponse>, Status> {
         todo!();
     }
     async fn set_problem(
         &self,
-        request: Request<SetProblemRequest>,
+        _request: Request<SetProblemRequest>,
     ) -> Result<Response<SetProblemResponse>, Status> {
         todo!();
     }
     async fn add_question(
         &self,
-        request: Request<AddQuestionRequest>,
+        _request: Request<AddQuestionRequest>,
     ) -> Result<Response<AddQuestionResponse>, Status> {
         todo!();
     }
     async fn add_announcement(
         &self,
-        request: Request<AddAnnouncementRequest>,
+        _request: Request<AddAnnouncementRequest>,
     ) -> Result<Response<AddAnnouncementResponse>, Status> {
         todo!();
     }
