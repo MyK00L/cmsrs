@@ -32,7 +32,7 @@ impl ContestService {
             .get_contests_collection()
             .find_one(None, None)
             .await
-            .map_err(|x| Status::internal(format!("{}", x)))? // TODO fix with error conversion
+            .map_err(|x| Status::internal(format!("{}", x)))?
             .ok_or_else(|| Status::not_found("Default contest not found"))?)
     }
 }
@@ -43,39 +43,38 @@ impl Contest for ContestService {
         &self,
         _request: Request<AuthUserRequest>,
     ) -> Result<Response<AuthUserResponse>, Status> {
-        let default_contest = self.get_default_contest_db().await?;
-
-        let users = default_contest
-            .get_array("users")
-            .map_err(|x| Status::internal(format!("{}", x)))?; // TODO fix with filter
         let auth_user = _request.into_inner();
-        for user in users {
-            let user = user
-                .as_document()
-                .ok_or_else(|| Status::internal("Could not convert to document"))?;
-            if user
-                .get_str("username")
-                .map_err(|x| Status::internal(format!("{}", x)))?
-                == auth_user.name
-                && user
-                    .get_str("password")
-                    .map_err(|x| Status::internal(format!("{}", x)))?
-                    == auth_user.passw
-            {
-                return Ok(Response::new(AuthUserResponse {
-                    username: Some(auth_user.name),
+        let auth_username = auth_user.name.clone();
+        let auth_password = auth_user.passw.clone();
+        Ok(self
+            .get_contests_collection()
+            .find_one(
+                doc! {
+                    "users": doc! {
+                        "username": auth_username,
+                        "password": auth_password
+                    }
+                },
+                None,
+            )
+            .await
+            .map_err(|x| Status::internal(format!("{}", x)))? // TODO fix with error conversion
+            .map_or(
+                Response::new(AuthUserResponse {
+                    error: Some("Incorrect username or password".to_string()),
+                    username: None,
                     fullname: None,
-                    error: None,
                     token: None,
-                }));
-            }
-        }
-        Ok(Response::new(AuthUserResponse {
-            error: Some("Incorrect username or password".to_string()),
-            username: None,
-            fullname: None,
-            token: None,
-        }))
+                }),
+                |_| {
+                    Response::new(AuthUserResponse {
+                        username: Some(auth_user.name),
+                        fullname: None,
+                        error: None,
+                        token: None,
+                    })
+                },
+            ))
     }
     async fn get_contest(
         &self,
