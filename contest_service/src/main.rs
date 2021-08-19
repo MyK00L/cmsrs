@@ -23,6 +23,18 @@ impl ContestService {
             client: Client::with_options(ClientOptions::parse(CONNECTION_STRING).await?)?,
         })
     }
+    fn get_contests_collection(&self) -> mongodb::Collection<Document> {
+        let db = self.client.database("contestdb");
+        db.collection::<Document>("contests")
+    }
+    async fn get_default_contest_db(&self) -> Result<Document, Status> {
+        Ok(self
+            .get_contests_collection()
+            .find_one(None, None)
+            .await
+            .map_err(|x| Status::internal(format!("{}", x)))? // TODO fix with error conversion
+            .ok_or_else(|| Status::not_found("Default contest not found"))?)
+    }
 }
 
 #[tonic::async_trait]
@@ -31,7 +43,39 @@ impl Contest for ContestService {
         &self,
         _request: Request<AuthUserRequest>,
     ) -> Result<Response<AuthUserResponse>, Status> {
-        todo!();
+        let default_contest = self.get_default_contest_db().await?;
+
+        let users = default_contest
+            .get_array("users")
+            .map_err(|x| Status::internal(format!("{}", x)))?; // TODO fix with filter
+        let auth_user = _request.into_inner();
+        for user in users {
+            let user = user
+                .as_document()
+                .ok_or_else(|| Status::internal("Could not convert to document"))?;
+            if user
+                .get_str("username")
+                .map_err(|x| Status::internal(format!("{}", x)))?
+                == auth_user.name
+                && user
+                    .get_str("password")
+                    .map_err(|x| Status::internal(format!("{}", x)))?
+                    == auth_user.passw
+            {
+                return Ok(Response::new(AuthUserResponse {
+                    username: Some(auth_user.name),
+                    fullname: None,
+                    error: None,
+                    token: None,
+                }));
+            }
+        }
+        Ok(Response::new(AuthUserResponse {
+            error: Some("Incorrect username or password".to_string()),
+            username: None,
+            fullname: None,
+            token: None,
+        }))
     }
     async fn get_contest(
         &self,
@@ -61,14 +105,8 @@ impl Contest for ContestService {
         &self,
         request: Request<SetUserRequest>,
     ) -> Result<Response<SetUserResponse>, Status> {
-        let db = self.client.database("contestdb");
-        let contests = db.collection::<Document>("contests");
-
-        let default_contest = contests
-            .find_one(None, None)
-            .await
-            .map_err(|x| Status::internal(format!("{}", x)))? // TODO fix with error conversion
-            .ok_or_else(|| Status::not_found("Default contest not found"))?;
+        let contests = self.get_contests_collection();
+        let default_contest = self.get_default_contest_db().await?;
 
         let default_contest_id = default_contest
             .get_object_id("_id")
