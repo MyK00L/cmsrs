@@ -17,9 +17,11 @@ macro_rules! rpc_mock_fn {
         {
             async fn f(
                 _self: &$stname,
-                _req: tonic::Request<$in>,
+                req: tonic::Request<$in>,
             ) -> Result<tonic::Response<$out>, tonic::Status> {
-                Ok(tonic::Response::new(_self.$rname.clone()))
+                let res = Ok(tonic::Response::new(_self.$rname.clone()));
+                eprintln!("{}:\nreceived {:?}\nresponding{:?}",std::any::type_name::<$stname>(),req,res);
+                res
             }
             Box::pin(f(self, req))
         }
