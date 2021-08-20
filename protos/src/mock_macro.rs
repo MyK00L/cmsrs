@@ -1,17 +1,27 @@
-
-
 // overly complicated due to async-trait
 #[macro_export]
 macro_rules! rpc_mock_fn {
     ( $stname:ident, $fname:ident, $rname:ident, $in:ty, $out:ty ) => {
-        fn $fname<'life0, 'async_trait>(&'life0 self, req: tonic::Request<$in>) -> core::pin::Pin<Box<(dyn core::future::Future<Output = Result<tonic::Response<$out>, tonic::Status>> + Send + 'async_trait)>>
+        fn $fname<'life0, 'async_trait>(
+            &'life0 self,
+            req: tonic::Request<$in>,
+        ) -> core::pin::Pin<
+            Box<
+                (dyn core::future::Future<Output = Result<tonic::Response<$out>, tonic::Status>>
+                     + Send
+                     + 'async_trait),
+            >,
+        >
         where
-        'life0: 'async_trait
+            'life0: 'async_trait,
         {
-            async fn f(_self: &$stname, _req: tonic::Request<$in>) -> Result<tonic::Response<$out>,tonic::Status> {
+            async fn f(
+                _self: &$stname,
+                _req: tonic::Request<$in>,
+            ) -> Result<tonic::Response<$out>, tonic::Status> {
                 Ok(tonic::Response::new(_self.$rname.clone()))
             }
-            Box::pin(f(self,req))
+            Box::pin(f(self, req))
         }
     };
 }
@@ -29,6 +39,7 @@ macro_rules! rpc_mock_set_fn {
 macro_rules! rpc_mock_server {
     ( $trait:ty; $stname:ident; $( ($fname:ident, $in:ty, $out:ty) ),* ) => {
         paste::paste!{
+            #[derive(Debug, Default, Clone)]
             pub struct $stname {
                 $(
                     [<$fname _return>] : $out,

@@ -9,7 +9,7 @@ async fn not_main<C: ChannelTrait>(
     let mut index = 1u32;
     loop {
         let mut client = main_client.clone();
-        let request = tonic::Request::new(StringRequest {
+        let request = tonic::Request::new(TestStringRequest {
             str: format!("Request#{}", index),
         });
 

@@ -24,28 +24,36 @@ impl Default for MyTest<Channel> {
 impl<T: ChannelTrait> Test for MyTest<T> {
     async fn test_string(
         &self,
-        request: tonic::Request<StringRequest>,
-    ) -> Result<tonic::Response<StringResponse>, tonic::Status> {
+        request: tonic::Request<TestStringRequest>,
+    ) -> Result<tonic::Response<TestStringResponse>, tonic::Status> {
         let mut test_client = self.test_client.clone();
         let addr = request.remote_addr();
         let inner = request.into_inner();
         test_client
-            .log_string(tonic::Request::new(LogRequest {
+            .log_string(tonic::Request::new(LogStringRequest {
                 str: format!("received request with value {:?} from {:?}", inner, addr),
             }))
             .await?;
-        let reply = StringResponse {
+        eprintln!(
+            "mock test: {:?}",
+            test_client
+                .test_string(tonic::Request::new(TestStringRequest {
+                    str: String::from("(ᓀ ᓀ)")
+                }))
+                .await
+        );
+        let reply = TestStringResponse {
             str: format!("Hello {}", inner.str),
         };
         Ok(Response::new(reply))
     }
     async fn log_string(
         &self,
-        request: tonic::Request<LogRequest>,
-    ) -> Result<tonic::Response<LogResponse>, tonic::Status> {
+        request: tonic::Request<LogStringRequest>,
+    ) -> Result<tonic::Response<LogStringResponse>, tonic::Status> {
         let inner = request.into_inner();
         eprintln!("{:?}", inner);
-        Ok(Response::new(LogResponse {}))
+        Ok(Response::new(LogStringResponse {}))
     }
 }
 

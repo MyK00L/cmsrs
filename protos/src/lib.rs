@@ -18,7 +18,6 @@ pub mod user {
 pub mod worker {
     tonic::include_proto!("worker");
 }
-//rpc_mock_server!(super::service::test::test_server::Test; MockTest; (log_string, super::service::test::LogRequest, super::service::test::LogResponse),  (test_string, super::service::test::StringRequest, super::service::test::StringResponse)  );
 pub mod service {
     pub mod contest {
         tonic::include_proto!("service.contest");
@@ -49,6 +48,9 @@ pub mod service {
     }
     pub mod test {
         tonic::include_proto!("service.test");
+        rpc_mock_server!(test_server::Test; MockTest;
+        (test_string,TestStringRequest,TestStringResponse),
+        (log_string,LogStringRequest,LogStringResponse));
     }
 }
 
