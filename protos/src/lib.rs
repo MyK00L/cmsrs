@@ -1,5 +1,12 @@
 #![feature(trait_alias)]
 
+/*
+ *rpc_mock_server!(super::service::test::test_server::Test; MockTest; (log_string, super::service::test::LogRequest, super::service::test::LogResponse),  (test_string, super::service::test::StringRequest, super::service::test::StringResponse)  );
+ * */
+
+#[macro_use]
+mod mock_macro;
+
 pub mod common {
     tonic::include_proto!("common");
 }
