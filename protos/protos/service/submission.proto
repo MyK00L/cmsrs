@@ -6,20 +6,20 @@ import "common.proto";
 import "evaluation.proto";
 
 // Submission service
-message SubmissionRequest {
+message EvaluateSubmissionRequest {
 	evaluation.Submission sub = 1;
 }
-message SubmissionResponse {
+message EvaluateSubmissionResponse {
 	evaluation.EvaluationResult res = 1;
 	common.Id submission_id = 2;
 	google.protobuf.Timestamp timestamp = 3;
 }
-message SubmissionListRequest {
+message GetSubmissionListRequest {
 	optional uint32 limit = 1;
 	optional string user = 2;
 	optional uint32 problem_id = 3;
 }
-message SubmissionListResponse {
+message GetSubmissionListResponse {
 	message Item {
 		common.Id sub_id = 1;
 		string user = 2;
@@ -29,15 +29,15 @@ message SubmissionListResponse {
 	}
 	repeated Item list = 1;
 }
-message SubmissionDetailsRequest {
+message GetSubmissionDetailsRequest {
 	common.Id submission_id = 1;
 }
-message SubmissionDetailsResponse {
+message GetSubmissionDetailsResponse {
 	evaluation.Submission sub = 1;
 	google.protobuf.Timestamp timestamp = 2;
 }
 service Submission {
-	rpc evaluate_submission(SubmissionRequest) returns (SubmissionResponse);
-	rpc get_submission_list(SubmissionListRequest) returns (SubmissionListResponse);
-	rpc get_submission_details(SubmissionDetailsRequest) returns (SubmissionDetailsResponse);
+	rpc evaluate_submission(EvaluateSubmissionRequest) returns (EvaluateSubmissionResponse);
+	rpc get_submission_list(GetSubmissionListRequest) returns (GetSubmissionListResponse);
+	rpc get_submission_details(GetSubmissionDetailsRequest) returns (GetSubmissionDetailsResponse);
 }

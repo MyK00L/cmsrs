@@ -36,15 +36,32 @@ pub mod service {
     }
     pub mod dispatcher {
         tonic::include_proto!("service.dispatcher");
+        rpc_mock_server!(dispatcher_server::Dispatcher; MockDispatcher;
+        (evaluate_submission,EvaluateSubmissionRequest,EvaluateSubmissionResponse)
+        );
     }
     pub mod evaluation_files {
         tonic::include_proto!("service.evaluation_files");
+        rpc_mock_server!(evaluation_server::Evaluation; MockEvaluation;
+        (get_scorer_info,GetScorerInfoRequest,GetScorerInfoResponse),
+        (get_scoreboard_info,GetScoreboardInfoRequest,GetScoreboardInfoResponse)
+        );
     }
     pub mod submission {
         tonic::include_proto!("service.submission");
+        rpc_mock_server!(submission_server::Submission; MockSubmission;
+        (evaluate_submission,EvaluateSubmissionRequest,EvaluateSubmissionResponse),
+        (get_submission_list,GetSubmissionListRequest,GetSubmissionListResponse),
+        (get_submission_details,GetSubmissionDetailsRequest,GetSubmissionDetailsResponse)
+        );
     }
     pub mod worker {
         tonic::include_proto!("service.worker");
+        rpc_mock_server!(worker_server::Worker; MockWorker;
+        (evaluate_submission,EvaluateSubmissionRequest,EvaluateSubmissionResponse),
+        (update_testcase,UpdateTestcaseRequest,UpdateTestcaseResponse),
+        (update_source,UpdateSourceRequest,UpdateSourceResponse)
+        );
     }
     pub mod test {
         tonic::include_proto!("service.test");
