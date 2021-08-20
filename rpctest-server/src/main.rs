@@ -40,7 +40,7 @@ impl<T: ChannelTrait> Test for MyTest<T> {
                 .test_string(tonic::Request::new(TestStringRequest {
                     str: String::from("(ᓀ ᓀ)")
                 }))
-                .await
+                .await?
         );
         let reply = TestStringResponse {
             str: format!("Hello {}", inner.str),

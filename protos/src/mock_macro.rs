@@ -1,5 +1,4 @@
 // overly complicated due to async-trait
-#[macro_export]
 macro_rules! rpc_mock_fn {
     ( $stname:ident, $fname:ident, $rname:ident, $in:ty, $out:ty ) => {
         fn $fname<'life0, 'async_trait>(
@@ -19,8 +18,16 @@ macro_rules! rpc_mock_fn {
                 _self: &$stname,
                 req: tonic::Request<$in>,
             ) -> Result<tonic::Response<$out>, tonic::Status> {
-                let res = Ok(tonic::Response::new(_self.$rname.clone()));
-                eprintln!("{}:\nreceived {:?}\nresponding{:?}",std::any::type_name::<$stname>(),req,res);
+                let res = match _self.$rname.clone() {
+                    Ok(x) => Ok(tonic::Response::new(x)),
+                    Err(x) => Err(tonic::Status::new(x.0, x.1)),
+                };
+                eprintln!(
+                    "{}:\nreceived {:?}\nresponding{:?}",
+                    std::any::type_name::<$stname>(),
+                    req,
+                    res
+                );
                 res
             }
             Box::pin(f(self, req))
@@ -28,11 +35,15 @@ macro_rules! rpc_mock_fn {
     };
 }
 
-#[macro_export]
-macro_rules! rpc_mock_set_fn {
-    ( $fname:ident, $rname:ident, $out:ty) => {
-        pub fn $fname(&mut self, val: $out) {
-            self.$rname = val;
+macro_rules! rpc_mock_setters {
+    ( $fname:ident, $rname:ident, $in:ty, $out:ty ) => {
+        paste::paste! {
+            pub fn [<$fname _set>] (&mut self, val: $out) {
+                self.$rname = Ok(val);
+            }
+            pub fn [<$fname _set_err>] (&mut self, val: tonic::Status) {
+                self.$rname = Err((val.code(),val.message().to_string()));
+            }
         }
     };
 }
@@ -41,10 +52,10 @@ macro_rules! rpc_mock_set_fn {
 macro_rules! rpc_mock_server {
     ( $trait:ty; $stname:ident; $( ($fname:ident, $in:ty, $out:ty) ),* ) => {
         paste::paste!{
-            #[derive(Debug, Default, Clone)]
+            #[derive(Debug, Clone)]
             pub struct $stname {
                 $(
-                    [<$fname _return>] : $out,
+                    [<$fname _return>] : Result<$out,(tonic::Code,String)>,
                 )*
             }
             impl $trait for $stname {
@@ -54,8 +65,17 @@ macro_rules! rpc_mock_server {
             }
             impl $stname {
                 $(
-                    rpc_mock_set_fn!([<$fname _set>], [<$fname _return>], $out);
+                    rpc_mock_setters!($fname,[<$fname _return>],$in,$out);
                 )*
+            }
+            impl Default for $stname {
+                fn default() -> Self {
+                    Self {
+                        $(
+                            [<$fname _return>] : Err((tonic::Code::Internal,String::from("the response for this mock method was not set"))),
+                        )*
+                    }
+                }
             }
         }
     }
