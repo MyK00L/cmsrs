@@ -1,9 +1,5 @@
 #![feature(trait_alias)]
 
-/*
- *rpc_mock_server!(super::service::test::test_server::Test; MockTest; (log_string, super::service::test::LogRequest, super::service::test::LogResponse),  (test_string, super::service::test::StringRequest, super::service::test::StringResponse)  );
- * */
-
 #[macro_use]
 mod mock_macro;
 
@@ -22,9 +18,22 @@ pub mod user {
 pub mod worker {
     tonic::include_proto!("worker");
 }
+//rpc_mock_server!(super::service::test::test_server::Test; MockTest; (log_string, super::service::test::LogRequest, super::service::test::LogResponse),  (test_string, super::service::test::StringRequest, super::service::test::StringResponse)  );
 pub mod service {
     pub mod contest {
         tonic::include_proto!("service.contest");
+        rpc_mock_server!(contest_server::Contest; MockContest;
+        (auth_user,AuthUserRequest,AuthUserResponse),
+        (get_contest,GetContestRequest,GetContestResponse),
+        (get_problem,GetProblemRequest,GetProblemResponse),
+        (get_announcement_list,GetAnnouncementListRequest,GetAnnouncementListResponse),
+        (get_question_list,GetQuestionListRequest,GetQuestionListResponse),
+        (set_user,SetUserRequest,SetUserResponse),
+        (set_contest,SetContestRequest,SetContestResponse),
+        (set_problem,SetProblemRequest,SetProblemResponse),
+        (add_question,AddQuestionRequest,AddQuestionResponse),
+        (add_announcement,AddAnnouncementRequest,AddAnnouncementResponse)
+        );
     }
     pub mod dispatcher {
         tonic::include_proto!("service.dispatcher");

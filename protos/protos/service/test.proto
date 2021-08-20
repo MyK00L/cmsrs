@@ -2,19 +2,19 @@ syntax = "proto3";
 
 package service.test;
 
-message StringRequest {
+message TestStringRequest {
 	string str = 1;
 }
-message StringResponse {
+message TestStringResponse {
 	string str = 1;
 }
 
-message LogRequest {
+message LogStringRequest {
 	string str = 1;
 }
-message LogResponse {}
+message LogStringResponse {}
 
 service Test {
-	rpc test_string(StringRequest) returns (StringResponse);
-	rpc log_string(LogRequest) returns (LogResponse);
+	rpc test_string(TestStringRequest) returns (TestStringResponse);
+	rpc log_string(LogStringRequest) returns (LogStringResponse);
 }
