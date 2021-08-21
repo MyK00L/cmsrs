@@ -7,6 +7,7 @@ use mongodb::{
 use protos::service::contest::{contest_server::*, *};
 use protos::utils::*;
 use tonic::{transport::*, Request, Response, Status};
+use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier};
 
 #[cfg(test)]
 mod tests;
@@ -120,10 +121,16 @@ impl Contest for ContestService {
         &self,
         request: Request<SetUserRequest>,
     ) -> Result<Response<SetUserResponse>, Status> {
+        let argon2 = argon2::Argon2::default();
+        
         let user = request.into_inner();
         let username = user.username.clone();
         let fullname = user.fullname.clone();
-        let password = user.password.clone();
+        
+        let salt = argon2::password_hash::SaltString::generate(&mut rand_core::OsRng);
+        let password = argon2.hash_password_simple(user.password.as_bytes(), &salt)
+            .map_err(|_| tonic::Status::new(tonic::Code::Internal, "failed to hash password")?;
+        
         Ok(self
             .get_users_collection()
             .update_one(
