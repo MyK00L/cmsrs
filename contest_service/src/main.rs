@@ -1,3 +1,4 @@
+use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier};
 use mongodb::{
     bson::{doc, Document},
     options::{ClientOptions, UpdateOptions},
@@ -6,7 +7,6 @@ use mongodb::{
 use protos::service::contest::{contest_server::*, *};
 use protos::utils::*;
 use tonic::{transport::*, Request, Response, Status};
-use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier};
 
 #[cfg(test)]
 mod tests;
@@ -81,18 +81,18 @@ impl Contest for ContestService {
                 Response::new(AuthUserResponse {
                     response: Some(auth_user_response::Response::Failure(
                         auth_user_response::Failure {
-                            error: "Incorrect username or password".to_string()
-                        }
-                    ))
+                            error: "Incorrect username or password".to_string(),
+                        },
+                    )),
                 }),
                 |user_doc| {
                     Response::new(AuthUserResponse {
-                        response: Some(auth_user_response::Response::Success (
+                        response: Some(auth_user_response::Response::Success(
                             auth_user_response::Success {
                                 username: user_doc.get("_id").unwrap().to_string(),
-                                fullname: user_doc.get("fullName").unwrap().to_string()
-                            }
-                        ))
+                                fullname: user_doc.get("fullName").unwrap().to_string(),
+                            },
+                        )),
                     })
                 },
             ))
@@ -126,7 +126,7 @@ impl Contest for ContestService {
         request: Request<SetUserRequest>,
     ) -> Result<Response<SetUserResponse>, Status> {
         let argon2 = argon2::Argon2::default();
-        
+
         let user = request.into_inner();
         let username = user.username.clone();
         let fullname = user.fullname.clone();
@@ -140,29 +140,26 @@ impl Contest for ContestService {
             .update_one(
                 doc! {
                     "_id": username
-                }, 
+                },
                 doc! {
                     "$set": doc! {
                         "fullName": fullname,
                         "password": password,
                     }
                 },
-                UpdateOptions::builder().upsert(true).build()
+                UpdateOptions::builder().upsert(true).build(),
             )
             .await
             .map_err(|err| Status::internal(format!("{}", err))) // TODO fix with error conversion
-            .map(
-                |update_result| {
-                    Response::new(SetUserResponse {
-                        code: 
-                            if update_result.matched_count == 0 {
-                                set_user_response::Code::Add as i32
-                            } else {
-                                set_user_response::Code::Update as i32
-                            }
-                    })
-                }
-            )
+            .map(|update_result| {
+                Response::new(SetUserResponse {
+                    code: if update_result.matched_count == 0 {
+                        set_user_response::Code::Add as i32
+                    } else {
+                        set_user_response::Code::Update as i32
+                    },
+                })
+            })
     }
     async fn set_contest(
         &self,
