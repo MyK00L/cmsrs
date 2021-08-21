@@ -22,9 +22,15 @@ message AuthUserResponse {
 	}
 }
 
+message Contest {
+	string name = 1;
+	string description = 2;
+	optional google.protobuf.Timestamp start_time = 3;
+	optional google.protobuf.Timestamp end_time = 4;
+}
 message GetContestRequest {}
 message GetContestResponse {
-	user.Contest info = 1;
+	Contest contest = 1;
 }
 
 message GetProblemRequest {
@@ -65,7 +71,7 @@ message SetUserResponse {
 }
 
 message SetContestRequest {
-	user.Contest info = 1;
+	Contest contest = 1;
 }
 message SetContestResponse {}
 
