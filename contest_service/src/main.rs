@@ -1,6 +1,7 @@
 use mongodb::{
     bson::{doc, Document},
-    options::ClientOptions,
+    options::{ClientOptions, UpdateOptions},
+    results::UpdateResult,
     Client,
 };
 use protos::service::contest::{contest_server::*, *};
@@ -14,26 +15,45 @@ const CONNECTION_STRING: &str = "mongodb://root:example@contest_service_db:27017
 
 #[derive(Debug)]
 pub struct ContestService {
-    client: Client,
+    db_client: Client,
 }
 
 impl ContestService {
     async fn new() -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Self {
-            client: Client::with_options(ClientOptions::parse(CONNECTION_STRING).await?)?,
+            db_client: Client::with_options(ClientOptions::parse(CONNECTION_STRING).await?)?,
         })
     }
-    fn get_contests_collection(&self) -> mongodb::Collection<Document> {
-        let db = self.client.database("contestdb");
-        db.collection::<Document>("contests")
+
+    /// Do not call, call get_*_collection or get_contest_metadata instead
+    fn get_collection(&self, collection_name: &str) -> mongodb::Collection<Document> {
+        let db = self.db_client.database("contestdb");
+        db.collection::<Document>(collection_name)
     }
-    async fn get_default_contest_db(&self) -> Result<Document, Status> {
+
+    async fn get_contest_metadata(&self) -> Result<Document, Status> {
         Ok(self
-            .get_contests_collection()
+            .get_collection("contest_metadata")
             .find_one(None, None)
             .await
             .map_err(|x| Status::internal(format!("{}", x)))?
-            .ok_or_else(|| Status::not_found("Default contest not found"))?)
+            .ok_or_else(|| Status::not_found("Contest metadata not found"))?)
+    }
+
+    fn get_problems_collection(&self) -> mongodb::Collection<Document> {
+        self.get_collection("problems")
+    }
+
+    fn get_users_collection(&self) -> mongodb::Collection<Document> {
+        self.get_collection("users")
+    }
+
+    fn get_announcements_collection(&self) -> mongodb::Collection<Document> {
+        self.get_collection("announcements")
+    }
+
+    fn get_questions_collection(&self) -> mongodb::Collection<Document> {
+        self.get_collection("questions")
     }
 }
 
@@ -41,19 +61,16 @@ impl ContestService {
 impl Contest for ContestService {
     async fn auth_user(
         &self,
-        _request: Request<AuthUserRequest>,
+        request: Request<AuthUserRequest>,
     ) -> Result<Response<AuthUserResponse>, Status> {
-        let auth_user = _request.into_inner();
-        let auth_username = auth_user.name.clone();
-        let auth_password = auth_user.passw.clone();
+        let user = request.into_inner();
+        let username = user.username.clone();
+        let password = user.password.clone();
         Ok(self
-            .get_contests_collection()
+            .get_users_collection()
             .find_one(
                 doc! {
-                    "users": doc! {
-                        "username": auth_username,
-                        "password": auth_password
-                    }
+                    "_id": username
                 },
                 None,
             )
@@ -61,17 +78,16 @@ impl Contest for ContestService {
             .map_err(|x| Status::internal(format!("{}", x)))? // TODO fix with error conversion
             .map_or(
                 Response::new(AuthUserResponse {
-                    error: Some("Incorrect username or password".to_string()),
-                    username: None,
-                    fullname: None,
-                    token: None,
+                    failure: AuthUserResponse::Failure {
+                        error: "Incorrect username or password".to_string()
+                    }
                 }),
-                |_| {
+                |user_doc| {
                     Response::new(AuthUserResponse {
-                        username: Some(auth_user.name),
-                        fullname: None,
-                        error: None,
-                        token: None,
+                        success: AuthUserResponse::Success {
+                            username: user_doc.get("_id").unwrap(),
+                            fullname: user_doc.get("fullName").unwrap()
+                        }
                     })
                 },
             ))
@@ -104,69 +120,38 @@ impl Contest for ContestService {
         &self,
         request: Request<SetUserRequest>,
     ) -> Result<Response<SetUserResponse>, Status> {
-        let contests = self.get_contests_collection();
-        let default_contest = self.get_default_contest_db().await?;
-
-        let default_contest_id = default_contest
-            .get_object_id("_id")
-            .map_err(|x| Status::internal(format!("{}", x)))?;
-
-        let users = default_contest
-            .get_array("users")
-            .map_err(|x| Status::internal(format!("{}", x)))?; // TODO fix with filter
-        let new_user = request.into_inner();
-
-        for user in users {
-            let user = user
-                .as_document()
-                .ok_or_else(|| Status::internal("Could not convert to document"))?;
-            if user
-                .get_str("username")
-                .map_err(|x| Status::internal(format!("{}", x)))?
-                == new_user.name
-            {
-                contests
-                    .update_one(
-                        doc! {
-                            "_id": default_contest_id,
-                            "users.username": new_user.name
-                        },
-                        doc! {
-                            "$set": doc! {
-                                "users.$.password": new_user.passw
-                            }
-                        },
-                        None,
-                    )
-                    .await
-                    .map_err(|x| Status::internal(format!("{}", x)))?;
-                return Ok(Response::new(SetUserResponse {
-                    code: set_user_response::Code::Update as i32,
-                }));
-            }
-        }
-
-        contests
+        let user = request.into_inner();
+        let username = user.username.clone();
+        let fullname = user.fullname.clone();
+        let password = user.password.clone();
+        Ok(self
+            .get_users_collection()
             .update_one(
                 doc! {
-                    "_id": default_contest_id
-                },
+                    "_id": username
+                }, 
                 doc! {
-                    "$push": doc! {
-                        "users": doc! {
-                            "username": new_user.name,
-                            "password": new_user.passw
-                        }
-                    }
+                    "_id": username,
+                    "fullName": fullname,
+                    "password": password
                 },
-                None,
+                UpdateOptions::builder().upsert(true).build()
             )
             .await
-            .map_err(|x| Status::internal(format!("{}", x)))?;
-
-        Ok(Response::new(SetUserResponse {
-            code: set_user_response::Code::Add as i32,
-        }))
+            .map_err(|x| Status::internal(format!("{}", x)))? // TODO fix with error conversion
+            .map(
+                |update_result| {
+                    Response::new(SetUserResponse {
+                        code: 
+                            if update_result.matched_count == 0 {
+                                set_user_response::Code::Add as i32
+                            } else {
+                                set_user_response::Code::Update as i32
+                            }
+                    })
+                }
+            )
+        )
     }
     async fn set_contest(
         &self,
@@ -197,11 +182,11 @@ impl Contest for ContestService {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = get_local_address(Service::CONTEST).parse()?;
-    let greeter = ContestService::new().await?;
+    let contest_service = ContestService::new().await?;
 
     println!("Starting contest server");
     Server::builder()
-        .add_service(ContestServer::new(greeter))
+        .add_service(ContestServer::new(contest_service))
         .serve(addr)
         .await?;
     Ok(())

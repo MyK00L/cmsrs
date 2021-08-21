@@ -5,14 +5,21 @@ package service.contest;
 import "user.proto";
 
 message AuthUserRequest {
-	string name = 1;
-	string passw = 2;
+	string username = 1;
+	string password = 2;
 }
 message AuthUserResponse {
-	optional string error = 1;
-	optional string username = 2;
-	optional string fullname = 3;
-	optional bytes token = 4;
+	message Success {
+		string username = 1;
+		string fullname = 2;
+	}
+	message Failure {
+		string error = 1;
+	}
+	oneof response {
+		Success success = 1;
+		Failure failure = 2;
+	}
 }
 
 message GetContestRequest {}
@@ -45,8 +52,9 @@ message GetQuestionListResponse {
 
 
 message SetUserRequest {
-	string name = 1;
-	string passw = 2;
+	string username = 1;
+	string fullname = 2;
+	string password = 3;
 }
 message SetUserResponse {
 	enum Code {
