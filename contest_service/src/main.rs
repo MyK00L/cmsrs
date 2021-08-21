@@ -97,10 +97,10 @@ impl Contest for ContestService {
                 },
             ))
     }
-    async fn get_contest(
+    async fn get_contest_metadata(
         &self,
-        _request: Request<GetContestRequest>,
-    ) -> Result<Response<GetContestResponse>, Status> {
+        _request: Request<GetContestMetadataRequest>,
+    ) -> Result<Response<GetContestMetadataResponse>, Status> {
         todo!();
     }
     async fn get_problem(
@@ -161,10 +161,10 @@ impl Contest for ContestService {
                 })
             })
     }
-    async fn set_contest(
+    async fn set_contest_metadata(
         &self,
-        _request: Request<SetContestRequest>,
-    ) -> Result<Response<SetContestResponse>, Status> {
+        _request: Request<SetContestMetadataRequest>,
+    ) -> Result<Response<SetContestMetadataResponse>, Status> {
         todo!();
     }
     async fn set_problem(
