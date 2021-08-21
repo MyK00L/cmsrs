@@ -4,12 +4,12 @@ package service.dispatcher;
 
 import "evaluation.proto";
 
-message DispatcherRequest {
+message EvaluateSubmissionRequest {
 	evaluation.Submission sub = 1;
 }
-message DispatcherResponse {
+message EvaluateSubmissionResponse {
 	evaluation.EvaluationResult res = 1;
 }
 service Dispatcher {
-	rpc evaluate_submission(DispatcherRequest) returns (DispatcherResponse);
+	rpc evaluate_submission(EvaluateSubmissionRequest) returns (EvaluateSubmissionResponse);
 }
