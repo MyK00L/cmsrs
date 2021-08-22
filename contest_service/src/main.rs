@@ -1,3 +1,5 @@
+use std::convert::TryInto;
+
 use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier};
 use mongodb::{
     bson::{doc, Document},
@@ -7,6 +9,9 @@ use mongodb::{
 use protos::service::contest::{contest_server::*, *};
 use protos::utils::*;
 use tonic::{transport::*, Request, Response, Status};
+
+mod mappings;
+mod utils;
 
 #[cfg(test)]
 mod tests;
@@ -116,7 +121,11 @@ impl Contest for ContestService {
         &self,
         _request: Request<GetContestMetadataRequest>,
     ) -> Result<Response<GetContestMetadataResponse>, Status> {
-        todo!();
+        self.get_contest_metadata()
+            .await
+            //.map_err(|x| Status::internal("Couldn't fetch contest from DB"))?
+            .map(|x| mappings::ContestMetadata::from(x).into())
+            .map(|x| x)
     }
     async fn get_problem(
         &self,
@@ -147,7 +156,7 @@ impl Contest for ContestService {
         let fullname = user.fullname.clone();
 
         let salt = argon2::password_hash::SaltString::generate(&mut rand_core::OsRng);
-        let hashed_password = argon2::Argon2::default()
+        let hashed_password = argon2
             .hash_password_simple(user.password.as_bytes(), &salt)
             .map_err(|_| tonic::Status::new(tonic::Code::Internal, "failed to hash password"))?;
 
