@@ -13,7 +13,7 @@ message FileRequest {
 	bytes file = 1;
 }
 message FileResponse {
-	string str = 1;
+	bytes file = 1;
 }
 
 message LogStringRequest {

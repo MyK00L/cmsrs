@@ -12,6 +12,7 @@ path = "src/main.rs"
 tonic = "0.5"
 protos = { path = "../protos" }
 tokio = { version = "1.9", features = ["macros", "rt-multi-thread"] }
+async-stream = "0.3"
 
 [dev-dependencies]
 tower = "0.4"

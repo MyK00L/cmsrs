@@ -55,8 +55,27 @@ impl<T: ChannelTrait> Test for MyTest<T> {
         eprintln!("{:?}", inner);
         Ok(Response::new(LogStringResponse {}))
     }
-    async fn file(&self, req: tonic::Request<tonic::Streaming<FileRequest>>) -> Result<tonic::Response<<Self as protos::service::test::test_server::Test>::fileStream>, tonic::Status> { todo!() }
-    type fileStream = tonic::Streaming<FileResponse>;
+/*
+ *let stream = async_stream::try_stream! {
+ 67                             for m in x.iter() {
+ 68                                 yield m.clone();
+ 69                             }
+ 70                         };
+ 71                         Ok(tonic::Response::new(Box::pin(stream) as Stream<$out>))
+ * */
+
+    async fn file(&self, req: tonic::Request<tonic::Streaming<FileRequest>>) -> Result<tonic::Response<<Self as protos::service::test::test_server::Test>::fileStream>, tonic::Status> {
+        let mut streamer = req.into_inner();
+        let stream = async_stream::try_stream!{
+            while let Some(req) = streamer.message().await.unwrap() {
+                yield FileResponse {
+                    file: format!("hello {:?}", req.file).into_bytes(),
+                };
+            }
+        };
+        Ok(Response::new(Box::pin(stream) as Stream<FileResponse>))
+    }
+    type fileStream = protos::utils::Stream<FileResponse>;
 }
 
 // Use the tokio runtime to run our server

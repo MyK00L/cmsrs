@@ -83,6 +83,8 @@ pub mod utils {
     use tonic::codegen::Body;
     use tonic::transport::Channel;
 
+    pub type Stream<T> = core::pin::Pin<Box<dyn futures_core::Stream<Item = std::result::Result<T, tonic::Status>> + Send + Sync + 'static>>;
+
     pub trait ChannelTrait = GrpcService<BoxBody> + 'static + Sync + Send + Debug + Clone
     where
         <Self as GrpcService<BoxBody>>::ResponseBody: Send + Sync + 'static,
