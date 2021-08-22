@@ -74,3 +74,89 @@ pub mod contest {
         }
     }
 }
+
+pub mod chat {
+    use super::*;
+    pub struct Message {
+        id: u32,
+        subject: String,
+        problem_id: Option<u32>,
+        body: String,
+        to: Option<String>,
+        from: Option<String>,
+        created: std::time::SystemTime,
+        thread: Option<i64>,
+    }
+    impl Message {
+        fn is_announcement(&self) -> bool {
+            self.from.is_none()
+        }
+        fn is_broadcast(&self) -> bool {
+            self.is_announcement() && self.to.is_none()
+        }
+        fn is_question(&self) -> bool {
+            self.to.is_none() && self.from.is_some()
+        }
+        fn get_recipient(&self) -> Option<String> {
+            if self.is_announcement() {
+                self.to.clone()
+            } else {
+                self.from.clone()
+            }
+        }
+    }
+
+    enum MessageType {
+        Announcement,
+        Question,
+    }
+
+    impl From<(protos::user::Message, MessageType)> for Message {
+        fn from((msg, msg_type): (protos::user::Message, MessageType)) -> Self {
+            match msg_type {
+                MessageType::Announcement => Self {
+                    id: msg.id,
+                    subject: msg.subject,
+                    problem_id: msg.problem_id,
+                    body: msg.text,
+                    to: msg.user,
+                    from: None,
+                    created: msg.timestamp.map(utils::prost_ts_to_systime).unwrap(),
+                    thread: None,
+                },
+                MessageType::Question => Self {
+                    id: msg.id,
+                    subject: msg.subject,
+                    problem_id: msg.problem_id,
+                    body: msg.text,
+                    to: None,
+                    from: msg.user,
+                    created: msg.timestamp.map(utils::prost_ts_to_systime).unwrap(),
+                    thread: None,
+                },
+            }
+        }
+    }
+    impl From<protos::service::contest::AddQuestionRequest> for Message {
+        fn from(req: protos::service::contest::AddQuestionRequest) -> Self {
+            Self::from((req.question.unwrap(), MessageType::Question))
+        }
+    }
+    impl From<protos::service::contest::AddAnnouncementRequest> for Message {
+        fn from(req: protos::service::contest::AddAnnouncementRequest) -> Self {
+            Self::from((req.announcement.unwrap(), MessageType::Announcement))
+        }
+    }
+    impl From<Message> for protos::user::Message {
+        fn from(msg: Message) -> Self {
+            Self {
+                id: msg.id,
+                problem_id: msg.problem_id,
+                subject: msg.subject.clone(),
+                text: msg.body.clone(),
+                timestamp: Some(utils::systime_to_prost_ts(msg.created)),
+                user: msg.get_recipient(),
+            }
+        }
+    }
+}
