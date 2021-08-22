@@ -188,3 +188,91 @@ pub mod chat {
         }
     }
 }
+
+pub mod problem {
+    use mongodb::bson::Document;
+
+    #[derive(Default)]
+    pub struct Resources {
+        time_limit: std::time::Duration,
+        /// Maximum memory usage, in bytes
+        memory: u64,
+    }
+    pub struct Problem {
+        id: u32,
+        name: String,
+        description: String,
+        testcases_per_subtask: Vec<u32>,
+        runtime_limits: Resources,
+        source_size_limit: u64,
+        task_type: String,
+    }
+
+    impl From<protos::common::Resources> for Resources {
+        fn from(input: protos::common::Resources) -> Self {
+            Resources {
+                time_limit: input
+                    .time
+                    .map(|x| std::convert::TryInto::try_into(x).unwrap_or_default())
+                    .unwrap(),
+                memory: input.memory_bytes,
+            }
+        }
+    }
+    impl From<protos::user::Problem> for Problem {
+        fn from(input: protos::user::Problem) -> Self {
+            Problem {
+                id: input.id,
+                name: input.name,
+                description: input.description,
+                testcases_per_subtask: input.testcases_per_subtask,
+                runtime_limits: input.runtime_limits.map(|x| x.into()).unwrap(),
+                source_size_limit: input.source_size_limit,
+                task_type: input.r#type,
+            }
+        }
+    }
+    impl From<Resources> for protos::common::Resources {
+        fn from(input: Resources) -> Self {
+            protos::common::Resources {
+                time: Some(input.time_limit.into()),
+                memory_bytes: input.memory,
+            }
+        }
+    }
+    impl From<Problem> for protos::user::Problem {
+        fn from(p: Problem) -> Self {
+            protos::user::Problem {
+                id: p.id,
+                name: p.name,
+                description: p.description,
+                testcases_per_subtask: p.testcases_per_subtask,
+                runtime_limits: Some(p.runtime_limits.into()),
+                source_size_limit: p.source_size_limit,
+                r#type: p.task_type,
+            }
+        }
+    }
+    impl From<Document> for Problem {
+        fn from(_: Document) -> Self {
+            todo!()
+        }
+    }
+    impl From<Problem> for Document {
+        fn from(p: Problem) -> Self {
+            todo!()
+            /*let mut result = Document::new();
+            result.insert("name", p.name);
+            result.insert("description", p.description);
+            result.insert(
+                "startTime",
+                p.start_time.map(convert::mongo::systime_to_timestamp),
+            );
+            result.insert(
+                "endTime",
+                p.end_time.map(convert::mongo::systime_to_timestamp),
+            );
+            result*/
+        }
+    }
+}

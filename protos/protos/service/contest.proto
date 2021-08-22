@@ -77,9 +77,8 @@ message SetContestMetadataRequest {
 message SetContestMetadataResponse {}
 
 message SetProblemRequest {
-	uint32 problem_id = 1;
-	optional user.Problem info = 2;
- 	optional bytes statement = 3;
+	optional user.Problem info = 1;
+ 	optional bytes statement = 2;
 }
 message SetProblemResponse {}
 
