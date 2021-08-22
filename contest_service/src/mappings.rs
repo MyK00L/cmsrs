@@ -85,7 +85,7 @@ pub mod chat {
         to: Option<String>,
         from: Option<String>,
         created: std::time::SystemTime,
-        thread: Option<i64>,
+        _thread: Option<i64>,
     }
     impl Message {
         fn is_announcement(&self) -> bool {
@@ -122,7 +122,7 @@ pub mod chat {
                     to: msg.user,
                     from: None,
                     created: msg.timestamp.map(utils::prost_ts_to_systime).unwrap(),
-                    thread: None,
+                    _thread: None,
                 },
                 MessageType::Question => Self {
                     id: msg.id,
@@ -132,7 +132,7 @@ pub mod chat {
                     to: None,
                     from: msg.user,
                     created: msg.timestamp.map(utils::prost_ts_to_systime).unwrap(),
-                    thread: None,
+                    _thread: None,
                 },
             }
         }
@@ -157,6 +157,22 @@ pub mod chat {
                 timestamp: Some(utils::systime_to_prost_ts(msg.created)),
                 user: msg.get_recipient(),
             }
+        }
+    }
+    impl From<Message> for mongodb::bson::Document {
+        fn from(m: Message) -> Self {
+            let mut resp = Document::new();
+            resp.insert("id", m.id);
+            resp.insert("subject", m.subject);
+            resp.insert("problemId", m.problem_id);
+            resp.insert("text", m.body);
+            if m.is_announcement() {
+                resp.insert("to", m.get_recipient());
+            } else {
+                resp.insert("from", m.get_recipient());
+            }
+            resp.insert("created", m.created);
+            resp
         }
     }
 }
