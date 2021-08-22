@@ -21,6 +21,7 @@ message Message { // questions and announcements are the same
 	string subject = 2;
 	optional uint32 problem_id = 3;
 	string text = 4;
-	optional string user = 5;
-	google.protobuf.Timestamp timestamp = 6;
+	optional string from = 5;
+	optional string to = 6;
+	google.protobuf.Timestamp timestamp = 7;
 }

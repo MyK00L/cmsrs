@@ -121,51 +121,26 @@ pub mod chat {
         }
     }
 
-    enum MessageType {
-        Announcement,
-        Question,
-    }
-
-    impl From<(protos::user::Message, MessageType)> for Message {
-        fn from((msg, msg_type): (protos::user::Message, MessageType)) -> Self {
-            match msg_type {
-                MessageType::Announcement => Self {
-                    id: msg.id,
-                    subject: msg.subject,
-                    problem_id: msg.problem_id,
-                    body: msg.text,
-                    to: msg.user,
-                    from: None,
-                    created: msg
-                        .timestamp
-                        .map(|x| std::time::SystemTime::try_from(x).unwrap())
-                        .unwrap(),
-                    _thread: None,
-                },
-                MessageType::Question => Self {
-                    id: msg.id,
-                    subject: msg.subject,
-                    problem_id: msg.problem_id,
-                    body: msg.text,
-                    to: None,
-                    from: msg.user,
-                    created: msg
-                        .timestamp
-                        .map(|x| std::time::SystemTime::try_from(x).unwrap())
-                        .unwrap(),
-                    _thread: None,
-                },
+    impl From<protos::user::Message> for Message {
+        fn from(msg: protos::user::Message) -> Self {
+            Self {
+                id: msg.id,
+                subject: msg.subject,
+                problem_id: msg.problem_id,
+                body: msg.text,
+                to: msg.to,
+                from: msg.from,
+                created: msg
+                    .timestamp
+                    .map(|x| std::time::SystemTime::try_from(x).unwrap())
+                    .unwrap(),
+                _thread: None,
             }
         }
     }
-    impl From<protos::service::contest::AddQuestionRequest> for Message {
-        fn from(req: protos::service::contest::AddQuestionRequest) -> Self {
-            Self::from((req.question.unwrap(), MessageType::Question))
-        }
-    }
-    impl From<protos::service::contest::AddAnnouncementRequest> for Message {
-        fn from(req: protos::service::contest::AddAnnouncementRequest) -> Self {
-            Self::from((req.announcement.unwrap(), MessageType::Announcement))
+    impl From<protos::service::contest::AddMessageRequest> for Message {
+        fn from(req: protos::service::contest::AddMessageRequest) -> Self {
+            Self::from(req.question.unwrap())
         }
     }
     impl From<Message> for protos::user::Message {
@@ -176,7 +151,8 @@ pub mod chat {
                 subject: msg.subject.clone(),
                 text: msg.body.clone(),
                 timestamp: Some(protos::prost_types::Timestamp::from(msg.created)),
-                user: msg.get_recipient(),
+                from: msg.from,
+                to: msg.to,
             }
         }
     }

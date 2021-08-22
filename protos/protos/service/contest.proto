@@ -83,15 +83,10 @@ message SetProblemRequest {
 }
 message SetProblemResponse {}
 
-message AddQuestionRequest {
-	user.Message question = 1;
+message AddMessageRequest {
+	user.Message message = 1;
 }
-message AddQuestionResponse {}
-
-message AddAnnouncementRequest {
-	user.Message announcement = 1;
-}
-message AddAnnouncementResponse {}
+message AddMessageResponse {}
 
 service Contest {
 	rpc auth_user(AuthUserRequest) returns (AuthUserResponse);
@@ -103,6 +98,5 @@ service Contest {
 	rpc set_user(SetUserRequest) returns (SetUserResponse);
 	rpc set_contest_metadata(SetContestMetadataRequest) returns (SetContestMetadataResponse);
 	rpc set_problem(SetProblemRequest) returns (SetProblemResponse);
-	rpc add_question(AddQuestionRequest) returns (AddQuestionResponse);
-	rpc add_announcement(AddAnnouncementRequest) returns (AddAnnouncementResponse);
+	rpc add_message(AddMessageRequest) returns (AddMessageResponse);
 }

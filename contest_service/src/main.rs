@@ -234,31 +234,22 @@ impl Contest for ContestService {
     ) -> Result<Response<SetProblemResponse>, Status> {
         todo!();
     }
-    async fn add_question(
+    async fn add_message(
         &self,
-        request: Request<AddQuestionRequest>,
-    ) -> Result<Response<AddQuestionResponse>, Status> {
+        request: Request<AddMessageRequest>,
+    ) -> Result<Response<AddMessageResponse>, Status> {
         let message = mappings::chat::Message::from(request.into_inner());
         // TODO should we notify someone here?
         let doc = Document::from(message);
-        self.get_questions_collection()
-            .insert_one(doc, None)
-            .await
-            .map_err(internal_error)?;
-        Ok(Response::new(AddQuestionResponse {}))
-    }
-    async fn add_announcement(
-        &self,
-        request: Request<AddAnnouncementRequest>,
-    ) -> Result<Response<AddAnnouncementResponse>, Status> {
-        let message = mappings::chat::Message::from(request.into_inner());
-        // TODO should we notify someone here?
-        let doc = Document::from(message);
-        self.get_announcements_collection()
-            .insert_one(doc, None)
-            .await
-            .map_err(internal_error)?;
-        Ok(Response::new(AddAnnouncementResponse {}))
+        if message.is_question() {
+            self.get_questions_collection()
+        } else {
+            self.get_announcements_collection()
+        }
+        .insert_one(doc, None)
+        .await
+        .map_err(internal_error)?;
+        Ok(Response::new(AddMessageResponse {}))
     }
 }
 
