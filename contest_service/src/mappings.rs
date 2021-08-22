@@ -190,6 +190,15 @@ pub mod chat {
 }
 
 pub mod problem {
+    pub struct ProblemData(Problem, Vec<u8>);
+    impl ProblemData {
+        pub fn get_problem(&self) -> &Problem {
+            &self.0
+        }
+        pub fn get_statement(&self) -> Vec<u8> {
+            self.1.clone()
+        }
+    }
     use mongodb::bson::Document;
 
     #[derive(Default)]
@@ -198,6 +207,8 @@ pub mod problem {
         /// Maximum memory usage, in bytes
         memory: u64,
     }
+
+    #[derive(Default)]
     pub struct Problem {
         id: u32,
         name: String,
@@ -253,26 +264,47 @@ pub mod problem {
             }
         }
     }
-    impl From<Document> for Problem {
-        fn from(_: Document) -> Self {
-            todo!()
+    impl From<Document> for ProblemData {
+        fn from(mongo_record: Document) -> Self {
+            ProblemData(
+                Problem {
+                    id: mongo_record.get_i32("_id").unwrap_or_default() as u32,
+                    name: mongo_record.get_str("name").unwrap_or_default().to_owned(),
+                    description: mongo_record
+                        .get_str("longName")
+                        .unwrap_or_default()
+                        .to_owned(),
+                    ..Default::default()
+                },
+                mongo_record
+                    .get_binary_generic("statement")
+                    .unwrap()
+                    .clone(),
+            )
         }
     }
-    impl From<Problem> for Document {
-        fn from(p: Problem) -> Self {
-            todo!()
-            /*let mut result = Document::new();
-            result.insert("name", p.name);
-            result.insert("description", p.description);
+    impl From<ProblemData> for Document {
+        fn from(problem_data: ProblemData) -> Self {
+            let p = problem_data.get_problem();
+            let statement = problem_data.get_statement();
+            let mut result = Document::new();
+            result.insert("_id", p.id);
+            result.insert("name", p.name.clone());
+            result.insert("longName", p.description.clone());
             result.insert(
-                "startTime",
-                p.start_time.map(convert::mongo::systime_to_timestamp),
+                "statement",
+                mongodb::bson::Binary {
+                    subtype: mongodb::bson::spec::BinarySubtype::Generic,
+                    bytes: statement,
+                },
             );
-            result.insert(
-                "endTime",
-                p.end_time.map(convert::mongo::systime_to_timestamp),
-            );
-            result*/
+            result
+        }
+    }
+
+    impl From<(Problem, Vec<u8>)> for ProblemData {
+        fn from((p, bin): (Problem, Vec<u8>)) -> Self {
+            ProblemData(p, bin)
         }
     }
 }
