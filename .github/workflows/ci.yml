@@ -25,8 +25,7 @@ jobs:
           args: --no-deps -- -D warnings
       - uses: actions/cache@v2
         with:
-          path: |
-            target
+          path: target
           key: ${{ runner.os }}-${{ rustc_hash }}
 
   test:
@@ -45,8 +44,7 @@ jobs:
           command: test
       - uses: actions/cache@v2
         with:
-          path: |
-            target
+          path: target
           key: ${{ runner.os }}-${{ rustc_hash }}
           
   code-coverage:
@@ -66,8 +64,7 @@ jobs:
       
       - uses: actions/cache@v2
         with:
-          path: |
-            target
+          path: target
           key: ${{ runner.os }}-${{ rustc_hash }}
       
       # afterwards, upload the report to codecov
