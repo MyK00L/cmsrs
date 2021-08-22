@@ -11,6 +11,8 @@ pub enum MappingError {
 }
 
 pub mod contest {
+    use std::convert::TryInto;
+
     use super::*;
     pub struct ContestMetadata {
         name: String,
@@ -38,8 +40,12 @@ pub mod contest {
                 metadata: Some(protos::service::contest::ContestMetadata {
                     name: md.name,
                     description: md.description,
-                    start_time: md.start_time.map(utils::systime_to_prost_ts),
-                    end_time: md.end_time.map(utils::systime_to_prost_ts),
+                    start_time: md
+                        .start_time
+                        .map(|x| protos::prost_types::Timestamp::try_from(x).unwrap()), // This should not break,
+                    end_time: md
+                        .end_time
+                        .map(|x| protos::prost_types::Timestamp::try_from(x).unwrap()), // This should not break,
                 }),
             })
         }
@@ -55,8 +61,8 @@ pub mod contest {
             Ok(Self {
                 name: metadata.name,
                 description: metadata.description,
-                start_time: metadata.start_time.map(utils::prost_ts_to_systime),
-                end_time: metadata.end_time.map(utils::prost_ts_to_systime),
+                start_time: metadata.start_time.map(|x| x.try_into().unwrap()),
+                end_time: metadata.end_time.map(|x| x.try_into().unwrap()),
             })
         }
 
@@ -121,7 +127,10 @@ pub mod chat {
                     body: msg.text,
                     to: msg.user,
                     from: None,
-                    created: msg.timestamp.map(utils::prost_ts_to_systime).unwrap(),
+                    created: msg
+                        .timestamp
+                        .map(|x| std::time::SystemTime::try_from(x).unwrap())
+                        .unwrap(),
                     _thread: None,
                 },
                 MessageType::Question => Self {
@@ -131,7 +140,10 @@ pub mod chat {
                     body: msg.text,
                     to: None,
                     from: msg.user,
-                    created: msg.timestamp.map(utils::prost_ts_to_systime).unwrap(),
+                    created: msg
+                        .timestamp
+                        .map(|x| std::time::SystemTime::try_from(x).unwrap())
+                        .unwrap(),
                     _thread: None,
                 },
             }
@@ -154,7 +166,7 @@ pub mod chat {
                 problem_id: msg.problem_id,
                 subject: msg.subject.clone(),
                 text: msg.body.clone(),
-                timestamp: Some(utils::systime_to_prost_ts(msg.created)),
+                timestamp: Some(protos::prost_types::Timestamp::from(msg.created)),
                 user: msg.get_recipient(),
             }
         }
