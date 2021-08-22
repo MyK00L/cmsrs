@@ -143,14 +143,14 @@ impl Contest for ContestService {
             .find_one(doc! {"_id": problem_id}, None)
             .await
             .map_err(internal_error)?
-            .map(|x| mappings::problem::ProblemData::from(x))
+            .map(mappings::problem::ProblemData::from)
             .map(|x| {
                 Response::new(GetProblemResponse {
                     info: Some(x.get_problem().into()),
                     statement: x.get_statement(),
                 })
             })
-            .ok_or(Status::internal("Problem not found"))
+            .ok_or_else(|| Status::internal("Problem not found"))
     }
     async fn get_announcement_list(
         &self,

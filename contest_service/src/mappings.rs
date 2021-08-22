@@ -290,7 +290,7 @@ pub mod problem {
             let mut result = Document::new();
             result.insert("_id", p.id);
             result.insert("name", p.name.clone());
-            result.insert("longName", p.description.clone());
+            result.insert("longName", p.description);
             result.insert(
                 "statement",
                 mongodb::bson::Binary {
