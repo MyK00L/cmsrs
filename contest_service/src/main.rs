@@ -1,6 +1,8 @@
+use futures::stream::StreamExt;
 use std::convert::TryFrom;
 
 use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier};
+use mappings::chat::Message;
 use mongodb::{
     bson::{doc, Document},
     options::{ClientOptions, UpdateOptions},
@@ -17,6 +19,13 @@ mod utils;
 mod tests;
 
 const CONNECTION_STRING: &str = "mongodb://root:example@contest_service_db:27017/";
+
+fn internal_error<T>(e: T) -> Status
+where
+    T: std::fmt::Debug,
+{
+    Status::internal(format!("{:?}", e))
+}
 
 #[derive(Debug)]
 pub struct ContestService {
@@ -141,13 +150,31 @@ impl Contest for ContestService {
         &self,
         _request: Request<GetAnnouncementListRequest>,
     ) -> Result<Response<GetAnnouncementListResponse>, Status> {
-        todo!();
+        let announcements = self
+            .get_announcements_collection()
+            .find(None, None)
+            .await
+            .map_err(internal_error)?
+            .map(|x| Message::from(x.unwrap()))
+            .map(|x| protos::user::Message::from(x))
+            .collect::<Vec<_>>()
+            .await;
+        Ok(Response::new(GetAnnouncementListResponse { announcements }))
     }
     async fn get_question_list(
         &self,
         _request: Request<GetQuestionListRequest>,
     ) -> Result<Response<GetQuestionListResponse>, Status> {
-        todo!();
+        let questions = self
+            .get_questions_collection()
+            .find(None, None)
+            .await
+            .map_err(internal_error)?
+            .map(|x| Message::from(x.unwrap()))
+            .map(|x| protos::user::Message::from(x))
+            .collect::<Vec<_>>()
+            .await;
+        Ok(Response::new(GetQuestionListResponse { questions }))
     }
     async fn set_user(
         &self,
@@ -196,7 +223,7 @@ impl Contest for ContestService {
         self.get_contest_metadata_collection()
             .delete_many(Document::new(), None)
             .await
-            .map_err(|e| Status::internal(format!("{:?}", e)))?; // This should delete every contest, since we don't want more than one
+            .map_err(internal_error)?; // This should delete every contest, since we don't want more than one
 
         let metadata = mappings::contest::ContestMetadata::try_from(request.into_inner())
             .map_err(|x| Status::invalid_argument(format!("{:?}", x)))?;
@@ -204,7 +231,7 @@ impl Contest for ContestService {
         self.get_contest_metadata_collection()
             .insert_one(Document::from(metadata), None)
             .await
-            .map_err(|e| Status::internal(format!("{:?}", e)))
+            .map_err(internal_error)
             .map(|_| Response::new(SetContestMetadataResponse {}))
     }
     async fn set_problem(
@@ -223,7 +250,7 @@ impl Contest for ContestService {
         self.get_questions_collection()
             .insert_one(doc, None)
             .await
-            .map_err(|e| Status::internal(format!("{:?}", e)))?;
+            .map_err(internal_error)?;
         Ok(Response::new(AddQuestionResponse {}))
     }
     async fn add_announcement(
@@ -233,10 +260,10 @@ impl Contest for ContestService {
         let message = mappings::chat::Message::from(request.into_inner());
         // TODO should we notify someone here?
         let doc = Document::from(message);
-        self.get_questions_collection()
+        self.get_announcements_collection()
             .insert_one(doc, None)
             .await
-            .map_err(|e| Status::internal(format!("{:?}", e)))?;
+            .map_err(internal_error)?;
         Ok(Response::new(AddAnnouncementResponse {}))
     }
 }
