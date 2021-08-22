@@ -15,6 +15,7 @@ jobs:
           toolchain: nightly
           override: true
           components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v1
       - uses: actions-rs/cargo@v1
         with:
           command: fmt
@@ -23,7 +24,7 @@ jobs:
         with:
           command: clippy
           args: --no-deps -- -D warnings
-      - uses: Swatinem/rust-cache@v1
+
   test:
     name: Test
     runs-on: ubuntu-latest
