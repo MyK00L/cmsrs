@@ -163,15 +163,15 @@ pub mod chat {
         fn from(m: Message) -> Self {
             let mut resp = Document::new();
             resp.insert("id", m.id);
-            resp.insert("subject", m.subject);
+            resp.insert("subject", m.subject.clone());
             resp.insert("problemId", m.problem_id);
-            resp.insert("text", m.body);
+            resp.insert("text", m.body.clone());
             if m.is_announcement() {
                 resp.insert("to", m.get_recipient());
             } else {
                 resp.insert("from", m.get_recipient());
             }
-            resp.insert("created", m.created);
+            resp.insert("created", utils::systime_to_timestamp(m.created));
             resp
         }
     }
