@@ -25,12 +25,16 @@ pub mod contest {
             Self {
                 name: value.get("name").unwrap().to_string(),
                 description: value.get("description").unwrap().to_string(),
-                start_time: value
-                    .get("startTime")
-                    .map(|x| x.as_timestamp().map(utils::timestamp_to_systime).unwrap()),
-                end_time: value
-                    .get("endTime")
-                    .map(|x| x.as_timestamp().map(utils::timestamp_to_systime).unwrap()),
+                start_time: value.get("startTime").map(|x| {
+                    x.as_timestamp()
+                        .map(convert::mongo::timestamp_to_systime)
+                        .unwrap()
+                }),
+                end_time: value.get("endTime").map(|x| {
+                    x.as_timestamp()
+                        .map(convert::mongo::timestamp_to_systime)
+                        .unwrap()
+                }),
             }
         }
     }
@@ -74,8 +78,14 @@ pub mod contest {
             let mut result = Document::new();
             result.insert("name", m.name);
             result.insert("description", m.description);
-            result.insert("startTime", m.start_time.map(utils::systime_to_timestamp));
-            result.insert("endTime", m.end_time.map(utils::systime_to_timestamp));
+            result.insert(
+                "startTime",
+                m.start_time.map(convert::mongo::systime_to_timestamp),
+            );
+            result.insert(
+                "endTime",
+                m.end_time.map(convert::mongo::systime_to_timestamp),
+            );
             result
         }
     }
@@ -183,7 +193,7 @@ pub mod chat {
             } else if m.is_question() {
                 resp.insert("from", m.get_recipient());
             }
-            resp.insert("created", utils::systime_to_timestamp(m.created));
+            resp.insert("created", convert::mongo::systime_to_timestamp(m.created));
             resp
         }
     }
@@ -196,7 +206,7 @@ pub mod chat {
                 body: d.get_str("text").unwrap().to_owned(),
                 to: d.get_str("to").map(|x| x.to_owned()).ok(),
                 from: d.get_str("from").map(|x| x.to_owned()).ok(),
-                created: utils::timestamp_to_systime(d.get_timestamp("created").unwrap()),
+                created: convert::mongo::timestamp_to_systime(d.get_timestamp("created").unwrap()),
                 _thread: None,
             }
         }
