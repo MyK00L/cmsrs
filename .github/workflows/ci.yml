@@ -40,12 +40,13 @@ jobs:
           command: test
   code-coverage:
     name: Code coverage
+    runs-on: ubuntu-latest
     steps:
       # the action needs a nightly toolchain with llvm-tools
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-         toolchain: nightly
+          toolchain: nightly
           components: llvm-tools-preview
       
       # runs cargo with defaults flags, using the default `lcov` output
