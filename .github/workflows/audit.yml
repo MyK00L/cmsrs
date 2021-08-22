@@ -17,3 +17,4 @@ jobs:
       - uses: actions-rs/audit-check@issue-104
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: Swatinem/rust-cache@v1
