@@ -9,3 +9,17 @@ pub fn systime_to_prost_ts(t: std::time::SystemTime) -> protos::prost_types::Tim
     let nanos = (nano_duration % 1_000_000_000) as i32; // TODO Check correctness of this
     protos::prost_types::Timestamp { seconds, nanos }
 }
+
+pub fn prost_ts_to_systime(t: protos::prost_types::Timestamp) -> std::time::SystemTime {
+    let nano_duration = t.nanos as u64 + t.seconds as u64 * 1_000_000_000;
+    std::time::UNIX_EPOCH + std::time::Duration::from_nanos(nano_duration)
+}
+
+pub fn systime_to_timestamp(st: std::time::SystemTime) -> mongodb::bson::Timestamp {
+    let nano_duration = st.duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+    let seconds = (nano_duration / 1_000_000_000) as u32; // TODO This is bad, because we will have an overflow on 2032 or such
+    mongodb::bson::Timestamp {
+        time: seconds,
+        increment: 0,
+    }
+}

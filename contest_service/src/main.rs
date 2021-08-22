@@ -1,4 +1,4 @@
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 
 use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier};
 use mongodb::{
@@ -38,11 +38,15 @@ impl ContestService {
 
     async fn get_contest_metadata(&self) -> Result<Document, Status> {
         Ok(self
-            .get_collection("contest_metadata")
+            .get_contest_metadata_collection()
             .find_one(None, None)
             .await
             .map_err(|x| Status::internal(format!("{}", x)))?
             .ok_or_else(|| Status::not_found("Contest metadata not found"))?)
+    }
+
+    fn get_contest_metadata_collection(&self) -> mongodb::Collection<Document> {
+        self.get_collection("contest_metadata")
     }
 
     fn get_problems_collection(&self) -> mongodb::Collection<Document> {
@@ -187,9 +191,21 @@ impl Contest for ContestService {
     }
     async fn set_contest_metadata(
         &self,
-        _request: Request<SetContestMetadataRequest>,
+        request: Request<SetContestMetadataRequest>,
     ) -> Result<Response<SetContestMetadataResponse>, Status> {
-        todo!();
+        self.get_contest_metadata_collection()
+            .delete_many(Document::new(), None)
+            .await
+            .map_err(|e| Status::internal(format!("{:?}", e)))?; // This should delete every contest, since we don't want more than one
+
+        let metadata = mappings::ContestMetadata::try_from(request.into_inner())
+            .map_err(|x| Status::invalid_argument(format!("{:?}", x)))?;
+
+        self.get_contest_metadata_collection()
+            .insert_one(Document::from(metadata), None)
+            .await
+            .map_err(|e| Status::internal(format!("{:?}", e)))
+            .map(|_| Response::new(SetContestMetadataResponse {}))
     }
     async fn set_problem(
         &self,
