@@ -48,7 +48,7 @@ jobs:
         with:
           profile: minimal
           toolchain: nightly
-          components: llvm-tools-preview
+          components: llvm-tools-preview, rustfmt
       
       # runs cargo with defaults flags, using the default `lcov` output
       - uses: Swatinem/fucov@v1
