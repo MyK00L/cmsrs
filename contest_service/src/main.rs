@@ -214,16 +214,15 @@ impl Contest for ContestService {
         &self,
         request: Request<SetContestMetadataRequest>,
     ) -> Result<Response<SetContestMetadataResponse>, Status> {
-        self.get_contest_metadata_collection()
-            .delete_many(Document::new(), None)
-            .await
-            .map_err(internal_error)?; // This should delete every contest, since we don't want more than one
-
         let metadata = mappings::contest::ContestMetadata::try_from(request.into_inner())
             .map_err(|err| Status::invalid_argument(format!("{:?}", err)))?;
 
         self.get_contest_metadata_collection()
-            .insert_one(Document::from(metadata), None)
+            .update_one(
+                doc! {},
+                doc! { "$set": Document::from(metadata) },
+                UpdateOptions::builder().upsert(true).build(),
+            )
             .await
             .map_err(internal_error)
             .map(|_| Response::new(SetContestMetadataResponse {}))
