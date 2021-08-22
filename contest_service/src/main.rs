@@ -215,15 +215,29 @@ impl Contest for ContestService {
     }
     async fn add_question(
         &self,
-        _request: Request<AddQuestionRequest>,
+        request: Request<AddQuestionRequest>,
     ) -> Result<Response<AddQuestionResponse>, Status> {
-        todo!();
+        let message = mappings::chat::Message::from(request.into_inner());
+        // TODO should we notify someone here?
+        let doc = Document::from(message);
+        self.get_questions_collection()
+            .insert_one(doc, None)
+            .await
+            .map_err(|e| Status::internal(format!("{:?}", e)))?;
+        Ok(Response::new(AddQuestionResponse {}))
     }
     async fn add_announcement(
         &self,
-        _request: Request<AddAnnouncementRequest>,
+        request: Request<AddAnnouncementRequest>,
     ) -> Result<Response<AddAnnouncementResponse>, Status> {
-        todo!();
+        let message = mappings::chat::Message::from(request.into_inner());
+        // TODO should we notify someone here?
+        let doc = Document::from(message);
+        self.get_questions_collection()
+            .insert_one(doc, None)
+            .await
+            .map_err(|e| Status::internal(format!("{:?}", e)))?;
+        Ok(Response::new(AddAnnouncementResponse {}))
     }
 }
 
