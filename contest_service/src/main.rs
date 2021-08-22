@@ -1,4 +1,4 @@
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 
 use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier};
 use mongodb::{
@@ -128,7 +128,7 @@ impl Contest for ContestService {
         self.get_contest_metadata()
             .await
             //.map_err(|x| Status::internal("Couldn't fetch contest from DB"))?
-            .map(|x| mappings::ContestMetadata::from(x).into())
+            .map(|x| mappings::contest::ContestMetadata::from(x).into())
             .map(|x| x)
     }
     async fn get_problem(
@@ -198,7 +198,7 @@ impl Contest for ContestService {
             .await
             .map_err(|e| Status::internal(format!("{:?}", e)))?; // This should delete every contest, since we don't want more than one
 
-        let metadata = mappings::ContestMetadata::try_from(request.into_inner())
+        let metadata = mappings::contest::ContestMetadata::try_from(request.into_inner())
             .map_err(|x| Status::invalid_argument(format!("{:?}", x)))?;
 
         self.get_contest_metadata_collection()
