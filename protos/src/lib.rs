@@ -1,5 +1,6 @@
 #![feature(trait_alias)]
 
+#![allow(non_camel_case_types)]
 #[macro_use]
 mod mock_macro;
 
@@ -31,20 +32,20 @@ pub mod service {
         (set_contest,SetContestRequest,SetContestResponse),
         (set_problem,SetProblemRequest,SetProblemResponse),
         (add_question,AddQuestionRequest,AddQuestionResponse),
-        (add_announcement,AddAnnouncementRequest,AddAnnouncementResponse)
+        (add_announcement,AddAnnouncementRequest,AddAnnouncementResponse);
         );
     }
     pub mod dispatcher {
         tonic::include_proto!("service.dispatcher");
         rpc_mock_server!(dispatcher_server::Dispatcher; MockDispatcher;
-        (evaluate_submission,EvaluateSubmissionRequest,EvaluateSubmissionResponse)
+        (evaluate_submission,EvaluateSubmissionRequest,EvaluateSubmissionResponse);
         );
     }
     pub mod evaluation_files {
         tonic::include_proto!("service.evaluation_files");
         rpc_mock_server!(evaluation_server::Evaluation; MockEvaluation;
         (get_scorer_info,GetScorerInfoRequest,GetScorerInfoResponse),
-        (get_scoreboard_info,GetScoreboardInfoRequest,GetScoreboardInfoResponse)
+        (get_scoreboard_info,GetScoreboardInfoRequest,GetScoreboardInfoResponse);
         );
     }
     pub mod submission {
@@ -52,7 +53,7 @@ pub mod service {
         rpc_mock_server!(submission_server::Submission; MockSubmission;
         (evaluate_submission,EvaluateSubmissionRequest,EvaluateSubmissionResponse),
         (get_submission_list,GetSubmissionListRequest,GetSubmissionListResponse),
-        (get_submission_details,GetSubmissionDetailsRequest,GetSubmissionDetailsResponse)
+        (get_submission_details,GetSubmissionDetailsRequest,GetSubmissionDetailsResponse);
         );
     }
     pub mod worker {
@@ -60,14 +61,17 @@ pub mod service {
         rpc_mock_server!(worker_server::Worker; MockWorker;
         (evaluate_submission,EvaluateSubmissionRequest,EvaluateSubmissionResponse),
         (update_testcase,UpdateTestcaseRequest,UpdateTestcaseResponse),
-        (update_source,UpdateSourceRequest,UpdateSourceResponse)
+        (update_source,UpdateSourceRequest,UpdateSourceResponse);
         );
     }
     pub mod test {
         tonic::include_proto!("service.test");
         rpc_mock_server!(test_server::Test; MockTest;
         (test_string,TestStringRequest,TestStringResponse),
-        (log_string,LogStringRequest,LogStringResponse));
+        (log_string,LogStringRequest,LogStringResponse);
+        (file,tonic::Streaming::<FileRequest>,FileResponse)
+        // functions with streaming response after third semicolon, for streaming requests, just encapsulate in Streaming
+        );
     }
 }
 

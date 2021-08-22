@@ -9,6 +9,13 @@ message TestStringResponse {
 	string str = 1;
 }
 
+message FileRequest {
+	bytes file = 1;
+}
+message FileResponse {
+	string str = 1;
+}
+
 message LogStringRequest {
 	string str = 1;
 }
@@ -17,4 +24,5 @@ message LogStringResponse {}
 service Test {
 	rpc test_string(TestStringRequest) returns (TestStringResponse);
 	rpc log_string(LogStringRequest) returns (LogStringResponse);
+	rpc file(stream FileRequest) returns (stream FileResponse);
 }

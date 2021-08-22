@@ -55,6 +55,8 @@ impl<T: ChannelTrait> Test for MyTest<T> {
         eprintln!("{:?}", inner);
         Ok(Response::new(LogStringResponse {}))
     }
+    async fn file(&self, req: tonic::Request<tonic::Streaming<FileRequest>>) -> Result<tonic::Response<<Self as protos::service::test::test_server::Test>::fileStream>, tonic::Status> { todo!() }
+    type fileStream = tonic::Streaming<FileResponse>;
 }
 
 // Use the tokio runtime to run our server

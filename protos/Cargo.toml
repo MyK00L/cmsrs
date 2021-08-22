@@ -9,6 +9,8 @@ edition = "2018"
 tonic = "0.5"
 prost = "0.8"
 prost-types = "0.8"
+async-stream = "0.3"
+futures-core = "0.3"
 paste = "1.0"
 
 [build-dependencies]
