@@ -2,7 +2,6 @@ use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier};
 use mongodb::{
     bson::{doc, Document},
     options::{ClientOptions, UpdateOptions},
-    results::UpdateResult,
     Client,
 };
 use protos::service::contest::{contest_server::*, *};
@@ -26,7 +25,7 @@ impl ContestService {
         })
     }
 
-    /// Do not call, call get_*_collection or get_contest_metadata instead
+    /// Do not call this function, call get_*_collection or get_contest_metadata instead
     fn get_collection(&self, collection_name: &str) -> mongodb::Collection<Document> {
         let db = self.db_client.database("contestdb");
         db.collection::<Document>(collection_name)
@@ -70,7 +69,7 @@ impl Contest for ContestService {
             .get_users_collection()
             .find_one(
                 doc! {
-                    "_id": username
+                    "_id": username,
                 },
                 None,
             )
@@ -79,7 +78,7 @@ impl Contest for ContestService {
             .filter(|x| {
                 if let Some(hash_bson) = x.get("password") {
                     if let Some(hash) = hash_bson.as_str().to_owned() {
-                        if let Ok(parsed_hash) = PasswordHash::new(&x) {
+                        if let Ok(parsed_hash) = PasswordHash::new(hash) {
                             argon2::Argon2::default()
                                 .verify_password(user.password.as_bytes(), &parsed_hash)
                                 .is_ok()
@@ -95,25 +94,28 @@ impl Contest for ContestService {
             })
             .map_or(
                 Response::new(AuthUserResponse {
-                    failure: AuthUserResponse::Failure {
-                        error: "Incorrect username or password".to_string(),
-                    },
-                    response: None,
+                    response: Some(auth_user_response::Response::Failure(
+                        auth_user_response::Failure {
+                            error: "Incorrect username or password".to_string(),
+                        },
+                    )),
                 }),
                 |user_doc| {
                     Response::new(AuthUserResponse {
-                        success: AuthUserResponse::Success {
-                            username: user_doc.get("_id").unwrap(),
-                            fullname: user_doc.get("fullName").unwrap(),
-                        },
+                        response: Some(auth_user_response::Response::Success(
+                            auth_user_response::Success {
+                                username: user_doc.get("_id").unwrap().to_string(),
+                                fullname: user_doc.get("fullName").unwrap().to_string(),
+                            },
+                        )),
                     })
                 },
             ))
     }
-    async fn get_contest(
+    async fn get_contest_metadata(
         &self,
-        _request: Request<GetContestRequest>,
-    ) -> Result<Response<GetContestResponse>, Status> {
+        _request: Request<GetContestMetadataRequest>,
+    ) -> Result<Response<GetContestMetadataResponse>, Status> {
         todo!();
     }
     async fn get_problem(
@@ -138,30 +140,32 @@ impl Contest for ContestService {
         &self,
         request: Request<SetUserRequest>,
     ) -> Result<Response<SetUserResponse>, Status> {
+        let argon2 = argon2::Argon2::default();
+
         let user = request.into_inner();
         let username = user.username.clone();
         let fullname = user.fullname.clone();
 
         let salt = argon2::password_hash::SaltString::generate(&mut rand_core::OsRng);
-        let password = argon2::Argon2::default()
+        let hashed_password = argon2::Argon2::default()
             .hash_password_simple(user.password.as_bytes(), &salt)
             .map_err(|_| tonic::Status::new(tonic::Code::Internal, "failed to hash password"))?;
 
-        Ok(self
-            .get_users_collection()
+        self.get_users_collection()
             .update_one(
                 doc! {
                     "_id": username
                 },
                 doc! {
-                    "_id": username,
-                    "fullName": fullname,
-                    "password": password
+                    "$set": doc! {
+                        "fullName": fullname,
+                        "password": hashed_password.to_string(),
+                    }
                 },
                 UpdateOptions::builder().upsert(true).build(),
             )
             .await
-            .map_err(|x| Status::internal(format!("{}", x)))? // TODO fix with error conversion
+            .map_err(|err| Status::internal(format!("{}", err))) // TODO fix with error conversion
             .map(|update_result| {
                 Response::new(SetUserResponse {
                     code: if update_result.matched_count == 0 {
@@ -170,12 +174,12 @@ impl Contest for ContestService {
                         set_user_response::Code::Update as i32
                     },
                 })
-            }))
+            })
     }
-    async fn set_contest(
+    async fn set_contest_metadata(
         &self,
-        _request: Request<SetContestRequest>,
-    ) -> Result<Response<SetContestResponse>, Status> {
+        _request: Request<SetContestMetadataRequest>,
+    ) -> Result<Response<SetContestMetadataResponse>, Status> {
         todo!();
     }
     async fn set_problem(

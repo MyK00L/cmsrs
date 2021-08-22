@@ -16,16 +16,6 @@ message Problem {
 	// statements & various files ...
 }
 
-message Contest {
-	string name = 1;
-	string description = 2;
-	google.protobuf.Timestamp start_time = 3;
-	google.protobuf.Timestamp end_time = 4;
-	optional uint32 submission_limit = 5;
-	//uint32 problem_count;
-	repeated Problem problem_infos = 6; // this better?
-}
-
 message Message { // questions and announcements are the same
 	string subject = 1;
 	optional uint32 problem_id = 2;

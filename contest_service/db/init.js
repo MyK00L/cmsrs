@@ -7,8 +7,8 @@ db.createCollection("contest_metadata", {
             properties: {
                 name: { bsonType: "string" },
                 description: { bsonType: "string" },
-                startTime: { bsonType: "timestamp" },
-                endTime: { bsonType: "timestamp" },
+                startTime: { bsonType: "timestamp" }, // missing means there is no start time
+                endTime: { bsonType: "timestamp" }, // missing means there is no end time
             }
         }
     }

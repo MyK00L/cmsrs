@@ -3,6 +3,7 @@ syntax = "proto3";
 package service.contest;
 
 import "user.proto";
+import "google/protobuf/timestamp.proto";
 
 message AuthUserRequest {
 	string username = 1;
@@ -22,9 +23,15 @@ message AuthUserResponse {
 	}
 }
 
-message GetContestRequest {}
-message GetContestResponse {
-	user.Contest info = 1;
+message ContestMetadata {
+	string name = 1;
+	string description = 2;
+	optional google.protobuf.Timestamp start_time = 3;
+	optional google.protobuf.Timestamp end_time = 4;
+}
+message GetContestMetadataRequest {}
+message GetContestMetadataResponse {
+	ContestMetadata metadata = 1;
 }
 
 message GetProblemRequest {
@@ -64,10 +71,10 @@ message SetUserResponse {
 	Code code = 1;
 }
 
-message SetContestRequest {
-	user.Contest info = 1;
+message SetContestMetadataRequest {
+	ContestMetadata metadata = 1;
 }
-message SetContestResponse {}
+message SetContestMetadataResponse {}
 
 message SetProblemRequest {
 	uint32 problem_id = 1;
@@ -88,13 +95,13 @@ message AddAnnouncementResponse {}
 
 service Contest {
 	rpc auth_user(AuthUserRequest) returns (AuthUserResponse);
-	rpc get_contest(GetContestRequest) returns (GetContestResponse);
+	rpc get_contest_metadata(GetContestMetadataRequest) returns (GetContestMetadataResponse);
 	rpc get_problem(GetProblemRequest) returns (GetProblemResponse);
 	rpc get_announcement_list(GetAnnouncementListRequest) returns (GetAnnouncementListResponse);
 	rpc get_question_list(GetQuestionListRequest) returns (GetQuestionListResponse);
 
 	rpc set_user(SetUserRequest) returns (SetUserResponse);
-	rpc set_contest(SetContestRequest) returns (SetContestResponse);
+	rpc set_contest_metadata(SetContestMetadataRequest) returns (SetContestMetadataResponse);
 	rpc set_problem(SetProblemRequest) returns (SetProblemResponse);
 	rpc add_question(AddQuestionRequest) returns (AddQuestionResponse);
 	rpc add_announcement(AddAnnouncementRequest) returns (AddAnnouncementResponse);
