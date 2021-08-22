@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn cycle_test_mongo() {
+fn convert_to_mongo_timestamp_test_and_back() {
     let now = std::time::UNIX_EPOCH
         + std::time::Duration::from_secs(
             std::time::SystemTime::now()
@@ -13,7 +13,7 @@ fn cycle_test_mongo() {
     assert_eq!(now, mongo::timestamp_to_systime(mongo_now));
 }
 #[test]
-fn cycle_test_proto() {
+fn convert_to_protobuf_timestamp_test_and_back() {
     let now = std::time::SystemTime::now();
     let proto_now = proto::systime_to_timestamp(now);
     assert_eq!(now, proto::timestamp_to_systime(proto_now));
