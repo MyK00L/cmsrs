@@ -229,9 +229,29 @@ impl Contest for ContestService {
     }
     async fn set_problem(
         &self,
-        _request: Request<SetProblemRequest>,
+        request: Request<SetProblemRequest>,
     ) -> Result<Response<SetProblemResponse>, Status> {
-        todo!();
+        let problem_data_from_req = request.into_inner();
+        if let Some(p) = problem_data_from_req.info {
+            if let Some(bin) = problem_data_from_req.statement {
+                let problem_data: mappings::problem::ProblemData = (p.into(), bin).into();
+
+                let document: Document = problem_data.into();
+                self.get_problems_collection()
+                    .update_one(
+                        doc! {"_id": document.get_i32("_id").unwrap()},
+                        doc! { "$set": document },
+                        UpdateOptions::builder().upsert(true).build(),
+                    )
+                    .await
+                    .map_err(internal_error)
+                    .map(|_| Response::new(SetProblemResponse {}))
+            } else {
+                Err(Status::invalid_argument("Missing required parameter"))
+            }
+        } else {
+            Err(Status::invalid_argument("Missing required parameter"))
+        }
     }
     async fn add_message(
         &self,
