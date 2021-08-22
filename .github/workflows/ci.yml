@@ -23,6 +23,11 @@ jobs:
         with:
           command: clippy
           args: --no-deps -- -D warnings
+      - uses: actions/cache@v2
+        with:
+          path: |
+            target
+          key: ${{ runner.os }}-${{ rustc_hash }}
 
   test:
     name: Test
@@ -38,6 +43,12 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: test
+      - uses: actions/cache@v2
+        with:
+          path: |
+            target
+          key: ${{ runner.os }}-${{ rustc_hash }}
+          
   code-coverage:
     name: Code coverage
     runs-on: ubuntu-latest
@@ -49,9 +60,15 @@ jobs:
           profile: minimal
           toolchain: nightly
           components: llvm-tools-preview, rustfmt
-      
+
       # runs cargo with defaults flags, using the default `lcov` output
       - uses: Swatinem/fucov@v1
+      
+      - uses: actions/cache@v2
+        with:
+          path: |
+            target
+          key: ${{ runner.os }}-${{ rustc_hash }}
       
       # afterwards, upload the report to codecov
       - uses: codecov/codecov-action@v1
