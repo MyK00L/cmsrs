@@ -1,3 +1,4 @@
+use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier};
 use mongodb::{
     bson::{doc, Document},
     options::{ClientOptions, UpdateOptions},
@@ -7,7 +8,6 @@ use mongodb::{
 use protos::service::contest::{contest_server::*, *};
 use protos::utils::*;
 use tonic::{transport::*, Request, Response, Status};
-use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier};
 
 #[cfg(test)]
 mod tests;
@@ -66,7 +66,6 @@ impl Contest for ContestService {
     ) -> Result<Response<AuthUserResponse>, Status> {
         let user = request.into_inner();
         let username = user.username.clone();
-        let password = user.password.clone();
         Ok(self
             .get_users_collection()
             .find_one(
@@ -77,18 +76,36 @@ impl Contest for ContestService {
             )
             .await
             .map_err(|x| Status::internal(format!("{}", x)))? // TODO fix with error conversion
+            .filter(|x| {
+                if let Some(hash_bson) = x.get("password") {
+                    if let Some(hash) = hash_bson.as_str().to_owned() {
+                        if let Ok(parsed_hash) = PasswordHash::new(&x) {
+                            argon2::Argon2::default()
+                                .verify_password(user.password.as_bytes(), &parsed_hash)
+                                .is_ok()
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            })
             .map_or(
                 Response::new(AuthUserResponse {
                     failure: AuthUserResponse::Failure {
-                        error: "Incorrect username or password".to_string()
-                    }
+                        error: "Incorrect username or password".to_string(),
+                    },
+                    response: None,
                 }),
                 |user_doc| {
                     Response::new(AuthUserResponse {
                         success: AuthUserResponse::Success {
                             username: user_doc.get("_id").unwrap(),
-                            fullname: user_doc.get("fullName").unwrap()
-                        }
+                            fullname: user_doc.get("fullName").unwrap(),
+                        },
                     })
                 },
             ))
@@ -121,44 +138,39 @@ impl Contest for ContestService {
         &self,
         request: Request<SetUserRequest>,
     ) -> Result<Response<SetUserResponse>, Status> {
-        let argon2 = argon2::Argon2::default();
-        
         let user = request.into_inner();
         let username = user.username.clone();
         let fullname = user.fullname.clone();
-        
+
         let salt = argon2::password_hash::SaltString::generate(&mut rand_core::OsRng);
-        let password = argon2.hash_password_simple(user.password.as_bytes(), &salt)
-            .map_err(|_| tonic::Status::new(tonic::Code::Internal, "failed to hash password")?;
-        
+        let password = argon2::Argon2::default()
+            .hash_password_simple(user.password.as_bytes(), &salt)
+            .map_err(|_| tonic::Status::new(tonic::Code::Internal, "failed to hash password"))?;
+
         Ok(self
             .get_users_collection()
             .update_one(
                 doc! {
                     "_id": username
-                }, 
+                },
                 doc! {
                     "_id": username,
                     "fullName": fullname,
                     "password": password
                 },
-                UpdateOptions::builder().upsert(true).build()
+                UpdateOptions::builder().upsert(true).build(),
             )
             .await
             .map_err(|x| Status::internal(format!("{}", x)))? // TODO fix with error conversion
-            .map(
-                |update_result| {
-                    Response::new(SetUserResponse {
-                        code: 
-                            if update_result.matched_count == 0 {
-                                set_user_response::Code::Add as i32
-                            } else {
-                                set_user_response::Code::Update as i32
-                            }
-                    })
-                }
-            )
-        )
+            .map(|update_result| {
+                Response::new(SetUserResponse {
+                    code: if update_result.matched_count == 0 {
+                        set_user_response::Code::Add as i32
+                    } else {
+                        set_user_response::Code::Update as i32
+                    },
+                })
+            }))
     }
     async fn set_contest(
         &self,
