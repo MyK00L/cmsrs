@@ -42,6 +42,7 @@ jobs:
     name: Code coverage
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v2
       # the action needs a nightly toolchain with llvm-tools
       - uses: actions-rs/toolchain@v1
         with:
