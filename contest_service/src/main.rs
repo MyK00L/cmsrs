@@ -150,7 +150,7 @@ impl Contest for ContestService {
             .await
             .map_err(internal_error)?
             .map(|x| Message::from(x.unwrap()))
-            .map(protos::user::Message::from)
+            .map(|x| x.into())
             .collect::<Vec<_>>()
             .await;
         Ok(Response::new(GetAnnouncementListResponse { announcements }))
@@ -165,7 +165,7 @@ impl Contest for ContestService {
             .await
             .map_err(internal_error)?
             .map(|x| Message::from(x.unwrap()))
-            .map(protos::user::Message::from)
+            .map(|x| x.into())
             .collect::<Vec<_>>()
             .await;
         Ok(Response::new(GetQuestionListResponse { questions }))
@@ -240,13 +240,12 @@ impl Contest for ContestService {
     ) -> Result<Response<AddMessageResponse>, Status> {
         let message = mappings::chat::Message::from(request.into_inner());
         // TODO should we notify someone here?
-        let doc = Document::from(message);
         if message.is_question() {
             self.get_questions_collection()
         } else {
             self.get_announcements_collection()
         }
-        .insert_one(doc, None)
+        .insert_one(Document::from(message), None)
         .await
         .map_err(internal_error)?;
         Ok(Response::new(AddMessageResponse {}))

@@ -32,8 +32,7 @@ pub mod service {
         (set_user,SetUserRequest,SetUserResponse),
         (set_contest_metadata,SetContestMetadataRequest,SetContestMetadataResponse),
         (set_problem,SetProblemRequest,SetProblemResponse),
-        (add_question,AddQuestionRequest,AddQuestionResponse),
-        (add_announcement,AddAnnouncementRequest,AddAnnouncementResponse)
+        (add_message,AddMessageRequest,AddMessageResponse)
         );
     }
     pub mod dispatcher {

@@ -92,6 +92,7 @@ pub mod contest {
 
 pub mod chat {
     use super::*;
+
     pub struct Message {
         id: u32,
         subject: String,
@@ -140,7 +141,7 @@ pub mod chat {
     }
     impl From<protos::service::contest::AddMessageRequest> for Message {
         fn from(req: protos::service::contest::AddMessageRequest) -> Self {
-            Self::from(req.question.unwrap())
+            Self::from(req.message.unwrap())
         }
     }
     impl From<Message> for protos::user::Message {
