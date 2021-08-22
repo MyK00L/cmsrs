@@ -17,6 +17,7 @@ mod mappings;
 #[cfg(test)]
 mod tests;
 
+// TODO: remove credentials to connect to db.
 const CONNECTION_STRING: &str = "mongodb://root:example@contest_service_db:27017/";
 
 fn internal_error<T>(e: T) -> Status
@@ -44,15 +45,6 @@ impl ContestService {
         db.collection::<Document>(collection_name)
     }
 
-    async fn get_contest_metadata(&self) -> Result<Document, Status> {
-        Ok(self
-            .get_contest_metadata_collection()
-            .find_one(None, None)
-            .await
-            .map_err(|x| Status::internal(format!("{}", x)))?
-            .ok_or_else(|| Status::not_found("Contest metadata not found"))?)
-    }
-
     fn get_contest_metadata_collection(&self) -> mongodb::Collection<Document> {
         self.get_collection("contest_metadata")
     }
@@ -72,6 +64,25 @@ impl ContestService {
     fn get_questions_collection(&self) -> mongodb::Collection<Document> {
         self.get_collection("questions")
     }
+
+    async fn get_contest_metadata(&self) -> Result<Document, Status> {
+        Ok(self
+            .get_contest_metadata_collection()
+            .find_one(None, None)
+            .await
+            .map_err(|x| Status::internal(format!("{}", x)))?
+            .ok_or_else(|| Status::not_found("Contest metadata not found"))?)
+    }
+}
+
+fn check_password(password: &str, user_doc: &Document) -> bool {
+    user_doc.get_str("password").map_or(false, |hash| {
+        PasswordHash::new(hash).map_or(false, |parsed_hash| {
+            argon2::Argon2::default()
+                .verify_password(password.as_bytes(), &parsed_hash)
+                .is_ok()
+        })
+    })
 }
 
 #[tonic::async_trait]
@@ -91,24 +102,8 @@ impl Contest for ContestService {
                 None,
             )
             .await
-            .map_err(|x| Status::internal(format!("{}", x)))? // TODO fix with error conversion
-            .filter(|x| {
-                if let Some(hash_bson) = x.get("password") {
-                    if let Some(hash) = hash_bson.as_str().to_owned() {
-                        if let Ok(parsed_hash) = PasswordHash::new(hash) {
-                            argon2::Argon2::default()
-                                .verify_password(user.password.as_bytes(), &parsed_hash)
-                                .is_ok()
-                        } else {
-                            false
-                        }
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                }
-            })
+            .map_err(|err| Status::internal(format!("{}", err)))? // TODO fix with error conversion
+            .filter(|user_doc| check_password(&user.password, user_doc))
             .map_or(
                 Response::new(AuthUserResponse {
                     response: Some(auth_user_response::Response::Failure(
@@ -135,8 +130,9 @@ impl Contest for ContestService {
     ) -> Result<Response<GetContestMetadataResponse>, Status> {
         self.get_contest_metadata()
             .await
-            //.map_err(|x| Status::internal("Couldn't fetch contest from DB"))?
-            .map(|x| mappings::contest::ContestMetadata::from(x).into())
+            .map(|contest_metadata_doc| {
+                mappings::contest::ContestMetadata::from(contest_metadata_doc).into()
+            })
     }
     async fn get_problem(
         &self,
@@ -224,7 +220,7 @@ impl Contest for ContestService {
             .map_err(internal_error)?; // This should delete every contest, since we don't want more than one
 
         let metadata = mappings::contest::ContestMetadata::try_from(request.into_inner())
-            .map_err(|x| Status::invalid_argument(format!("{:?}", x)))?;
+            .map_err(|err| Status::invalid_argument(format!("{:?}", err)))?;
 
         self.get_contest_metadata_collection()
             .insert_one(Document::from(metadata), None)
