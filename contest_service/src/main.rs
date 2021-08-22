@@ -13,7 +13,6 @@ use protos::utils::*;
 use tonic::{transport::*, Request, Response, Status};
 
 mod mappings;
-mod utils;
 
 #[cfg(test)]
 mod tests;
