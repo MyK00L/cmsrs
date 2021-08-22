@@ -137,7 +137,6 @@ impl Contest for ContestService {
             .await
             //.map_err(|x| Status::internal("Couldn't fetch contest from DB"))?
             .map(|x| mappings::contest::ContestMetadata::from(x).into())
-            .map(|x| x)
     }
     async fn get_problem(
         &self,
@@ -155,7 +154,7 @@ impl Contest for ContestService {
             .await
             .map_err(internal_error)?
             .map(|x| Message::from(x.unwrap()))
-            .map(|x| protos::user::Message::from(x))
+            .map(protos::user::Message::from)
             .collect::<Vec<_>>()
             .await;
         Ok(Response::new(GetAnnouncementListResponse { announcements }))
@@ -170,7 +169,7 @@ impl Contest for ContestService {
             .await
             .map_err(internal_error)?
             .map(|x| Message::from(x.unwrap()))
-            .map(|x| protos::user::Message::from(x))
+            .map(protos::user::Message::from)
             .collect::<Vec<_>>()
             .await;
         Ok(Response::new(GetQuestionListResponse { questions }))

@@ -1,6 +1,5 @@
 use std::convert::TryFrom;
 
-use super::utils;
 use mongodb::bson::Document;
 use protos::service::contest::GetContestMetadataResponse;
 use tonic::Response;
