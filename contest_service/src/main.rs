@@ -136,9 +136,21 @@ impl Contest for ContestService {
     }
     async fn get_problem(
         &self,
-        _request: Request<GetProblemRequest>,
+        request: Request<GetProblemRequest>,
     ) -> Result<Response<GetProblemResponse>, Status> {
-        todo!();
+        let problem_id = request.into_inner().problem_id;
+        self.get_problems_collection()
+            .find_one(doc! {"_id": problem_id}, None)
+            .await
+            .map_err(internal_error)?
+            .map(|x| mappings::problem::ProblemData::from(x))
+            .map(|x| {
+                Response::new(GetProblemResponse {
+                    info: Some(x.get_problem().into()),
+                    statement: x.get_statement(),
+                })
+            })
+            .ok_or(Status::internal("Problem not found"))
     }
     async fn get_announcement_list(
         &self,

@@ -192,8 +192,8 @@ pub mod chat {
 pub mod problem {
     pub struct ProblemData(Problem, Vec<u8>);
     impl ProblemData {
-        pub fn get_problem(&self) -> &Problem {
-            &self.0
+        pub fn get_problem(&self) -> Problem {
+            self.0.clone()
         }
         pub fn get_statement(&self) -> Vec<u8> {
             self.1.clone()
@@ -201,14 +201,14 @@ pub mod problem {
     }
     use mongodb::bson::Document;
 
-    #[derive(Default)]
+    #[derive(Default, Clone)]
     pub struct Resources {
         time_limit: std::time::Duration,
         /// Maximum memory usage, in bytes
         memory: u64,
     }
 
-    #[derive(Default)]
+    #[derive(Default, Clone)]
     pub struct Problem {
         id: u32,
         name: String,
