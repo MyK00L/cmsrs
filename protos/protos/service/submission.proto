@@ -11,18 +11,17 @@ message EvaluateSubmissionRequest {
 }
 message EvaluateSubmissionResponse {
 	evaluation.EvaluationResult res = 1;
-	common.Id submission_id = 2;
-	google.protobuf.Timestamp timestamp = 3;
+	common.Id submission_id = 2; // TODO check this
 }
 message GetSubmissionListRequest {
 	optional uint32 limit = 1;
-	optional string user = 2;
+	optional string author_username = 2;
 	optional uint32 problem_id = 3;
 }
 message GetSubmissionListResponse {
 	message Item {
-		common.Id sub_id = 1;
-		string user = 2;
+		common.Id submission_id = 1; // TODO check this
+		string author_username = 2;
 		uint32 problem_id = 3;
 		google.protobuf.Timestamp timestamp = 5;
 		optional double score = 6;
@@ -34,10 +33,17 @@ message GetSubmissionDetailsRequest {
 }
 message GetSubmissionDetailsResponse {
 	evaluation.Submission sub = 1;
-	google.protobuf.Timestamp timestamp = 2;
+	google.protobuf.Timestamp timestamp = 2; // really needed?
 }
+
 service Submission {
+	// 1) write into dabatase with Pending state
+	// 2) redirect request to the dispatcher and await response
+	// 3) write values returned by the dispatcher into database
+	//    changing the state to Evaluated
 	rpc evaluate_submission(EvaluateSubmissionRequest) returns (EvaluateSubmissionResponse);
 	rpc get_submission_list(GetSubmissionListRequest) returns (GetSubmissionListResponse);
+	
+	// What do we want as returning value?
 	rpc get_submission_details(GetSubmissionDetailsRequest) returns (GetSubmissionDetailsResponse);
 }

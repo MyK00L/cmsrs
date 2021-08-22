@@ -28,7 +28,7 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: example
-      MONGO_INITDB_DATABASE: contestdb
+      MONGO_INITDB_DATABASE: submissionsdb
     volumes:
       - ./submission_service/db/init.js:/docker-entrypoint-initdb.d/init.js
       # - submission_service_db_volume:/data/db

@@ -9,7 +9,7 @@ db.createCollection("submissions", {
         problemId: { bsonType: "int" },
         created: { bsonType: "timestamp" },
         source: { bsonType: "binData" },
-        state: { enum: ['Pending','Evaluated'] },
+        state: { enum: ["Pending","Evaluated"] },
         compilation: {
           bsonType: "object",
           required: ["outcome", "timeMs", "memoryB"],
@@ -19,7 +19,7 @@ db.createCollection("submissions", {
             memoryB: { bsonType: "int" },
             error: { bsonType: "string" }
           }
-        },
+        }, // EvaluationResult.compilation_result
         evaluation: {
           bsonType: "object",
           required: ["subtasks"],
@@ -35,7 +35,7 @@ db.createCollection("submissions", {
                       { bsonType: "bool"},
                       { bsonType: "double"}
                     ]
-                  },
+                  }, // SubtaskResult.subtask_score
                   testcases: {
                     bsonType: "array",
                     items: {
@@ -49,23 +49,23 @@ db.createCollection("submissions", {
                               verdict: { bsonType : "string" } ,
                               score: { bsonType: "double" },
                           }
-                        },
-                        timeMs: { bsonType: "int" },
-                        memoryB: { bsonType: "int" },
+                        }, // TestcaseResult.outcome + TestcaseResult.verdict
+                        timeNs: { bsonType: "int" }, // TestcaseResult.used_resources
+                        memoryB: { bsonType: "int" }, // TestcaseResult.used_resources
                       }
                     }
-                  }
+                  } // SubtaskResult.testcase_results
                 }
               }
             }
-          }
+          } // EvaluationResult.subtask_results
         },
         overallScore: { 
           oneOf: [ 
             { bsonType: "bool"},
             { bsonType: "double"}
           ]
-        }
+        } // EvaluationResult.overall_score
       }
     }
   }
