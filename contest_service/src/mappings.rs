@@ -88,13 +88,13 @@ pub mod chat {
         _thread: Option<i64>,
     }
     impl Message {
-        fn is_announcement(&self) -> bool {
+        pub fn is_announcement(&self) -> bool {
             self.from.is_none()
         }
-        fn is_broadcast(&self) -> bool {
+        pub fn is_broadcast(&self) -> bool {
             self.is_announcement() && self.to.is_none()
         }
-        fn is_question(&self) -> bool {
+        pub fn is_question(&self) -> bool {
             self.to.is_none() && self.from.is_some()
         }
         fn get_recipient(&self) -> Option<String> {
@@ -162,17 +162,31 @@ pub mod chat {
     impl From<Message> for mongodb::bson::Document {
         fn from(m: Message) -> Self {
             let mut resp = Document::new();
-            resp.insert("id", m.id);
+            resp.insert("_id", m.id);
             resp.insert("subject", m.subject.clone());
             resp.insert("problemId", m.problem_id);
             resp.insert("text", m.body.clone());
             if m.is_announcement() {
                 resp.insert("to", m.get_recipient());
-            } else {
+            } else if m.is_question() {
                 resp.insert("from", m.get_recipient());
             }
             resp.insert("created", utils::systime_to_timestamp(m.created));
             resp
+        }
+    }
+    impl From<Document> for Message {
+        fn from(d: Document) -> Self {
+            Self {
+                id: d.get_i32("_id").unwrap() as u32,
+                subject: d.get_str("subject").unwrap().to_owned(),
+                problem_id: d.get_i32("problemId").map(|x| x as u32).ok(),
+                body: d.get_str("text").unwrap().to_owned(),
+                to: d.get_str("to").map(|x| x.to_owned()).ok(),
+                from: d.get_str("from").map(|x| x.to_owned()).ok(),
+                created: utils::timestamp_to_systime(d.get_timestamp("created").unwrap()),
+                _thread: None,
+            }
         }
     }
 }
