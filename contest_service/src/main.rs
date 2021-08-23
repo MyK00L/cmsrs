@@ -1,7 +1,7 @@
 use futures::stream::StreamExt;
+use serde::Serialize;
 use std::convert::TryFrom;
 
-use mappings::chat::Message;
 use mongodb::{
     bson::{doc, Document},
     options::{ClientOptions, UpdateOptions},
@@ -39,12 +39,17 @@ impl ContestService {
     }
 
     /// Do not call this function, call get_*_collection or get_contest_metadata instead
-    fn get_collection(&self, collection_name: &str) -> mongodb::Collection<Document> {
+    fn get_collection<T>(&self, collection_name: &str) -> mongodb::Collection<T>
+    where
+        T: Serialize,
+    {
         let db = self.db_client.database("contestdb");
-        db.collection::<Document>(collection_name)
+        db.collection::<T>(collection_name)
     }
 
-    fn get_contest_metadata_collection(&self) -> mongodb::Collection<Document> {
+    fn get_contest_metadata_collection(
+        &self,
+    ) -> mongodb::Collection<mappings::contest::ContestMetadata> {
         self.get_collection("contest_metadata")
     }
 
@@ -56,15 +61,15 @@ impl ContestService {
         self.get_collection("users")
     }
 
-    fn get_announcements_collection(&self) -> mongodb::Collection<Document> {
+    fn get_announcements_collection(&self) -> mongodb::Collection<mappings::chat::Message> {
         self.get_collection("announcements")
     }
 
-    fn get_questions_collection(&self) -> mongodb::Collection<Document> {
+    fn get_questions_collection(&self) -> mongodb::Collection<mappings::chat::Message> {
         self.get_collection("questions")
     }
 
-    async fn get_contest_metadata(&self) -> Result<Document, Status> {
+    async fn get_contest_metadata(&self) -> Result<mappings::contest::ContestMetadata, Status> {
         Ok(self
             .get_contest_metadata_collection()
             .find_one(None, None)
@@ -121,9 +126,7 @@ impl Contest for ContestService {
     ) -> Result<Response<GetContestMetadataResponse>, Status> {
         self.get_contest_metadata()
             .await
-            .map(|contest_metadata_doc| {
-                mappings::contest::ContestMetadata::from(contest_metadata_doc).into()
-            })
+            .map(|contest_metadata_doc| contest_metadata_doc.into())
     }
     async fn get_problem(
         &self,
@@ -152,8 +155,7 @@ impl Contest for ContestService {
             .find(None, None)
             .await
             .map_err(internal_error)?
-            .map(|x| Message::from(x.unwrap()))
-            .map(|x| x.into())
+            .map(|x| x.unwrap().into())
             .collect::<Vec<_>>()
             .await;
         Ok(Response::new(GetAnnouncementListResponse { announcements }))
@@ -167,7 +169,7 @@ impl Contest for ContestService {
             .find(None, None)
             .await
             .map_err(internal_error)?
-            .map(|x| Message::from(x.unwrap()))
+            .map(|x| x.unwrap())
             .map(|x| x.into())
             .collect::<Vec<_>>()
             .await;
@@ -253,7 +255,7 @@ impl Contest for ContestService {
         } else {
             self.get_announcements_collection()
         }
-        .insert_one(Document::from(message), None)
+        .insert_one(message, None)
         .await
         .map_err(internal_error)?;
         Ok(Response::new(AddMessageResponse {}))

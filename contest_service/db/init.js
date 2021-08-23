@@ -64,6 +64,7 @@ db.createCollection("announcements", {
                 subject: { bsonType: "string" },
                 problemId: { bsonType: "int" },
                 text: { bsonType: "string" },
+                from: { bsonType: "string" },
                 to: { bsonType: "string" },
                 created: { bsonType: "timestamp" }
             }
@@ -82,6 +83,7 @@ db.createCollection("questions", {
                 problemId: { bsonType: "int" },
                 text: { bsonType: "string" },
                 from: { bsonType: "string" },
+                to: { bsonType: "string" },
                 created: { bsonType: "timestamp" }
             }
         }
