@@ -8,10 +8,10 @@ message Problem {
 	uint32 id = 1;
 	string name = 2;
 	string description = 3; // long name
-	repeated uint32 testcases_per_subtask = 4;
-	common.Resources runtime_limits = 5;
-	uint64 source_size_limit = 6;
-	string type = 7; // unsure about this
+	// repeated uint32 testcases_per_subtask = 4;
+	// common.Resources runtime_limits = 5;
+	// uint64 source_size_limit = 6;
+	// string type = 7; // unsure about this
 	// available languages ...
 	// statements & various files ...
 }

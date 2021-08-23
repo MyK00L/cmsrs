@@ -201,25 +201,25 @@ pub mod problem {
     }
     use mongodb::bson::Document;
 
-    #[derive(Default, Clone)]
+    /*#[derive(Default, Clone)]
     pub struct Resources {
         time_limit: std::time::Duration,
         /// Maximum memory usage, in bytes
         memory: u64,
-    }
+    }*/
 
     #[derive(Default, Clone)]
     pub struct Problem {
         id: u32,
         name: String,
         description: String,
-        testcases_per_subtask: Vec<u32>,
+        /*testcases_per_subtask: Vec<u32>,
         runtime_limits: Resources,
         source_size_limit: u64,
-        task_type: String,
+        task_type: String,*/
     }
 
-    impl From<protos::common::Resources> for Resources {
+    /*impl From<protos::common::Resources> for Resources {
         fn from(input: protos::common::Resources) -> Self {
             Resources {
                 time_limit: input
@@ -229,38 +229,38 @@ pub mod problem {
                 memory: input.memory_bytes,
             }
         }
-    }
+    }*/
     impl From<protos::user::Problem> for Problem {
         fn from(input: protos::user::Problem) -> Self {
             Problem {
                 id: input.id,
                 name: input.name,
                 description: input.description,
-                testcases_per_subtask: input.testcases_per_subtask,
+                /*testcases_per_subtask: input.testcases_per_subtask,
                 runtime_limits: input.runtime_limits.map(|x| x.into()).unwrap(),
                 source_size_limit: input.source_size_limit,
-                task_type: input.r#type,
+                task_type: input.r#type,*/
             }
         }
     }
-    impl From<Resources> for protos::common::Resources {
+    /*impl From<Resources> for protos::common::Resources {
         fn from(input: Resources) -> Self {
             protos::common::Resources {
                 time: Some(input.time_limit.into()),
                 memory_bytes: input.memory,
             }
         }
-    }
+    }*/
     impl From<Problem> for protos::user::Problem {
         fn from(p: Problem) -> Self {
             protos::user::Problem {
                 id: p.id,
                 name: p.name,
                 description: p.description,
-                testcases_per_subtask: p.testcases_per_subtask,
+                /*testcases_per_subtask: p.testcases_per_subtask,
                 runtime_limits: Some(p.runtime_limits.into()),
                 source_size_limit: p.source_size_limit,
-                r#type: p.task_type,
+                r#type: p.task_type,*/
             }
         }
     }
@@ -307,4 +307,13 @@ pub mod problem {
             ProblemData(p, bin)
         }
     }
+}
+
+pub mod user {
+
+    enum Password {
+        Hashed(String),
+        Clear(String),
+    }
+    pub struct User {}
 }
