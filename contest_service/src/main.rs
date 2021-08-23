@@ -85,9 +85,7 @@ impl Contest for ContestService {
         Ok(self
             .get_users_collection()
             .find_one(
-                doc! {
-                    "_id": username,
-                },
+                doc! { "_id": username },
                 None,
             )
             .await
@@ -181,10 +179,8 @@ impl Contest for ContestService {
 
         self.get_users_collection()
             .update_one(
-                doc! {
-                    "_id": user.get_username()
-                },
-                Document::from(user),
+                doc! { "_id": user.get_username() },
+                doc! { "$set": Document::from(user) },
                 UpdateOptions::builder().upsert(true).build(),
             )
             .await
@@ -228,7 +224,7 @@ impl Contest for ContestService {
                 let document: Document = problem_data.into();
                 self.get_problems_collection()
                     .update_one(
-                        doc! {"_id": document.get_i32("_id").unwrap()},
+                        doc! { "_id": document.get_i32("_id").unwrap() },
                         doc! { "$set": document },
                         UpdateOptions::builder().upsert(true).build(),
                     )
