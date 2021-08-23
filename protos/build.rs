@@ -4,7 +4,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "protos/common.proto",
             "protos/evaluation.proto",
             "protos/scoring.proto",
-            "protos/user.proto",
             "protos/worker.proto",
             "protos/service/contest.proto",
             "protos/service/dispatcher.proto",

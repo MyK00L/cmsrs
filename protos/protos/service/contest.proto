@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package service.contest;
 
-import "user.proto";
 import "google/protobuf/timestamp.proto";
 
 message AuthUserRequest {
@@ -34,19 +33,33 @@ message GetContestMetadataResponse {
 	ContestMetadata metadata = 1;
 }
 
+message Problem {
+	uint32 id = 1;
+	string name = 2;
+	string long_name = 3;
+}
 message GetProblemRequest {
 	uint32 problem_id = 1;
 }
 message GetProblemResponse {
- 	user.Problem info = 1;
+ 	Problem info = 1;
 	bytes statement = 2;
 }
 
+message Message { // questions and announcements are the same
+	uint32 id = 1;
+	string subject = 2;
+	optional uint32 problem_id = 3;
+	string text = 4;
+	optional string from = 5;
+	optional string to = 6;
+	google.protobuf.Timestamp sent_at = 7;
+}
 message GetAnnouncementListRequest {
 	optional uint32 problem_id = 1;
 }
 message GetAnnouncementListResponse {
-	repeated user.Message announcements = 1;
+	repeated Message announcements = 1;
 }
 
 message GetQuestionListRequest {
@@ -54,7 +67,7 @@ message GetQuestionListRequest {
 	optional uint32 user_id = 2;
 }
 message GetQuestionListResponse {
-	repeated user.Message questions = 1;
+	repeated Message questions = 1;
 }
 
 
@@ -77,13 +90,13 @@ message SetContestMetadataRequest {
 message SetContestMetadataResponse {}
 
 message SetProblemRequest {
-	optional user.Problem info = 1;
+	optional Problem info = 1;
  	optional bytes statement = 2;
 }
 message SetProblemResponse {}
 
 message AddMessageRequest {
-	user.Message message = 1;
+	Message message = 1;
 }
 message AddMessageResponse {}
 

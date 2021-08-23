@@ -126,8 +126,8 @@ pub mod chat {
         }
     }
 
-    impl From<protos::user::Message> for Message {
-        fn from(msg: protos::user::Message) -> Self {
+    impl From<protos::service::contest::Message> for Message {
+        fn from(msg: protos::service::contest::Message) -> Self {
             Self {
                 id: msg.id,
                 subject: msg.subject,
@@ -148,7 +148,7 @@ pub mod chat {
             Self::from(req.message.unwrap())
         }
     }
-    impl From<Message> for protos::user::Message {
+    impl From<Message> for protos::service::contest::Message {
         fn from(msg: Message) -> Self {
             Self {
                 id: msg.id,
@@ -205,66 +205,29 @@ pub mod problem {
     }
     use mongodb::bson::Document;
 
-    /*#[derive(Default, Clone)]
-    pub struct Resources {
-        time_limit: std::time::Duration,
-        /// Maximum memory usage, in bytes
-        memory: u64,
-    }*/
-
     #[derive(Default, Clone)]
     pub struct Problem {
         id: u32,
         name: String,
-        description: String,
-        /*testcases_per_subtask: Vec<u32>,
-        runtime_limits: Resources,
-        source_size_limit: u64,
-        task_type: String,*/
+        long_name: String,
     }
 
-    /*impl From<protos::common::Resources> for Resources {
-        fn from(input: protos::common::Resources) -> Self {
-            Resources {
-                time_limit: input
-                    .time
-                    .map(|x| std::convert::TryInto::try_into(x).unwrap_or_default())
-                    .unwrap(),
-                memory: input.memory_bytes,
-            }
-        }
-    }*/
-    impl From<protos::user::Problem> for Problem {
-        fn from(input: protos::user::Problem) -> Self {
+    impl From<protos::service::contest::Problem> for Problem {
+        fn from(input: protos::service::contest::Problem) -> Self {
             Problem {
                 id: input.id,
                 name: input.name,
-                description: input.description,
-                /*testcases_per_subtask: input.testcases_per_subtask,
-                runtime_limits: input.runtime_limits.map(|x| x.into()).unwrap(),
-                source_size_limit: input.source_size_limit,
-                task_type: input.r#type,*/
+                long_name: input.long_name,
             }
         }
     }
-    /*impl From<Resources> for protos::common::Resources {
-        fn from(input: Resources) -> Self {
-            protos::common::Resources {
-                time: Some(input.time_limit.into()),
-                memory_bytes: input.memory,
-            }
-        }
-    }*/
-    impl From<Problem> for protos::user::Problem {
+
+    impl From<Problem> for protos::service::contest::Problem {
         fn from(p: Problem) -> Self {
-            protos::user::Problem {
+            protos::service::contest::Problem {
                 id: p.id,
                 name: p.name,
-                description: p.description,
-                /*testcases_per_subtask: p.testcases_per_subtask,
-                runtime_limits: Some(p.runtime_limits.into()),
-                source_size_limit: p.source_size_limit,
-                r#type: p.task_type,*/
+                long_name: p.long_name,
             }
         }
     }
@@ -274,11 +237,10 @@ pub mod problem {
                 Problem {
                     id: mongo_record.get_i32("_id").unwrap_or_default() as u32,
                     name: mongo_record.get_str("name").unwrap_or_default().to_owned(),
-                    description: mongo_record
+                    long_name: mongo_record
                         .get_str("longName")
                         .unwrap_or_default()
                         .to_owned(),
-                    //..Default::default()
                 },
                 mongo_record
                     .get_binary_generic("statement")
@@ -294,7 +256,7 @@ pub mod problem {
             let mut result = Document::new();
             result.insert("_id", p.id);
             result.insert("name", p.name.clone());
-            result.insert("longName", p.description);
+            result.insert("longName", p.long_name);
             result.insert(
                 "statement",
                 mongodb::bson::Binary {

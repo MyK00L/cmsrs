@@ -14,9 +14,6 @@ pub mod evaluation {
 pub mod scoring {
     tonic::include_proto!("scoring");
 }
-pub mod user {
-    tonic::include_proto!("user");
-}
 pub mod worker {
     tonic::include_proto!("worker");
 }
