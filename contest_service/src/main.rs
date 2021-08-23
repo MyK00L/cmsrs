@@ -84,12 +84,9 @@ impl Contest for ContestService {
         let username = user.username.clone();
         Ok(self
             .get_users_collection()
-            .find_one(
-                doc! { "_id": username },
-                None,
-            )
+            .find_one(doc! { "_id": username }, None)
             .await
-            .ok_or_else(|| Status::not_found(format!("User {} was not found", username))?
+            .ok_or_else(|| Status::not_found(format!("User {} was not found", username)))?
             .map_err(internal_error)?
             .map(mappings::user::User::from)
             .filter(|u| {
