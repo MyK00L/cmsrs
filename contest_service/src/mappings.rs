@@ -2,7 +2,6 @@ use std::convert::TryFrom;
 
 use mongodb::bson::Document;
 use protos::service::contest::GetContestMetadataResponse;
-use serde::{Deserialize, Serialize};
 use tonic::Response;
 
 #[derive(Debug)]
@@ -17,14 +16,29 @@ pub mod contest {
     use std::convert::TryInto;
 
     use super::*;
-
-    #[derive(Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct ContestMetadata {
         name: String,
         description: String,
         start_time: Option<std::time::SystemTime>,
         end_time: Option<std::time::SystemTime>,
+    }
+    impl From<Document> for ContestMetadata {
+        fn from(value: Document) -> Self {
+            Self {
+                name: value.get("name").unwrap().to_string(),
+                description: value.get("description").unwrap().to_string(),
+                start_time: value.get("startTime").map(|x| {
+                    x.as_timestamp()
+                        .map(convert::mongo::timestamp_to_systime)
+                        .unwrap()
+                }),
+                end_time: value.get("endTime").map(|x| {
+                    x.as_timestamp()
+                        .map(convert::mongo::timestamp_to_systime)
+                        .unwrap()
+                }),
+            }
+        }
     }
     impl From<ContestMetadata> for Response<GetContestMetadataResponse> {
         fn from(md: ContestMetadata) -> Self {
@@ -82,14 +96,10 @@ pub mod contest {
 pub mod chat {
     use super::*;
 
-    #[derive(Serialize, Deserialize)]
-    #[serde(rename_all = "camelCase")]
     pub struct Message {
-        #[serde(rename = "_id")]
         id: u32,
         subject: String,
         problem_id: Option<u32>,
-        #[serde(rename = "text")]
         body: String,
         to: Option<String>,
         from: Option<String>,
@@ -107,13 +117,13 @@ pub mod chat {
         pub fn is_question(&self) -> bool {
             self.to.is_none() && self.from.is_some()
         }
-        /*fn get_recipient(&self) -> Option<String> {
+        fn get_recipient(&self) -> Option<String> {
             if self.is_announcement() {
                 self.to.clone()
             } else {
                 self.from.clone()
             }
-        }*/
+        }
     }
 
     impl From<protos::user::Message> for Message {
@@ -148,6 +158,36 @@ pub mod chat {
                 sent_at: Some(protos::prost_types::Timestamp::from(msg.sent_at)),
                 from: msg.from,
                 to: msg.to,
+            }
+        }
+    }
+    impl From<Message> for mongodb::bson::Document {
+        fn from(m: Message) -> Self {
+            let mut resp = Document::new();
+            resp.insert("_id", m.id);
+            resp.insert("subject", m.subject.clone());
+            resp.insert("problemId", m.problem_id);
+            resp.insert("text", m.body.clone());
+            if m.is_announcement() {
+                resp.insert("to", m.get_recipient());
+            } else if m.is_question() {
+                resp.insert("from", m.get_recipient());
+            }
+            resp.insert("created", convert::mongo::systime_to_timestamp(m.created));
+            resp
+        }
+    }
+    impl From<Document> for Message {
+        fn from(d: Document) -> Self {
+            Self {
+                id: d.get_i32("_id").unwrap() as u32,
+                subject: d.get_str("subject").unwrap().to_owned(),
+                problem_id: d.get_i32("problemId").map(|x| x as u32).ok(),
+                body: d.get_str("text").unwrap().to_owned(),
+                to: d.get_str("to").map(|x| x.to_owned()).ok(),
+                from: d.get_str("from").map(|x| x.to_owned()).ok(),
+                created: convert::mongo::timestamp_to_systime(d.get_timestamp("created").unwrap()),
+                _thread: None,
             }
         }
     }
@@ -277,12 +317,12 @@ pub mod user {
     use super::*;
     use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier};
 
-    #[derive(Clone, Serialize, Deserialize)]
+    #[derive(Clone)]
     enum Password {
         Hashed(String),
         Clear(String),
     }
-    #[derive(Clone, Serialize, Deserialize)]
+    #[derive(Clone)]
     pub struct User {
         username: String,
         name: String,
