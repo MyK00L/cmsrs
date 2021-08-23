@@ -17,6 +17,7 @@ async-stream = "0.3"
 [dev-dependencies]
 tower = "0.4"
 tokio-test = "0.4"
+futures-util = "0.3"
 
 [features]
 loopback = ["protos/loopback"]
