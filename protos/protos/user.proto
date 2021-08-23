@@ -23,5 +23,5 @@ message Message { // questions and announcements are the same
 	string text = 4;
 	optional string from = 5;
 	optional string to = 6;
-	google.protobuf.Timestamp timestamp = 7;
+	google.protobuf.Timestamp sent_at = 7;
 }

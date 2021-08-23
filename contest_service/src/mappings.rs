@@ -93,7 +93,7 @@ pub mod chat {
         body: String,
         to: Option<String>,
         from: Option<String>,
-        created: std::time::SystemTime,
+        sent_at: std::time::SystemTime,
         #[serde(skip)]
         _thread: Option<i64>,
     }
@@ -125,8 +125,8 @@ pub mod chat {
                 body: msg.text,
                 to: msg.to,
                 from: msg.from,
-                created: msg
-                    .timestamp
+                sent_at: msg
+                    .sent_at
                     .map(|x| std::time::SystemTime::try_from(x).unwrap())
                     .unwrap(),
                 _thread: None,
@@ -145,7 +145,7 @@ pub mod chat {
                 problem_id: msg.problem_id,
                 subject: msg.subject.clone(),
                 text: msg.body.clone(),
-                timestamp: Some(protos::prost_types::Timestamp::from(msg.created)),
+                sent_at: Some(protos::prost_types::Timestamp::from(msg.sent_at)),
                 from: msg.from,
                 to: msg.to,
             }
