@@ -277,7 +277,7 @@ pub mod problem {
                         .get_str("longName")
                         .unwrap_or_default()
                         .to_owned(),
-                    ..Default::default()
+                    //..Default::default()
                 },
                 mongo_record
                     .get_binary_generic("statement")
@@ -316,10 +316,12 @@ pub mod user {
     use super::*;
     use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier};
 
+    #[derive(Clone)]
     enum Password {
         Hashed(String),
         Clear(String),
     }
+    #[derive(Clone)]
     pub struct User {
         username: String,
         name: String,
@@ -334,7 +336,7 @@ pub mod user {
                 let salt = argon2::password_hash::SaltString::generate(&mut rand_core::OsRng);
                 let hashed_password = argon2
                     .hash_password_simple(pass.as_bytes(), &salt)
-                    .map_err(|e| MappingError::HashingError(e))?;
+                    .map_err(MappingError::HashingError)?;
                 self.password = Password::Hashed(hashed_password.to_string());
                 Ok(())
             } else {
@@ -343,13 +345,16 @@ pub mod user {
         }
         pub fn verify_password(&mut self, password: &str) -> Result<bool, MappingError> {
             if let Password::Hashed(hash) = &self.password {
-                let hash = PasswordHash::new(hash).map_err(|e| MappingError::HashingError(e))?;
+                let hash = PasswordHash::new(hash).map_err(MappingError::HashingError)?;
                 Ok(argon2::Argon2::default()
                     .verify_password(password.as_bytes(), &hash)
                     .is_ok())
             } else {
                 Err(MappingError::PasswordNotHashed)
             }
+        }
+        pub fn get_username(&self) -> &str {
+            &self.username
         }
     }
 
@@ -374,7 +379,8 @@ pub mod user {
     }
     impl From<User> for Document {
         fn from(u: User) -> Self {
-            u.hash_password();
+            let mut u = u;
+            u.hash_password().expect("Could not hash password");
             let mut result = Document::new();
             result.insert("_id", u.username);
             result.insert("longName", u.name);
@@ -389,6 +395,14 @@ pub mod user {
                 .unwrap(),
             );
             result
+        }
+    }
+    impl From<User> for protos::service::contest::auth_user_response::Response {
+        fn from(u: User) -> Self {
+            Self::Success(protos::service::contest::auth_user_response::Success {
+                username: u.username,
+                fullname: u.name,
+            })
         }
     }
 }

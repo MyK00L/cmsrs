@@ -1,7 +1,6 @@
 use futures::stream::StreamExt;
 use std::convert::TryFrom;
 
-use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier};
 use mappings::chat::Message;
 use mongodb::{
     bson::{doc, Document},
@@ -75,16 +74,6 @@ impl ContestService {
     }
 }
 
-fn check_password(password: &str, user_doc: &Document) -> bool {
-    user_doc.get_str("password").map_or(false, |hash| {
-        PasswordHash::new(hash).map_or(false, |parsed_hash| {
-            argon2::Argon2::default()
-                .verify_password(password.as_bytes(), &parsed_hash)
-                .is_ok()
-        })
-    })
-}
-
 #[tonic::async_trait]
 impl Contest for ContestService {
     async fn auth_user(
@@ -102,8 +91,15 @@ impl Contest for ContestService {
                 None,
             )
             .await
-            .map_err(|err| Status::internal(format!("{}", err)))? // TODO fix with error conversion
-            .filter(|user_doc| check_password(&user.password, user_doc))
+            .map_err(internal_error)?
+            .map(mappings::user::User::from)
+            .filter(|u| {
+                if let Ok(r) = u.clone().verify_password(&user.password) {
+                    r
+                } else {
+                    false
+                }
+            })
             .map_or(
                 Response::new(AuthUserResponse {
                     response: Some(auth_user_response::Response::Failure(
@@ -112,14 +108,9 @@ impl Contest for ContestService {
                         },
                     )),
                 }),
-                |user_doc| {
+                |u| {
                     Response::new(AuthUserResponse {
-                        response: Some(auth_user_response::Response::Success(
-                            auth_user_response::Success {
-                                username: user_doc.get("_id").unwrap().to_string(),
-                                fullname: user_doc.get("fullName").unwrap().to_string(),
-                            },
-                        )),
+                        response: Some(u.into()),
                     })
                 },
             ))
@@ -186,28 +177,14 @@ impl Contest for ContestService {
         &self,
         request: Request<SetUserRequest>,
     ) -> Result<Response<SetUserResponse>, Status> {
-        let argon2 = argon2::Argon2::default();
-
-        let user = request.into_inner();
-        let username = user.username.clone();
-        let fullname = user.fullname.clone();
-
-        let salt = argon2::password_hash::SaltString::generate(&mut rand_core::OsRng);
-        let hashed_password = argon2
-            .hash_password_simple(user.password.as_bytes(), &salt)
-            .map_err(|_| tonic::Status::new(tonic::Code::Internal, "failed to hash password"))?;
+        let user: mappings::user::User = request.into_inner().into();
 
         self.get_users_collection()
             .update_one(
                 doc! {
-                    "_id": username
+                    "_id": user.get_username()
                 },
-                doc! {
-                    "$set": doc! {
-                        "fullName": fullname,
-                        "password": hashed_password.to_string(),
-                    }
-                },
+                Document::from(user),
                 UpdateOptions::builder().upsert(true).build(),
             )
             .await
