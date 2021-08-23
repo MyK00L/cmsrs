@@ -7,6 +7,9 @@ use tonic::Response;
 #[derive(Debug)]
 pub enum MappingError {
     MissingField(&'static str),
+    PasswordAlreadyHashed,
+    PasswordNotHashed,
+    HashingError(argon2::password_hash::Error),
 }
 
 pub mod contest {
@@ -310,10 +313,82 @@ pub mod problem {
 }
 
 pub mod user {
+    use super::*;
+    use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier};
 
     enum Password {
         Hashed(String),
         Clear(String),
     }
-    pub struct User {}
+    pub struct User {
+        username: String,
+        name: String,
+        password: Password,
+    }
+
+    impl User {
+        fn hash_password(&mut self) -> Result<(), MappingError> {
+            if let Password::Clear(pass) = &self.password {
+                let argon2 = argon2::Argon2::default();
+
+                let salt = argon2::password_hash::SaltString::generate(&mut rand_core::OsRng);
+                let hashed_password = argon2
+                    .hash_password_simple(pass.as_bytes(), &salt)
+                    .map_err(|e| MappingError::HashingError(e))?;
+                self.password = Password::Hashed(hashed_password.to_string());
+                Ok(())
+            } else {
+                Ok(())
+            }
+        }
+        pub fn verify_password(&mut self, password: &str) -> Result<bool, MappingError> {
+            if let Password::Hashed(hash) = &self.password {
+                let hash = PasswordHash::new(hash).map_err(|e| MappingError::HashingError(e))?;
+                Ok(argon2::Argon2::default()
+                    .verify_password(password.as_bytes(), &hash)
+                    .is_ok())
+            } else {
+                Err(MappingError::PasswordNotHashed)
+            }
+        }
+    }
+
+    impl From<Document> for User {
+        fn from(record: Document) -> Self {
+            Self {
+                username: record.get_str("_id").unwrap().to_owned(),
+                name: record.get_str("fullName").unwrap().to_owned(),
+                // Here I assume that the password stored in the DB are hashed, since I hash them before insertion
+                password: Password::Hashed(record.get_str("password").unwrap().to_owned()),
+            }
+        }
+    }
+    impl From<protos::service::contest::SetUserRequest> for User {
+        fn from(pb: protos::service::contest::SetUserRequest) -> Self {
+            Self {
+                username: pb.username,
+                name: pb.fullname,
+                password: Password::Clear(pb.password),
+            }
+        }
+    }
+    impl From<User> for Document {
+        fn from(u: User) -> Self {
+            u.hash_password();
+            let mut result = Document::new();
+            result.insert("_id", u.username);
+            result.insert("longName", u.name);
+            result.insert(
+                "password",
+                {
+                    match u.password {
+                        Password::Clear(_) => None,
+                        Password::Hashed(h) => Some(h),
+                    }
+                }
+                .unwrap(),
+            );
+            result
+        }
+    }
 }
