@@ -104,7 +104,7 @@ pub mod chat {
         to: Option<String>,
         from: Option<String>,
         sent_at: std::time::SystemTime,
-        #[serde(skip)]
+        //#[serde(skip)]
         _thread: Option<i64>,
     }
     impl Message {
@@ -173,7 +173,7 @@ pub mod chat {
             } else if m.is_question() {
                 resp.insert("from", m.get_recipient());
             }
-            resp.insert("created", convert::mongo::systime_to_timestamp(m.created));
+            resp.insert("created", convert::mongo::systime_to_timestamp(m.sent_at));
             resp
         }
     }
@@ -186,7 +186,7 @@ pub mod chat {
                 body: d.get_str("text").unwrap().to_owned(),
                 to: d.get_str("to").map(|x| x.to_owned()).ok(),
                 from: d.get_str("from").map(|x| x.to_owned()).ok(),
-                created: convert::mongo::timestamp_to_systime(d.get_timestamp("created").unwrap()),
+                sent_at: convert::mongo::timestamp_to_systime(d.get_timestamp("created").unwrap()),
                 _thread: None,
             }
         }
