@@ -89,6 +89,7 @@ impl Contest for ContestService {
                 None,
             )
             .await
+            .ok_or_else(|| Status::not_found(format!("User {} was not found", username))?
             .map_err(internal_error)?
             .map(mappings::user::User::from)
             .filter(|u| {
