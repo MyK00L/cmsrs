@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>users</title>
+		<meta charset="UTF-8">
+	</head>
+	<body>
+	<ul>
+			<li><a href="/home">home</a></li>
+			<li><a href="/questions">questions</a></li>
+			<li><a href="/submissions">submissions</a></li>
+			<li><a href="/contest">contest</a></li>
+			<li><a href="/problems">problems</a></li>
+			<li><a href="/users">users</a></li>
+	</ul>
+	<hr>
+	<form action="/form/add_user" method="post" enctype="multipart/form-data">
+		<input type="text" name="name"><br>
+		<input type="password" name="passw"><br>
+		<input type="submit" value="Add">
+	</form>
+	</body>
+</html>

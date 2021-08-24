@@ -24,8 +24,6 @@
 			<input type="checkbox" name="broadcast"><br>
 			<input type="submit">
 		</form>
-		</body>
 	{% endfor %}
-	
 	</body>
 </html>

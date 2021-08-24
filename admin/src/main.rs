@@ -43,6 +43,21 @@ async fn login_form(cookies: &CookieJar<'_>, login: Form<Strict<LoginForm>>) -> 
 }
 
 #[derive(FromForm)]
+struct AddUserForm {
+    name: String,
+    passw: String,
+}
+#[post("/form/add_user", data = "<user>")]
+async fn add_user_form(_admin: Admin, user: Form<Strict<AddUserForm>>, contest_client: &State<ContestClient>) -> Result<(),String> {
+    let contest_client = contest_client.inner().clone();
+    let req = protos::service::contest::SetUserRequest{name:user.name.clone(),passw:user.passw.clone()};
+    match contest_client.set_user(tonic::Request::new(req)).await {
+        Ok(_) => Ok(()),
+        Err(err) => Err(format!("Error in sending request:\n{:?}",err)),
+    }
+}
+
+#[derive(FromForm)]
 struct ReplyForm<> {
     user: String,
     subject: String,
@@ -133,7 +148,9 @@ fn rocket() -> _ {
     let mut contest_client = protos::service::contest::MockContest::default();
     contest_client.get_question_list_set(protos::service::contest::GetQuestionListResponse{
         questions: vec![
-            protos::user::Message{subject:String::from("Problem A"),text:String::from("oh hi"),user:Some(String::from("me")),..Default::default()}
+            protos::user::Message{subject:String::from("Problem A"),text:String::from("oh hi"),user:Some(String::from("me")),..Default::default()},
+            protos::user::Message{subject:String::from("Problem AA"),text:String::from("///"),user:Some(String::from("a")),..Default::default()},
+            protos::user::Message{subject:String::from("Problem C"),text:String::from("uwu"),user:Some(String::from("b")),..Default::default()}
         ]
     });
     rocket::build()
@@ -147,7 +164,8 @@ fn rocket() -> _ {
                 statics_redirect,
                 questions,
                 login_form,
-                reply_form
+                reply_form,
+                add_user_form,
             ],
         ).attach(Template::fairing())
 }
