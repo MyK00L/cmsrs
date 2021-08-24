@@ -86,7 +86,6 @@ impl Contest for ContestService {
             .get_users_collection()
             .find_one(doc! { "_id": username }, None)
             .await
-            .ok_or_else(|| Status::not_found(format!("User {} was not found", username)))?
             .map_err(internal_error)?
             .map(mappings::user::User::from)
             .filter(|u| {
