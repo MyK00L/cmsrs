@@ -3,10 +3,8 @@ use rocket::http::{Cookie, CookieJar};
 use rocket::outcome::IntoOutcome;
 use rocket::request::FromRequest;
 use rocket::response::Redirect;
-//use rocket::response::content::Html;
 use rocket::*;
 use protos::service::contest::contest_server::Contest;
-//use rocket::http::RawStr;
 use rocket_dyn_templates::Template;
 use rocket::serde::Serialize;
 use std::path::{PathBuf, Path};
@@ -90,7 +88,7 @@ async fn questions(_admin: Admin, contest_client: &State<ContestClient>) -> Opti
         Some(response) => {
             let questions = TemplateQuestions{questions:response.into_inner().questions.iter().map(|q|{
                 TemplateQuestion{
-                    user: q.user.clone().unwrap_or(String::from("")),
+                    user: q.user.clone().unwrap_or_else(|| String::from("")),
                     subject: q.subject.clone(),
                     text: q.text.clone(),
                 }
