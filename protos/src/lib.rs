@@ -1,5 +1,7 @@
 #![feature(trait_alias)]
 
+pub use prost_types;
+
 #[macro_use]
 mod mock_macro;
 
@@ -12,9 +14,6 @@ pub mod evaluation {
 pub mod scoring {
     tonic::include_proto!("scoring");
 }
-pub mod user {
-    tonic::include_proto!("user");
-}
 pub mod worker {
     tonic::include_proto!("worker");
 }
@@ -23,15 +22,14 @@ pub mod service {
         tonic::include_proto!("service.contest");
         rpc_mock_server!(contest_server::Contest; MockContest;
         (auth_user,AuthUserRequest,AuthUserResponse),
-        (get_contest,GetContestRequest,GetContestResponse),
+        (get_contest_metadata,GetContestMetadataRequest,GetContestMetadataResponse),
         (get_problem,GetProblemRequest,GetProblemResponse),
         (get_announcement_list,GetAnnouncementListRequest,GetAnnouncementListResponse),
         (get_question_list,GetQuestionListRequest,GetQuestionListResponse),
         (set_user,SetUserRequest,SetUserResponse),
-        (set_contest,SetContestRequest,SetContestResponse),
+        (set_contest_metadata,SetContestMetadataRequest,SetContestMetadataResponse),
         (set_problem,SetProblemRequest,SetProblemResponse),
-        (add_question,AddQuestionRequest,AddQuestionResponse),
-        (add_announcement,AddAnnouncementRequest,AddAnnouncementResponse)
+        (add_message,AddMessageRequest,AddMessageResponse)
         );
     }
     pub mod dispatcher {
