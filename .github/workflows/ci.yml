@@ -3,7 +3,6 @@ name: CI
 on: [push, pull_request]
 
 jobs:
-
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -24,7 +23,6 @@ jobs:
         with:
           command: clippy
           args: --no-deps -- -D warnings
-
   test:
     name: Test
     runs-on: ubuntu-latest
@@ -41,7 +39,6 @@ jobs:
         with:
           command: test
 
-          
 #  code-coverage:
 #    name: Code coverage
 #    runs-on: ubuntu-latest
@@ -56,9 +53,9 @@ jobs:
 #
 #      # runs cargo with defaults flags, using the default `lcov` output
 #      - uses: Swatinem/fucov@v1
-#      
+#
 #      - uses: Swatinem/rust-cache@v1
-#      
+#
 #      # afterwards, upload the report to codecov
 #      - uses: codecov/codecov-action@v1
 #        with:

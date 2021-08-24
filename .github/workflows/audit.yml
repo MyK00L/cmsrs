@@ -1,8 +1,24 @@
 name: Security audit
-
 on:
-  schedule:
-    - cron: '0 0 * * 0'
+  #schedule:
+  #  - cron: '0 0 * * 0'
+  push:
+    paths:
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+jobs:
+  security_audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions-rs/audit-check@v1
+      - uses: Swatinem/rust-cache@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+name: Security audit
+
+"""
+on:
   push:
     paths:
       - '**/Cargo.toml'
@@ -18,3 +34,4 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
       - uses: Swatinem/rust-cache@v1
+"""
