@@ -2,7 +2,7 @@ version: "3.3"
 
 services:
   contest_service_db:
-    image: mongo
+    image: mongo:4.4.8
     restart: always
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
