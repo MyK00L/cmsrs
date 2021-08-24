@@ -16,5 +16,4 @@ jobs:
       - uses: Swatinem/rust-cache@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-name: Security audit
 
