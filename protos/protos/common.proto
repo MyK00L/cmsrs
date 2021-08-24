@@ -12,8 +12,7 @@ message Id {
 */
 
 message Id { // maybe this so that the length is fixed (and we know that if id exists it must have 12 bytes)?
-	fixed32 timestamp = 1;
-	fixed64 randinc = 2;
+	uint64 randId = 1;
 }
 
 message Resources {
