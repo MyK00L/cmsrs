@@ -1,2 +1,2 @@
 [workspace]
-members = ["protos", "contest_service", "rpctest-client", "rpctest-server"]
+members = ["protos", "contest_service", "rpctest-client", "rpctest-server", "submission_service"]
