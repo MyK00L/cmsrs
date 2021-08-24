@@ -17,10 +17,12 @@
 		<hr>
 		<p>{{question.subject}}</p>
 		<p>{{question.text}}</p>
-		<form action="{{ "/form/reply/"~question.id }}" method="post" enctype="multipart/form-data">
-			<input type="text" name="subject"><br>
+		<form action="/form/reply" method="post" enctype="multipart/form-data">
+			<input type="hidden" name="user" value="{{question.user}}">
+			<input type="text" name="subject" required><br>
 			<textarea name="text" required></textarea><br>
-			<input type="submit" value="Submit">
+			<input type="checkbox" name="broadcast"><br>
+			<input type="submit">
 		</form>
 		</body>
 	{% endfor %}

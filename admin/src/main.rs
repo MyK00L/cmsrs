@@ -44,22 +44,37 @@ async fn login_form(cookies: &CookieJar<'_>, login: Form<Strict<LoginForm>>) -> 
     }
 }
 
+#[derive(FromForm)]
+struct ReplyForm<> {
+    user: String,
+    subject: String,
+    text: String,
+    broadcast: Option<bool>,
+}
+#[post("/form/reply", data = "<message>")]
+async fn reply_form(_admin: Admin, message: Form<Strict<ReplyForm>>, contest_client: &State<ContestClient>) -> Result<(),String> {
+    let contest_client = contest_client.inner().clone();
+    let req = protos::service::contest::AddAnnouncementRequest {
+        announcement: Some(protos::user::Message {
+            subject: message.subject.clone(),
+            problem_id: None,
+            text: message.text.clone(),
+            user: if Some(true) == message.broadcast {None} else {Some(message.user.clone())},
+            timestamp:None,
+        })
+    };
+    match contest_client.add_announcement(tonic::Request::new(req)).await {
+        Ok(_) => Ok(()),
+        Err(err) => Err(format!("Error in sending request:\n{:?}",err)),
+    }
+}
+
 // templates
 
 #[derive(Serialize)]
 #[serde(crate = "rocket::serde")]
-struct TemplateContext {
-    hello: String,
-}
-#[get("/tem")]
-async fn template_try() -> Template {
-    Template::render("home",TemplateContext{hello:String::from("owo//\\")})
-}
-
-#[derive(Serialize)]
-#[serde(crate = "rocket::serde")]
 struct TemplateQuestion {
-    id: u64,
+    user: String,
     subject: String,
     text: String
 }
@@ -75,7 +90,7 @@ async fn questions(_admin: Admin, contest_client: &State<ContestClient>) -> Opti
         Some(response) => {
             let questions = TemplateQuestions{questions:response.into_inner().questions.iter().map(|q|{
                 TemplateQuestion{
-                    id: 42,
+                    user: q.user.clone().unwrap_or(String::from("")),
                     subject: q.subject.clone(),
                     text: q.text.clone(),
                 }
@@ -134,7 +149,7 @@ fn rocket() -> _ {
                 statics_redirect,
                 questions,
                 login_form,
-                template_try
+                reply_form
             ],
         ).attach(Template::fairing())
 }
