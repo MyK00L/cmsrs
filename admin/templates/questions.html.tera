@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>questions</title>
+		<meta charset="UTF-8">
+	</head>
+	<body>
+	<ul>
+			<li><a href="/home">home</a></li>
+			<li><a href="/questions">questions</a></li>
+			<li><a href="/submissions">submissions</a></li>
+			<li><a href="/contest">contest</a></li>
+			<li><a href="/problems">problems</a></li>
+			<li><a href="/users">users</a></li>
+	</ul>
+	{% for question in questions %}
+		<hr>
+		<p>{{question.subject}}</p>
+		<p>{{question.text}}</p>
+		<form action="{{ "/form/reply/"~question.id }}" method="post" enctype="multipart/form-data">
+			<input type="text" name="subject"><br>
+			<textarea name="text" required></textarea><br>
+			<input type="submit" value="Submit">
+		</form>
+		</body>
+	{% endfor %}
+	
+	</body>
+</html>
