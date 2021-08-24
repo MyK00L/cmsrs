@@ -1,10 +1,13 @@
+use std::time::SystemTime;
 
-use mongodb::{
-    bson::{doc, Document},
-    options::{ClientOptions, UpdateOptions},
-    Client,
-};
-use protos::service::submission::{submission_server::*, *};
+use futures::stream::StreamExt;
+
+use convert::mongo::*;
+
+use mongodb::{Client, bson::{Document, doc, spec::ElementType}, options::{ClientOptions, FindOptions}};
+use protos::common::*;
+use protos::service::submission::*;
+use protos::service::submission::submission_server::*;
 use protos::utils::*;
 use tonic::{transport::*, Request, Response, Status};
 
@@ -40,13 +43,44 @@ impl SubmissionService {
     }
 }
 
+// TODO check this
+fn get_item_from_doc(doc: Document) -> get_submission_list_response::Item {
+    get_submission_list_response::Item{
+        submission_id: Some(protos::common::Id{
+            rand_id: doc.get_i64("_id").unwrap() as u64
+        }),
+        author_username: doc.get_str("authorUsername").unwrap().to_string(),
+        problem_id: doc.get_i32("problemId").unwrap() as u32,
+        timestamp: Some(
+            timestamp_to_systime(doc.get_timestamp("created").unwrap()).into()
+        ),
+        overall_score: {
+            let opt_score = doc.get("overallScore");
+            if let Some(score) = opt_score {
+                if score.element_type() == ElementType::Double {
+                    Some(get_submission_list_response::item::OverallScore::OverallScoreDouble(score.as_f64().unwrap()))
+                } else {
+                    Some(get_submission_list_response::item::OverallScore::OverallScoreBool(score.as_bool().unwrap()))
+                }
+            } else {
+                None
+            }
+        }
+    }
+}
+
 #[tonic::async_trait]
 impl Submission for SubmissionService {
-    // TODO implement the RPCs here (signatures in submission.proto file)
     async fn evaluate_submission(
         &self, 
-        _request: Request<EvaluateSubmissionRequest>
+        request: Request<EvaluateSubmissionRequest>
     ) -> Result<Response<EvaluateSubmissionResponse>, Status> { 
+        let evaluate_submission_request = request.into_inner();
+        let _submission = evaluate_submission_request.sub.clone();
+        // 1) write into dabatase with Pending state
+	    // 2) redirect request to the dispatcher and await response
+	    // 3) write values returned by the dispatcher into database
+	    //    changing the state to Evaluated
         todo!() 
     }
 
@@ -57,200 +91,67 @@ impl Submission for SubmissionService {
         &self,
         request: Request<GetSubmissionListRequest>
     ) -> Result<Response<GetSubmissionListResponse>, Status> { 
-        todo!()
-        /*let list_request = request.into_inner();
-        let limit = list_request.limit.clone();
-        let author_username = list_request.author_username.clone();
-        let problem_id = list_request.problem_id.clone();
+        let list_request = request.into_inner();
+        let opt_limit = list_request.limit.clone();
+        let opt_author_username = list_request.author_username.clone();
+        let opt_problem_id = list_request.problem_id.clone();
 
+        let doc_filter;
+        if opt_author_username.is_some() && opt_problem_id.is_some() {
+            doc_filter = doc! {
+                "authorUsername": opt_author_username.unwrap(),
+                "problemId": opt_problem_id.unwrap(),
+            };
+        } else if let Some(author_username) =  opt_author_username {
+            doc_filter = doc! {
+                "authorUsername": author_username,
+            };
+        } else if opt_problem_id.is_some() {
+            doc_filter = doc! {
+                "problemId": opt_problem_id.unwrap(),
+            };
+        } else {
+            doc_filter = doc! {};
+        }
 
-
-        Ok(self
+        let submissions = self
             .get_collection()
             .find(
-                
-            ))
-        */
+                doc_filter,
+                FindOptions::builder().limit(
+                    if let Some(limit) = opt_limit {
+                        Some(limit as i64)
+                    } else {
+                        None
+                    }).build()
+            )
+            .await
+            .map_err(internal_error)?
+            .filter(|opt_submission| futures::future::ready(opt_submission.is_ok()))
+            .map(|some_submission| { 
+                match some_submission {
+                    Ok(submission) => Some(get_item_from_doc(submission)),
+                    Err(_) => None
+                }
+            })
+            .filter(|opt_item| futures::future::ready(opt_item.is_some()))
+            .map(|some_item| some_item.unwrap())
+            .collect::<Vec<_>>()
+            .await;
+
+        Ok(Response::new(
+            GetSubmissionListResponse {
+                list: submissions
+            }
+        ))
     }
 
-    fn get_submission_details(
+    async fn get_submission_details(
         &self,
         _request: Request<GetSubmissionDetailsRequest>
     ) -> Result<Response<GetSubmissionDetailsResponse>, Status> { 
         todo!() 
     }
-
-/*
-    async fn auth_user(
-        &self,
-        request: Request<AuthUserRequest>,
-    ) -> Result<Response<AuthUserResponse>, Status> {
-    
-    async fn auth_user(
-        &self,
-        request: Request<AuthUserRequest>,
-    ) -> Result<Response<AuthUserResponse>, Status> {
-        let user = request.into_inner();
-        let username = user.username.clone();
-        Ok(self
-            .get_users_collection()
-            .find_one(
-                doc! {
-                    "_id": username,
-                },
-                None,
-            )
-            .await
-            .map_err(|err| Status::internal(format!("{}", err)))? // TODO fix with error conversion
-            .filter(|user_doc| check_password(&user.password, user_doc))
-            .map_or(
-                Response::new(AuthUserResponse {
-                    response: Some(auth_user_response::Response::Failure(
-                        auth_user_response::Failure {
-                            error: "Incorrect username or password".to_string(),
-                        },
-                    )),
-                }),
-                |user_doc| {
-                    Response::new(AuthUserResponse {
-                        response: Some(auth_user_response::Response::Success(
-                            auth_user_response::Success {
-                                username: user_doc.get("_id").unwrap().to_string(),
-                                fullname: user_doc.get("fullName").unwrap().to_string(),
-                            },
-                        )),
-                    })
-                },
-            ))
-    }
-    async fn get_contest_metadata(
-        &self,
-        _request: Request<GetContestMetadataRequest>,
-    ) -> Result<Response<GetContestMetadataResponse>, Status> {
-        self.get_contest_metadata()
-            .await
-            .map(|contest_metadata_doc| {
-                mappings::contest::ContestMetadata::from(contest_metadata_doc).into()
-            })
-    }
-    async fn get_problem(
-        &self,
-        _request: Request<GetProblemRequest>,
-    ) -> Result<Response<GetProblemResponse>, Status> {
-        todo!();
-    }
-    async fn get_announcement_list(
-        &self,
-        _request: Request<GetAnnouncementListRequest>,
-    ) -> Result<Response<GetAnnouncementListResponse>, Status> {
-        let announcements = self
-            .get_announcements_collection()
-            .find(None, None)
-            .await
-            .map_err(internal_error)?
-            .map(|x| Message::from(x.unwrap()))
-            .map(protos::user::Message::from)
-            .collect::<Vec<_>>()
-            .await;
-        Ok(Response::new(GetAnnouncementListResponse { announcements }))
-    }
-    async fn get_question_list(
-        &self,
-        _request: Request<GetQuestionListRequest>,
-    ) -> Result<Response<GetQuestionListResponse>, Status> {
-        let questions = self
-            .get_questions_collection()
-            .find(None, None)
-            .await
-            .map_err(internal_error)?
-            .map(|x| Message::from(x.unwrap()))
-            .map(protos::user::Message::from)
-            .collect::<Vec<_>>()
-            .await;
-        Ok(Response::new(GetQuestionListResponse { questions }))
-    }
-    async fn set_user(
-        &self,
-        request: Request<SetUserRequest>,
-    ) -> Result<Response<SetUserResponse>, Status> {
-        let argon2 = argon2::Argon2::default();
-
-        let user = request.into_inner();
-        let username = user.username.clone();
-        let fullname = user.fullname.clone();
-
-        let salt = argon2::password_hash::SaltString::generate(&mut rand_core::OsRng);
-        let hashed_password = argon2
-            .hash_password_simple(user.password.as_bytes(), &salt)
-            .map_err(|_| tonic::Status::new(tonic::Code::Internal, "failed to hash password"))?;
-
-        self.get_users_collection()
-            .update_one(
-                doc! {
-                    "_id": username
-                },
-                doc! {
-                    "$set": doc! {
-                        "fullName": fullname,
-                        "password": hashed_password.to_string(),
-                    }
-                },
-                UpdateOptions::builder().upsert(true).build(),
-            )
-            .await
-            .map_err(|err| Status::internal(format!("{}", err))) // TODO fix with error conversion
-            .map(|update_result| {
-                Response::new(SetUserResponse {
-                    code: if update_result.matched_count == 0 {
-                        set_user_response::Code::Add as i32
-                    } else {
-                        set_user_response::Code::Update as i32
-                    },
-                })
-            })
-    }
-    async fn set_contest_metadata(
-        &self,
-        request: Request<SetContestMetadataRequest>,
-    ) -> Result<Response<SetContestMetadataResponse>, Status> {
-        self.get_contest_metadata_collection()
-            .delete_many(Document::new(), None)
-            .await
-            .map_err(internal_error)?; // This should delete every contest, since we don't want more than one
-
-        let metadata = mappings::contest::ContestMetadata::try_from(request.into_inner())
-            .map_err(|err| Status::invalid_argument(format!("{:?}", err)))?;
-
-        self.get_contest_metadata_collection()
-            .insert_one(Document::from(metadata), None)
-            .await
-            .map_err(internal_error)
-            .map(|_| Response::new(SetContestMetadataResponse {}))
-    }
-    async fn set_problem(
-        &self,
-        _request: Request<SetProblemRequest>,
-    ) -> Result<Response<SetProblemResponse>, Status> {
-        todo!();
-    }
-    async fn add_message(
-        &self,
-        request: Request<AddMessageRequest>,
-    ) -> Result<Response<AddMessageResponse>, Status> {
-        let message = mappings::chat::Message::from(request.into_inner());
-        // TODO should we notify someone here?
-        let doc = Document::from(message);
-        if message.is_question() {
-            self.get_questions_collection()
-        } else {
-            self.get_announcements_collection()
-        }
-        .insert_one(doc, None)
-        .await
-        .map_err(internal_error)?;
-        Ok(Response::new(AddMessageResponse {}))
-    }
-    */
 }
 
 
