@@ -15,10 +15,15 @@
 	</ul>
 	{% for question in questions %}
 		<hr>
+		<p>{{question.time}}</p>
 		<p>{{question.subject}}</p>
-		<p>{{question.text}}</p>
+		<p>{{question.text | escape | linebreaksbr | safe}}</p>
 		<form action="/form/reply" method="post" enctype="multipart/form-data">
+			<input type="hidden" name="id" value="{{question.id}}">
 			<input type="hidden" name="user" value="{{question.user}}">
+			{% if question.problem_id %}
+			<input type="hidden" name="problem_id" value="{{question.problem_id}}">
+			{% endif %}
 			<input type="text" name="subject" required><br>
 			<textarea name="text" required></textarea><br>
 			<input type="checkbox" name="broadcast"><br>

@@ -1,3 +1,4 @@
+use protos::service::contest;
 use protos::service::contest::contest_server::Contest;
 use rocket::form::{Form, Strict};
 use rocket::fs::{relative, NamedFile};
@@ -8,11 +9,13 @@ use rocket::response::Redirect;
 use rocket::serde::Serialize;
 use rocket::*;
 use rocket_dyn_templates::Template;
+use std::convert::TryFrom;
 use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 use utils::gen_uuid;
 
 const PASS: &str = "1234";
-type ContestClient = protos::service::contest::MockContest;
+type ContestClient = contest::MockContest;
 
 struct Admin {}
 #[rocket::async_trait]
@@ -45,30 +48,35 @@ async fn login_form(cookies: &CookieJar<'_>, login: Form<Strict<LoginForm>>) -> 
 
 #[derive(FromForm)]
 struct AddUserForm {
-    name: String,
-    passw: String,
+    username: String,
+    fullname: String,
+    password: String,
 }
 #[post("/form/add_user", data = "<user>")]
 async fn add_user_form(
     _admin: Admin,
     user: Form<Strict<AddUserForm>>,
     contest_client: &State<ContestClient>,
-) -> Result<(), String> {
+) -> Result<Redirect, String> {
     let contest_client = contest_client.inner().clone();
-    let req = protos::service::contest::SetUserRequest {
-        name: user.name.clone(),
-        passw: user.passw.clone(),
+    let req = contest::SetUserRequest {
+        username: user.username.clone(),
+        fullname: user.fullname.clone(),
+        password: user.password.clone(),
     };
     match contest_client.set_user(tonic::Request::new(req)).await {
-        Ok(_) => Ok(()),
+        Ok(_) => Ok(Redirect::to(uri!(root))),
         Err(err) => Err(format!("Error in sending request:\n{:?}", err)),
     }
 }
 
 #[derive(FromForm)]
 struct ReplyForm {
+    #[allow(dead_code)]
+    id: u64,
     user: String,
     subject: String,
+    problem_id: Option<u64>,
     text: String,
     broadcast: Option<bool>,
 }
@@ -77,27 +85,25 @@ async fn reply_form(
     _admin: Admin,
     message: Form<Strict<ReplyForm>>,
     contest_client: &State<ContestClient>,
-) -> Result<(), String> {
+) -> Result<Redirect, String> {
     let contest_client = contest_client.inner().clone();
-    let req = protos::service::contest::AddAnnouncementRequest {
-        announcement: Some(protos::user::Message {
-            id
+    let req = contest::AddMessageRequest {
+        message: Some(contest::Message {
+            id: gen_uuid(),
             subject: message.subject.clone(),
-            problem_id: None,
+            problem_id: message.problem_id,
             text: message.text.clone(),
-            user: if Some(true) == message.broadcast {
+            to: if Some(true) == message.broadcast {
                 None
             } else {
                 Some(message.user.clone())
             },
-            timestamp: None,
+            from: None,
+            sent_at: Some(SystemTime::now().into()),
         }),
     };
-    match contest_client
-        .add_announcement(tonic::Request::new(req))
-        .await
-    {
-        Ok(_) => Ok(()),
+    match contest_client.add_message(tonic::Request::new(req)).await {
+        Ok(_) => Ok(Redirect::to(uri!(questions))),
         Err(err) => Err(format!("Error in sending request:\n{:?}", err)),
     }
 }
@@ -107,6 +113,9 @@ async fn reply_form(
 #[derive(Serialize)]
 #[serde(crate = "rocket::serde")]
 struct TemplateQuestion {
+    id: u64,
+    problem_id: Option<u64>,
+    time: String,
     user: String,
     subject: String,
     text: String,
@@ -121,7 +130,7 @@ async fn questions(_admin: Admin, contest_client: &State<ContestClient>) -> Opti
     let contest_client = contest_client.inner().clone();
     match contest_client
         .get_question_list(tonic::Request::new(
-            protos::service::contest::GetQuestionListRequest::default(),
+            contest::GetQuestionListRequest::default(),
         ))
         .await
         .ok()
@@ -133,7 +142,21 @@ async fn questions(_admin: Admin, contest_client: &State<ContestClient>) -> Opti
                     .questions
                     .iter()
                     .map(|q| TemplateQuestion {
-                        user: q.user.clone().unwrap_or_else(|| String::from("")),
+                        id: q.id,
+                        problem_id: q.problem_id,
+                        time: {
+                            match q.sent_at.clone() {
+                                Some(timestamp) => match SystemTime::try_from(timestamp) {
+                                    Ok(t) => match SystemTime::now().duration_since(t) {
+                                        Ok(elapsed) => format!("{}s ago", elapsed.as_secs()),
+                                        Err(_) => String::from("err"),
+                                    },
+                                    Err(_) => String::from("err"),
+                                },
+                                None => String::from("err"),
+                            }
+                        },
+                        user: q.from.clone().unwrap_or_else(|| String::from("")),
                         subject: q.subject.clone(),
                         text: q.text.clone(),
                     })
@@ -174,25 +197,23 @@ async fn statics_redirect(_path: PathBuf) -> Redirect {
 
 #[launch]
 fn rocket() -> _ {
-    let mut contest_client = protos::service::contest::MockContest::default();
-    contest_client.get_question_list_set(protos::service::contest::GetQuestionListResponse {
+    let mut contest_client = contest::MockContest::default();
+    contest_client.add_message_set(contest::AddMessageResponse::default());
+    contest_client.get_question_list_set(contest::GetQuestionListResponse {
         questions: vec![
-            protos::user::Message {
+            contest::Message {
                 subject: String::from("Problem A"),
-                text: String::from("oh hi"),
-                user: Some(String::from("me")),
+                text: String::from("<b>hello</b>"),
+                from: Some(String::from("me")),
+                sent_at: Some(SystemTime::now().into()),
                 ..Default::default()
             },
-            protos::user::Message {
+            contest::Message {
                 subject: String::from("Problem AA"),
-                text: String::from("///"),
-                user: Some(String::from("a")),
-                ..Default::default()
-            },
-            protos::user::Message {
-                subject: String::from("Problem C"),
-                text: String::from("uwu"),
-                user: Some(String::from("b")),
+                text: String::from("contains\nproblem\nid"),
+                from: Some(String::from("a")),
+                problem_id: Some(42),
+                sent_at: Some(SystemTime::now().into()),
                 ..Default::default()
             },
         ],
