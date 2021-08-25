@@ -126,7 +126,7 @@ impl Contest for ContestService {
     ) -> Result<Response<GetProblemResponse>, Status> {
         let problem_id = request.into_inner().problem_id;
         self.get_problems_collection()
-            .find_one(doc! {"_id": problem_id}, None)
+            .find_one(doc! {"_id": problem_id as i64}, None)
             .await
             .map_err(internal_error)?
             .map(mappings::problem::ProblemData::from)
@@ -181,7 +181,7 @@ impl Contest for ContestService {
                 UpdateOptions::builder().upsert(true).build(),
             )
             .await
-            .map_err(|err| Status::internal(format!("{}", err))) // TODO fix with error conversion
+            .map_err(|err| Status::internal(format!("{}", err)))
             .map(|update_result| {
                 Response::new(SetUserResponse {
                     code: if update_result.matched_count == 0 {
