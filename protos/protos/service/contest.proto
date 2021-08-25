@@ -2,37 +2,64 @@ syntax = "proto3";
 
 package service.contest;
 
-import "user.proto";
+import "google/protobuf/timestamp.proto";
 
 message AuthUserRequest {
-	string name = 1;
-	string passw = 2;
+	string username = 1;
+	string password = 2;
 }
 message AuthUserResponse {
-	optional string error = 1;
-	optional string username = 2;
-	optional string fullname = 3;
-	optional bytes token = 4;
+	message Success {
+		string username = 1;
+		string fullname = 2;
+	}
+	message Failure {
+		string error = 1;
+	}
+	oneof response {
+		Success success = 1;
+		Failure failure = 2;
+	}
 }
 
-message GetContestRequest {}
-message GetContestResponse {
-	user.Contest info = 1;
+message ContestMetadata {
+	string name = 1;
+	string description = 2;
+	optional google.protobuf.Timestamp start_time = 3;
+	optional google.protobuf.Timestamp end_time = 4;
+}
+message GetContestMetadataRequest {}
+message GetContestMetadataResponse {
+	ContestMetadata metadata = 1;
 }
 
+message Problem {
+	uint32 id = 1;
+	string name = 2;
+	string long_name = 3;
+}
 message GetProblemRequest {
 	uint32 problem_id = 1;
 }
 message GetProblemResponse {
- 	user.Problem info = 1;
+ 	Problem info = 1;
 	bytes statement = 2;
 }
 
+message Message { // questions and announcements are the same
+	uint32 id = 1;
+	string subject = 2;
+	optional uint32 problem_id = 3;
+	string text = 4;
+	optional string from = 5;
+	optional string to = 6;
+	google.protobuf.Timestamp sent_at = 7;
+}
 message GetAnnouncementListRequest {
 	optional uint32 problem_id = 1;
 }
 message GetAnnouncementListResponse {
-	repeated user.Message announcements = 1;
+	repeated Message announcements = 1;
 }
 
 message GetQuestionListRequest {
@@ -40,13 +67,14 @@ message GetQuestionListRequest {
 	optional uint32 user_id = 2;
 }
 message GetQuestionListResponse {
-	repeated user.Message questions = 1;
+	repeated Message questions = 1;
 }
 
 
 message SetUserRequest {
-	string name = 1;
-	string passw = 2;
+	string username = 1;
+	string fullname = 2;
+	string password = 3;
 }
 message SetUserResponse {
 	enum Code {
@@ -56,38 +84,31 @@ message SetUserResponse {
 	Code code = 1;
 }
 
-message SetContestRequest {
-	user.Contest info = 1;
+message SetContestMetadataRequest {
+	ContestMetadata metadata = 1;
 }
-message SetContestResponse {}
+message SetContestMetadataResponse {}
 
 message SetProblemRequest {
-	uint32 problem_id = 1;
-	optional user.Problem info = 2;
- 	optional bytes statement = 3;
+	optional Problem info = 1;
+ 	optional bytes statement = 2;
 }
 message SetProblemResponse {}
 
-message AddQuestionRequest {
-	user.Message question = 1;
+message AddMessageRequest {
+	Message message = 1;
 }
-message AddQuestionResponse {}
-
-message AddAnnouncementRequest {
-	user.Message announcement = 1;
-}
-message AddAnnouncementResponse {}
+message AddMessageResponse {}
 
 service Contest {
 	rpc auth_user(AuthUserRequest) returns (AuthUserResponse);
-	rpc get_contest(GetContestRequest) returns (GetContestResponse);
+	rpc get_contest_metadata(GetContestMetadataRequest) returns (GetContestMetadataResponse);
 	rpc get_problem(GetProblemRequest) returns (GetProblemResponse);
 	rpc get_announcement_list(GetAnnouncementListRequest) returns (GetAnnouncementListResponse);
 	rpc get_question_list(GetQuestionListRequest) returns (GetQuestionListResponse);
 
 	rpc set_user(SetUserRequest) returns (SetUserResponse);
-	rpc set_contest(SetContestRequest) returns (SetContestResponse);
+	rpc set_contest_metadata(SetContestMetadataRequest) returns (SetContestMetadataResponse);
 	rpc set_problem(SetProblemRequest) returns (SetProblemResponse);
-	rpc add_question(AddQuestionRequest) returns (AddQuestionResponse);
-	rpc add_announcement(AddAnnouncementRequest) returns (AddAnnouncementResponse);
+	rpc add_message(AddMessageRequest) returns (AddMessageResponse);
 }
