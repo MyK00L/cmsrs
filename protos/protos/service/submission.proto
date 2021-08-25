@@ -11,26 +11,26 @@ message EvaluateSubmissionRequest {
 }
 message EvaluateSubmissionResponse {
 	evaluation.EvaluationResult res = 1;
-	common.Id submission_id = 2;
+	uint64 submission_id = 2;
 	google.protobuf.Timestamp timestamp = 3;
 }
 message GetSubmissionListRequest {
 	optional uint32 limit = 1;
 	optional string user = 2;
-	optional uint32 problem_id = 3;
+	optional uint64 problem_id = 3;
 }
 message GetSubmissionListResponse {
 	message Item {
-		common.Id sub_id = 1;
+		uint64 sub_id = 1;
 		string user = 2;
-		uint32 problem_id = 3;
+		uint64 problem_id = 3;
 		google.protobuf.Timestamp timestamp = 5;
 		optional double score = 6;
 	}
 	repeated Item list = 1;
 }
 message GetSubmissionDetailsRequest {
-	common.Id submission_id = 1;
+	uint64 submission_id = 1;
 }
 message GetSubmissionDetailsResponse {
 	evaluation.Submission sub = 1;
