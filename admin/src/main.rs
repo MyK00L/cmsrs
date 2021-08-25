@@ -9,6 +9,7 @@ use rocket::serde::Serialize;
 use rocket::*;
 use rocket_dyn_templates::Template;
 use std::path::{Path, PathBuf};
+use utils::gen_uuid;
 
 const PASS: &str = "1234";
 type ContestClient = protos::service::contest::MockContest;
@@ -80,6 +81,7 @@ async fn reply_form(
     let contest_client = contest_client.inner().clone();
     let req = protos::service::contest::AddAnnouncementRequest {
         announcement: Some(protos::user::Message {
+            id
             subject: message.subject.clone(),
             problem_id: None,
             text: message.text.clone(),
