@@ -7,7 +7,7 @@ import "evaluation.proto";
 import "worker.proto";
 
 message EvaluateSubmissionRequest {
-	uint32 problem_id = 1;
+	uint64 problem_id = 1;
 	common.Source source = 2;
 }
 message EvaluateSubmissionResponse {
