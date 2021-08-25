@@ -27,7 +27,7 @@
 			<input type="text" name="subject" required><br>
 			<textarea name="text" required></textarea><br>
 			<input type="checkbox" name="broadcast"><br>
-			<input type="submit">
+			<input type="submit" value="send">
 		</form>
 	{% endfor %}
 	</body>

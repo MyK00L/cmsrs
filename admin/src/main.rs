@@ -52,8 +52,8 @@ struct AddUserForm {
     fullname: String,
     password: String,
 }
-#[post("/form/add_user", data = "<user>")]
-async fn add_user_form(
+#[post("/form/set_user", data = "<user>")]
+async fn set_user_form(
     _admin: Admin,
     user: Form<Strict<AddUserForm>>,
     contest_client: &State<ContestClient>,
@@ -65,7 +65,7 @@ async fn add_user_form(
         password: user.password.clone(),
     };
     match contest_client.set_user(tonic::Request::new(req)).await {
-        Ok(_) => Ok(Redirect::to(uri!(root))),
+        Ok(_) => Ok(Redirect::to("/users")),
         Err(err) => Err(format!("Error in sending request:\n{:?}", err)),
     }
 }
@@ -230,7 +230,7 @@ fn rocket() -> _ {
                 questions,
                 login_form,
                 reply_form,
-                add_user_form,
+                set_user_form,
             ],
         )
         .attach(Template::fairing())
