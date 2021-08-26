@@ -38,11 +38,12 @@ pub mod service {
         (evaluate_submission,EvaluateSubmissionRequest,EvaluateSubmissionResponse)
         );
     }
-    pub mod evaluation_files {
-        tonic::include_proto!("service.evaluation_files");
+    pub mod evaluation {
+        tonic::include_proto!("service.evaluation");
         rpc_mock_server!(evaluation_server::Evaluation; MockEvaluation;
-        (get_scorer_info,GetScorerInfoRequest,GetScorerInfoResponse),
-        (get_scoreboard_info,GetScoreboardInfoRequest,GetScoreboardInfoResponse)
+        (get_testcase_io_files,GetTestcaseIoFilesRequest,GetTestcaseIoFilesResponse),
+        (get_problem_scoring,GetProblemScoringRequest,GetProblemScoringResponse),
+        (get_contest_user_scoring,GetContestUserScoringRequest,GetContestUserScoringResponse)
         );
     }
     pub mod submission {

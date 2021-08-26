@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+package service.evaluation;
+
+import "scoring.proto";
+
+// Schema-defining messages
+
+message ProblemEvaluationInfo {
+    message Subtask {
+        uint32 index = 1;
+        uint32 testcase_count = 2;
+        double max_score = 3;
+    }
+    message Testcase {
+        uint64 index = 1;
+        optional string input_file_path = 2;
+        optional string output_file_path = 3;
+    }
+    message ProblemLimits {
+        uint64 time_limit_ns = 1;
+		uint64 memory_limit_B = 2;
+		uint64 source_size_limit_B = 3;
+		uint64 compile_time_limit_ns = 4;
+    }
+    uint64 problem_id = 1;
+    repeated Testcase testcases = 2;
+    repeated Subtask subtasks = 3;
+    optional string checker_file_path = 4;
+    optional string interactor_file_path = 5;
+    scoring.Problem problem_scoring = 6;
+    scoring.Subtask subtask_scoring = 7;
+    double max_score = 8;
+    ProblemLimits limits = 9;
+}
+
+message ContestEvaluationInfo {
+    repeated ProblemEvaluationInfo problems = 2;
+    scoring.User user_scoring_method = 3;
+}
+
+// Communication messages
+
+message TestcaseIOFile {
+    bytes content = 1;
+}
+
+message EvaluationFile {
+    bytes content = 1;
+    optional string extension = 2;  // if no extension, then its an executable file
+}
+
+// RPC messages
+
+message GetTestcaseIoFilesRequest {
+    uint64 problem_id = 1;
+    uint64 testcase_index = 2;
+}
+message GetTestcaseIoFilesResponse {
+    optional TestcaseIOFile input = 1;
+    optional TestcaseIOFile output = 2;
+}
+
+message GetProblemScoringRequest {
+    uint64 problem_id = 1;
+}
+message GetProblemScoringResponse {
+    scoring.Problem problem_scoring = 1;
+    scoring.Subtask subtask_scoring = 2;
+    repeated ProblemEvaluationInfo.Subtask subtasks = 3;
+    double max_score = 4;
+}
+
+message GetContestUserScoringRequest {}
+message GetContestUserScoringResponse {
+    scoring.User method = 1;
+}
+
+service Evaluation {
+    rpc get_testcase_io_files(GetTestcaseIoFilesRequest) returns (GetTestcaseIoFilesResponse);
+    rpc get_problem_scoring(GetProblemScoringRequest) returns (GetProblemScoringResponse);
+    rpc get_contest_user_scoring(GetContestUserScoringRequest) returns (GetContestUserScoringResponse);
+}
