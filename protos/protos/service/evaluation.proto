@@ -6,78 +6,146 @@ import "scoring.proto";
 
 // Schema-defining messages
 
+// Problems, subtasks, testcases IO files and evaluation related files are stored
+// in the filesystem using a gerarchy of nested folders.
+
+enum ProblemType {
+    BATCH = 0;
+    OUTPUT_ONLY = 1;
+    INTERACTIVE = 2;
+    OTHER = 3;
+}
+message ProblemLimits {
+    uint64 runtime_time_limit_ns = 1;
+    uint64 runtime_memory_limit_B = 2;
+    optional uint64 compile_time_limit_ns = 3;
+    optional uint64 source_size_limit_B = 4;
+}
 message ProblemEvaluationInfo {
-    message Subtask {
-        uint32 index = 1;
-        uint32 testcase_count = 2;
-        double max_score = 3;
-    }
+    ProblemType type = 1;
+    ProblemLimits limits = 2;
+}
+message ProblemScoringInfo {
+    repeated scoring.Subtask subtask_scorings = 3;
+    scoring.Problem problem_scoring = 4;
+    double problem_score = 5;   // This is a redundant information obtained by adding all subtask max scores
+}
+
+// Communication messages for large files and utils
+
+message Subtask {
     message Testcase {
-        uint64 index = 1;
-        optional string input_file_path = 2;
-        optional string output_file_path = 3;
+        uint64 id = 1;
+        optional bytes input = 2;
+        optional bytes output = 3;
     }
-    message ProblemLimits {
-        uint64 time_limit_ns = 1;
-		uint64 memory_limit_B = 2;
-		uint64 source_size_limit_B = 3;
-		uint64 compile_time_limit_ns = 4;
-    }
-    uint64 problem_id = 1;
-    repeated Testcase testcases = 2;
-    repeated Subtask subtasks = 3;
-    optional string checker_file_path = 4;
-    optional string interactor_file_path = 5;
-    scoring.Problem problem_scoring = 6;
-    scoring.Subtask subtask_scoring = 7;
-    double max_score = 8;
-    ProblemLimits limits = 9;
-}
-
-message ContestEvaluationInfo {
-    repeated ProblemEvaluationInfo problems = 2;
-    scoring.User user_scoring_method = 3;
-}
-
-// Communication messages
-
-message TestcaseIOFile {
-    bytes content = 1;
+    uint64 id = 1;
+    scoring.Subtask scoring = 2;
+    repeated Testcase testcases = 3;
 }
 
 message EvaluationFile {
-    bytes content = 1;
+    enum Type {
+        GENERIC = 0;
+        CHECKER = 1;
+        INTERACTOR = 2;
+    }
+    Type type = 1;
     optional string extension = 2;  // if no extension, then its an executable file
+    bytes content = 3;
+}
+
+message Failure {
+    string error = 1;
 }
 
 // RPC messages
 
-message GetTestcaseIoFilesRequest {
-    uint64 problem_id = 1;
-    uint64 testcase_index = 2;
-}
-message GetTestcaseIoFilesResponse {
-    optional TestcaseIOFile input = 1;
-    optional TestcaseIOFile output = 2;
-}
-
-message GetProblemScoringRequest {
+message GetProblemScoringInfoRequest {
     uint64 problem_id = 1;
 }
-message GetProblemScoringResponse {
-    scoring.Problem problem_scoring = 1;
-    scoring.Subtask subtask_scoring = 2;
-    repeated ProblemEvaluationInfo.Subtask subtasks = 3;
-    double max_score = 4;
+message GetProblemScoringInfoResponse {
+    message Success {
+        ProblemScoringInfo info = 1;
+    }
+    oneof response {
+        Success success = 1;
+        Failure failure = 2;
+    }
 }
 
-message GetContestUserScoringRequest {}
-message GetContestUserScoringResponse {
+message GetProblemEvaluationInfoRequest {
+    uint64 problem_id = 1;
+}
+message GetProblemEvaluationInfoResponse {
+    message Success {
+        ProblemEvaluationInfo info = 1;
+    }
+    oneof response {
+        Success success = 1;
+        Failure failure = 2;
+    }
+}
+
+message GetProblemTestcasesRequest {
+    uint64 problem_id = 1;
+}
+message GetProblemTestcasesResponse {
+    message Success {
+        repeated Subtask subtasks = 1;
+    }
+    oneof response {
+        Success success = 1;
+        Failure failure = 2;
+    }
+}
+
+message GetProblemEvaluationFileRequest {
+    uint64 problem_id = 1;
+    EvaluationFile.Type file_type = 2;
+}
+message GetProblemEvaluationFileResponse {
+    message Success {
+        EvaluationFile file = 1;
+    }
+    oneof response {
+        Success success = 1;
+        Failure failure = 2;
+    }
+}
+
+message GetUserScoringMethodRequest {}
+message GetUserScoringMethodResponse {
     scoring.User method = 1;
 }
 
+message SetProblemInfoRequest {
+    uint64 problem_id = 1;
+    ProblemType type = 2;
+    ProblemLimits limits = 3;
+    repeated Subtask subtasks = 4;
+    repeated EvaluationFile evaluation_files = 5;
+    scoring.Problem problem_scoring = 6;
+}
+message SetProblemInfoResponse {
+    message Success {}
+    oneof response {
+        Success success = 1;
+        Failure failure = 2;
+    }
+}
+
+message SetUserScoringMethodRequest {
+    scoring.User method = 1;
+}
+message SetUserScoringMethodResponse {}
+
 service Evaluation {
-    rpc get_testcase_io_files(GetTestcaseIoFilesRequest) returns (GetTestcaseIoFilesResponse);
-    rpc get_problem_scoring(GetProblemScoringRequest) returns (GetProblemScoringResponse);
-    rpc get_contest_user_scoring(GetContestUserScoringRequest) returns (GetContestUserScoringResponse);
+    rpc get_problem_scoring_info(GetProblemScoringInfoRequest) returns (GetProblemScoringInfoResponse);
+    rpc get_problem_evaluation_info(GetProblemEvaluationInfoRequest) returns (GetProblemEvaluationInfoResponse);
+    rpc get_problem_testcases(GetProblemTestcasesRequest) returns (GetProblemTestcasesResponse);
+    rpc get_problem_evaluation_file(GetProblemEvaluationFileRequest) returns (GetProblemEvaluationFileResponse);
+    rpc get_user_scoring_method(GetUserScoringMethodRequest) returns (GetUserScoringMethodResponse);
+    rpc set_problem_info(SetProblemInfoRequest) returns (SetProblemInfoResponse);
+    rpc set_user_scoring_method(SetUserScoringMethodRequest) returns (SetUserScoringMethodResponse);
 }

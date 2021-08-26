@@ -7,22 +7,46 @@ pub struct EvaluationService {}
 
 #[tonic::async_trait]
 impl Evaluation for EvaluationService {
-    async fn get_testcase_io_files(
+    async fn get_problem_scoring_info(
         &self,
-        _request: Request<GetTestcaseIoFilesRequest>,
-    ) -> Result<Response<GetTestcaseIoFilesResponse>, Status> {
+        _request: Request<GetProblemScoringInfoRequest>,
+    ) -> Result<Response<GetProblemScoringInfoResponse>, Status> {
         todo!()
     }
-    async fn get_problem_scoring(
+    async fn get_problem_evaluation_info(
         &self,
-        _request: Request<GetProblemScoringRequest>,
-    ) -> Result<Response<GetProblemScoringResponse>, Status> {
+        _request: Request<GetProblemEvaluationInfoRequest>,
+    ) -> Result<Response<GetProblemEvaluationInfoResponse>, Status> {
         todo!()
     }
-    async fn get_contest_user_scoring(
+    async fn get_problem_testcases(
         &self,
-        _request: Request<GetContestUserScoringRequest>,
-    ) -> Result<Response<GetContestUserScoringResponse>, Status> {
+        _request: Request<GetProblemTestcasesRequest>,
+    ) -> Result<Response<GetProblemTestcasesResponse>, Status> {
+        todo!()
+    }
+    async fn get_problem_evaluation_file(
+        &self,
+        _request: Request<GetProblemEvaluationFileRequest>,
+    ) -> Result<Response<GetProblemEvaluationFileResponse>, Status> {
+        todo!()
+    }
+    async fn get_user_scoring_method(
+        &self,
+        _request: Request<GetUserScoringMethodRequest>,
+    ) -> Result<Response<GetUserScoringMethodResponse>, Status> {
+        todo!()
+    }
+    async fn set_problem_info(
+        &self,
+        _request: Request<SetProblemInfoRequest>,
+    ) -> Result<Response<SetProblemInfoResponse>, Status> {
+        todo!()
+    }
+    async fn set_user_scoring_method(
+        &self,
+        _request: Request<SetUserScoringMethodRequest>,
+    ) -> Result<Response<SetUserScoringMethodResponse>, Status> {
         todo!()
     }
 }
