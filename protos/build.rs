@@ -1,5 +1,8 @@
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tonic_build::configure().compile(
+    tonic_build::configure()
+    .type_attribute(".service.evaluation", "#[derive(::serde::Serialize,::serde::Deserialize)]")
+    .type_attribute(".scoring", "#[derive(::serde::Serialize,::serde::Deserialize)]")
+    .compile(
         &[
             "protos/common.proto",
             "protos/evaluation.proto",
