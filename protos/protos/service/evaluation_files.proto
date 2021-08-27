@@ -1,4 +1,4 @@
-syntax = "proto3";
+syntax = "proto2";
 
 package service.evaluation_files;
 
@@ -6,14 +6,14 @@ import "scoring.proto";
 
 message GetScorerInfoRequest {}
 message GetScorerInfoResponse {
-	uint64 problem_id = 1;
+	required uint64 problem_id = 1;
 	repeated scoring.Subtask subtasks_scoring = 2;
-	scoring.Problem submission_scoring = 3; // not really needed rn as all of these are just sum of subtasks for a single sub
+	required scoring.Problem submission_scoring = 3; // not really needed rn as all of these are just sum of subtasks for a single sub
 }
 message GetScoreboardInfoRequest {}
 message GetScoreboardInfoResponse {
 	repeated scoring.Problem problems_scoring = 1;
-	scoring.User user_scoring = 2;
+	required scoring.User user_scoring = 2;
 }
 
 service Evaluation {
