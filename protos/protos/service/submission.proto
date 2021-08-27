@@ -1,4 +1,4 @@
-syntax = "proto3";
+syntax = "proto2";
 
 package service.submission;
 
@@ -7,7 +7,7 @@ import "evaluation.proto";
 
 // Submission service
 message EvaluateSubmissionRequest {
-	evaluation.Submission sub = 1;
+	required evaluation.Submission sub = 1;
 }
 message EvaluateSubmissionResponse {
 	evaluation.EvaluationResult res = 1;
@@ -20,23 +20,20 @@ message GetSubmissionListRequest {
 }
 message GetSubmissionListResponse {
 	message Item {
-		uint64 submission_id = 1;
-		string user = 2;
-		uint64 problem_id = 3;
-		google.protobuf.Timestamp timestamp = 5;
-		oneof overall_score {
-			bool overall_score_bool = 6;
-			double overall_score_double = 7;
-		} 
+		required uint64 sub_id = 1;
+		required string user = 2;
+		required uint64 problem_id = 3;
+		required google.protobuf.Timestamp timestamp = 5;
+		optional double score = 6;
 	}
 	repeated Item list = 1;
 }
 message GetSubmissionDetailsRequest {
-	uint64 submission_id = 1;
+	required uint64 submission_id = 1;
 }
 message GetSubmissionDetailsResponse {
-	evaluation.Submission sub = 1;
-	google.protobuf.Timestamp timestamp = 2; // really needed?
+	required evaluation.Submission sub = 1;
+	required google.protobuf.Timestamp timestamp = 2;
 }
 
 service Submission {

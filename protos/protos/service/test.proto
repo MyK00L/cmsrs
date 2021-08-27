@@ -1,16 +1,16 @@
-syntax = "proto3";
+syntax = "proto2";
 
 package service.test;
 
 message TestStringRequest {
-	string str = 1;
+	required string str = 1;
 }
 message TestStringResponse {
-	string str = 1;
+	required string str = 1;
 }
 
 message LogStringRequest {
-	string str = 1;
+	required string str = 1;
 }
 message LogStringResponse {}
 
