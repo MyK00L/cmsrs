@@ -88,7 +88,7 @@ async fn reply_form(
 ) -> Result<Redirect, String> {
     let contest_client = contest_client.inner().clone();
     let req = contest::AddMessageRequest {
-        message: Some(contest::Message {
+        message: contest::Message {
             id: gen_uuid(),
             subject: message.subject.clone(),
             problem_id: message.problem_id,
@@ -99,8 +99,8 @@ async fn reply_form(
                 Some(message.user.clone())
             },
             from: None,
-            sent_at: Some(SystemTime::now().into()),
-        }),
+            sent_at: SystemTime::now().into(),
+        },
     };
     match contest_client.add_message(tonic::Request::new(req)).await {
         Ok(_) => Ok(Redirect::to(uri!(questions))),
@@ -144,17 +144,12 @@ async fn questions(_admin: Admin, contest_client: &State<ContestClient>) -> Opti
                     .map(|q| TemplateQuestion {
                         id: q.id,
                         problem_id: q.problem_id,
-                        time: {
-                            match q.sent_at.clone() {
-                                Some(timestamp) => match SystemTime::try_from(timestamp) {
-                                    Ok(t) => match SystemTime::now().duration_since(t) {
-                                        Ok(elapsed) => format!("{}s ago", elapsed.as_secs()),
-                                        Err(_) => String::from("err"),
-                                    },
-                                    Err(_) => String::from("err"),
-                                },
-                                None => String::from("err"),
-                            }
+                        time: match SystemTime::try_from(q.sent_at.clone()) {
+                            Ok(t) => match SystemTime::now().duration_since(t) {
+                                Ok(elapsed) => format!("{}s ago", elapsed.as_secs()),
+                                Err(_) => String::from("err"),
+                            },
+                            Err(_) => String::from("err"),
                         },
                         user: q.from.clone().unwrap_or_else(|| String::from("")),
                         subject: q.subject.clone(),
@@ -205,7 +200,7 @@ fn rocket() -> _ {
                 subject: String::from("Problem A"),
                 text: String::from("<b>hello</b>"),
                 from: Some(String::from("me")),
-                sent_at: Some(SystemTime::now().into()),
+                sent_at: SystemTime::now().into(),
                 ..Default::default()
             },
             contest::Message {
@@ -213,7 +208,7 @@ fn rocket() -> _ {
                 text: String::from("contains\nproblem\nid"),
                 from: Some(String::from("a")),
                 problem_id: Some(42),
-                sent_at: Some(SystemTime::now().into()),
+                sent_at: SystemTime::now().into(),
                 ..Default::default()
             },
         ],
