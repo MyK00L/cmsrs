@@ -6,7 +6,7 @@ import "common.proto";
 
 message Submission {
 	string author_username = 1;
-	uint32 problem_id = 2;
+	uint64 problem_id = 2;
 	common.Source source = 3;
 }
 message TestcaseResult {
