@@ -39,10 +39,19 @@ message CompilationResult {
 	required common.Resources used_resources = 2;
 	optional string error_message = 3;
 }
+
+message SubtaskResult {
+	repeated TestcaseResult testcase_results = 1;
+	oneof subtask_score {
+		bool bool_score = 3;
+		double double_score = 4;
+	}
+}
+
 message EvaluationResult {
 	required CompilationResult compilation_result = 1;
-	repeated TestcaseResult testcase_results = 2;
-	oneof score {
+	repeated SubtaskResult subtask_results = 2;
+	oneof overall_score {
 		bool bool_score = 3;
 		double double_score = 4;
 	}
