@@ -5,28 +5,37 @@
 		<meta charset="UTF-8">
 	</head>
 	<body>
-	<ul>
-			<li><a href="/home">home</a></li>
-			<li><a href="/questions">questions</a></li>
-			<li><a href="/submissions">submissions</a></li>
-			<li><a href="/contest">contest</a></li>
-			<li><a href="/problems">problems</a></li>
-			<li><a href="/users">users</a></li>
-	</ul>
+	<nav>
+			<a href="/home">home</a> |
+			<a href="/questions">questions</a> |
+			<a href="/submissions">submissions</a> |
+			<a href="/contest">contest</a> |
+			<a href="/problems">problems</a> |
+			<a href="/users">users</a>
+	</nav>
+	<h2>Announcement</h2>
+	<form action="/form/reply" method="post" enctype="multipart/form-data">
+		<label>Subject <input type="text" name="subject" required></label><br>
+		<label>User <input type="text" name="user"></label><br>
+		<label>Broadcast <input type="checkbox" checked="checked" name="broadcast"></label><br>
+		<!--<input type="number" name="problem_id">-->
+		<label>Text <textarea name="text" required></textarea></label><br>
+		<input type="submit" value="send">
+	</form>
+	<hr>
+	<h2>Questions</h2>
 	{% for question in questions %}
 		<hr>
-		<p>{{question.time}}</p>
-		<p>{{question.subject}}</p>
+		<p>{{question.subject}} - {{question.time}}</p>
 		<p>{{question.text | escape | linebreaksbr | safe}}</p>
 		<form action="/form/reply" method="post" enctype="multipart/form-data">
-			<input type="hidden" name="id" value="{{question.id}}">
 			<input type="hidden" name="user" value="{{question.user}}">
 			{% if question.problem_id %}
 			<input type="hidden" name="problem_id" value="{{question.problem_id}}">
 			{% endif %}
-			<input type="text" name="subject" required><br>
-			<textarea name="text" required></textarea><br>
-			<input type="checkbox" name="broadcast"><br>
+			<label>Subject <input type="text" name="subject" required></label><br>
+			<label>Text <textarea name="text" required></textarea></label><br>
+			<label>Broadcast <input type="checkbox" name="broadcast"></label><br>
 			<input type="submit" value="send">
 		</form>
 	{% endfor %}

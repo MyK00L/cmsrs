@@ -72,8 +72,6 @@ async fn set_user_form(
 
 #[derive(FromForm)]
 struct ReplyForm {
-    #[allow(dead_code)]
-    id: u64,
     user: String,
     subject: String,
     problem_id: Option<u64>,
