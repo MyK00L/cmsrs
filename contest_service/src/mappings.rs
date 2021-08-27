@@ -43,7 +43,7 @@ pub mod contest {
     impl From<ContestMetadata> for Response<GetContestMetadataResponse> {
         fn from(md: ContestMetadata) -> Self {
             Response::new(GetContestMetadataResponse {
-                metadata: Some(protos::service::contest::ContestMetadata {
+                metadata: protos::service::contest::ContestMetadata {
                     name: md.name,
                     description: md.description,
                     start_time: md
@@ -52,7 +52,7 @@ pub mod contest {
                     end_time: md
                         .end_time
                         .map(|x| protos::prost_types::Timestamp::try_from(x).unwrap()), // This should not break,
-                }),
+                },
             })
         }
     }
@@ -61,9 +61,7 @@ pub mod contest {
         fn try_from(
             pb_meta: protos::service::contest::SetContestMetadataRequest,
         ) -> Result<Self, Self::Error> {
-            let metadata = pb_meta
-                .metadata
-                .ok_or(MappingError::MissingField("metadata"))?;
+            let metadata = pb_meta.metadata;
             Ok(Self {
                 name: metadata.name,
                 description: metadata.description,
@@ -135,17 +133,14 @@ pub mod chat {
                 body: msg.text,
                 to: msg.to,
                 from: msg.from,
-                sent_at: msg
-                    .sent_at
-                    .map(|x| std::time::SystemTime::try_from(x).unwrap())
-                    .unwrap(),
+                sent_at: std::time::SystemTime::try_from(msg.sent_at).unwrap(),
                 _thread: None,
             }
         }
     }
     impl From<protos::service::contest::AddMessageRequest> for Message {
         fn from(req: protos::service::contest::AddMessageRequest) -> Self {
-            Self::from(req.message.unwrap())
+            Self::from(req.message)
         }
     }
     impl From<Message> for protos::service::contest::Message {
@@ -155,7 +150,7 @@ pub mod chat {
                 problem_id: msg.problem_id,
                 subject: msg.subject.clone(),
                 text: msg.body.clone(),
-                sent_at: Some(protos::prost_types::Timestamp::from(msg.sent_at)),
+                sent_at: protos::prost_types::Timestamp::from(msg.sent_at),
                 from: msg.from,
                 to: msg.to,
             }

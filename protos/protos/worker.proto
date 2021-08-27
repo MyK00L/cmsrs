@@ -1,17 +1,17 @@
-syntax = "proto3";
+syntax = "proto2";
 
 package worker;
 
 import "common.proto";
 
 message Problem {
-	uint64 problem_id = 1;
-	common.Resources compilation_limits = 2;
-	common.Resources runtime_limits = 3;
+	required uint64 problem_id = 1;
+	required common.Resources compilation_limits = 2;
+	required common.Resources runtime_limits = 3;
 }
 message Testcase {
-	uint64 problem_id = 1;
-	uint64 testcase_id = 2;
+	required uint64 problem_id = 1;
+	required uint64 testcase_id = 2;
 	optional bytes testcase = 3; // None for delete?
 }
 message SourceFile {
@@ -21,7 +21,7 @@ message SourceFile {
 		CHEKCER = 2;
 		// GRADER = ;
 	}
-	uint64 problem_id = 1;
-	Type type = 2;
+	required uint64 problem_id = 1;
+	required Type type = 2;
 	optional common.Source source = 3;
 }
