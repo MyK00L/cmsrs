@@ -13,9 +13,7 @@
 			<a href="/problems">problems</a> |
 			<a href="/users">users</a>
 		</nav>
-		{% for sub in submission_list %}
 		<hr>
-		<a href="/submission/{{sub.submission_id}}">{{sub.user}} - {{sub.problem_id}} - {{sub.state}} - {{sub.time}}</a>
-		{% endfor %}
+		<textarea readonly="readonly">{{code}}</textarea>
 	</body>
 </html>

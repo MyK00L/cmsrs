@@ -1,5 +1,6 @@
-use protos::service::contest;
+use protos::service::{contest,submission};
 use protos::service::contest::contest_server::Contest;
+use protos::service::submission::submission_server::Submission;
 use rocket::form::{Form, Strict};
 use rocket::fs::{relative, NamedFile};
 use rocket::http::{Cookie, CookieJar};
@@ -16,6 +17,7 @@ use utils::gen_uuid;
 
 const PASS: &str = "1234";
 type ContestClient = contest::MockContest;
+type SubmissionClient = submission::MockSubmission;
 
 struct Admin {}
 #[rocket::async_trait]
@@ -30,7 +32,7 @@ impl<'r> FromRequest<'r> for Admin {
     }
 }
 
-// API (forms)
+// API (forms and stuff)
 
 #[derive(FromForm)]
 struct LoginForm {
@@ -101,12 +103,41 @@ async fn reply_form(
         },
     };
     match contest_client.add_message(tonic::Request::new(req)).await {
-        Ok(_) => Ok(Redirect::to(uri!(questions))),
+        Ok(_) => Ok(Redirect::to(uri!(questions_template))),
         Err(err) => Err(format!("Error in sending request:\n{:?}", err)),
     }
 }
 
+
+// TODO: respond with response instead of option
+
 // templates
+
+#[derive(Serialize)]
+#[serde(crate = "rocket::serde")]
+struct TemplateSubmissionDetails {
+    code: String,
+}
+#[get("/submission/<id>")]
+async fn submission_details_template(_admin: Admin, submission_client: &State<SubmissionClient>, id: u64) -> Option<Template> {
+    let submission_client = submission_client.inner().clone();
+    match submission_client
+        .get_submission_details(tonic::Request::new(
+            submission::GetSubmissionDetailsRequest{submission_id:id},
+        ))
+        .await
+        .ok()
+    {
+        Some(response) => {
+            let res = response.into_inner();
+            let submission_details = TemplateSubmissionDetails {
+                code: String::from_utf8(res.sub.source.code).unwrap(),
+            };
+            Some(Template::render("submission_details", submission_details))
+        }
+        None => None,
+    }
+}
 
 #[derive(Serialize)]
 #[serde(crate = "rocket::serde")]
@@ -124,7 +155,7 @@ struct TemplateQuestions {
     questions: Vec<TemplateQuestion>,
 }
 #[get("/questions")]
-async fn questions(_admin: Admin, contest_client: &State<ContestClient>) -> Option<Template> {
+async fn questions_template(_admin: Admin, contest_client: &State<ContestClient>) -> Option<Template> {
     let contest_client = contest_client.inner().clone();
     match contest_client
         .get_question_list(tonic::Request::new(
@@ -161,6 +192,58 @@ async fn questions(_admin: Admin, contest_client: &State<ContestClient>) -> Opti
     }
 }
 
+
+#[derive(Serialize)]
+#[serde(crate = "rocket::serde")]
+struct TemplateSubmissionsItem {
+    submission_id: u64,
+    problem_id: u64,
+    user: String,
+    state: String,
+    time: String,
+}
+#[derive(Serialize)]
+#[serde(crate = "rocket::serde")]
+struct TemplateSubmissions {
+    submission_list: Vec<TemplateSubmissionsItem>,
+}
+#[get("/submissions")]
+async fn submissions_template(_admin: Admin, submission_client: &State<SubmissionClient>) -> Option<Template> {
+    let submission_client = submission_client.inner().clone();
+    match submission_client
+        .get_submission_list(tonic::Request::new(
+            submission::GetSubmissionListRequest::default(),
+        ))
+        .await
+        .ok()
+    {
+        Some(response) => {
+            let submissions = TemplateSubmissions {
+                submission_list: response
+                    .into_inner()
+                    .list
+                    .iter()
+                    .map(|q| TemplateSubmissionsItem {
+                        submission_id: q.submission_id,
+                        problem_id: q.submission_id,
+                        user: q.user.clone(),
+                        state: format!("{:?}",q.state), // TODO: convert to enum
+                        time: match SystemTime::try_from(q.timestamp.clone()) { // TODO: render times as absolute times
+                            Ok(t) => match SystemTime::now().duration_since(t) {
+                                Ok(elapsed) => format!("{}s ago", elapsed.as_secs()),
+                                Err(_) => String::from("err"),
+                            },
+                            Err(_) => String::from("err"),
+                        },
+                    })
+                    .collect(),
+            };
+            Some(Template::render("submissions", submissions))
+        }
+        None => None,
+    }
+}
+
 // static
 
 #[get("/")]
@@ -191,6 +274,30 @@ async fn statics_redirect(_path: PathBuf) -> Redirect {
 #[launch]
 fn rocket() -> _ {
     let mut contest_client = contest::MockContest::default();
+    let mut submission_client = submission::MockSubmission::default();
+    submission_client.get_submission_list_set(submission::GetSubmissionListResponse{
+        list: vec![
+            submission::get_submission_list_response::Item{
+                submission_id: 42,
+                user: String::from("pippo"),
+                problem_id: 2,
+                state: submission::SubmissionState::Evaluated as i32,
+                timestamp: SystemTime::now().into(),
+                overall_score: Some(submission::get_submission_list_response::item::OverallScore::DoubleScore(42.0))
+            }
+        ]
+    });
+    submission_client.get_submission_details_set(submission::GetSubmissionDetailsResponse{
+        sub:protos::evaluation::Submission{
+            user: String::from("pippo"),
+            problem_id: 2,
+            source: protos::common::Source{
+                code:"#define OII\nint main(){\n\treturn 0;\n}".as_bytes().to_vec(),
+                ..Default::default()
+            }
+        },
+        ..Default::default()
+    });
     contest_client.add_message_set(contest::AddMessageResponse::default());
     contest_client.get_question_list_set(contest::GetQuestionListResponse {
         questions: vec![
@@ -213,6 +320,7 @@ fn rocket() -> _ {
     });
     rocket::build()
         .manage(contest_client)
+        .manage(submission_client)
         .mount(
             "/",
             routes![
@@ -220,7 +328,9 @@ fn rocket() -> _ {
                 root_logged,
                 statics,
                 statics_redirect,
-                questions,
+                questions_template,
+                submissions_template,
+                submission_details_template,
                 login_form,
                 reply_form,
                 set_user_form,
