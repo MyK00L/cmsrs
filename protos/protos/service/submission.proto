@@ -12,7 +12,6 @@ message EvaluateSubmissionRequest {
 message EvaluateSubmissionResponse {
 	evaluation.EvaluationResult res = 1;
 	uint64 submission_id = 2;
-	google.protobuf.Timestamp timestamp = 3;
 }
 message GetSubmissionListRequest {
 	optional uint32 limit = 1;
@@ -21,7 +20,7 @@ message GetSubmissionListRequest {
 }
 message GetSubmissionListResponse {
 	message Item {
-		uint64 sub_id = 1;
+		uint64 submission_id = 1;
 		string user = 2;
 		uint64 problem_id = 3;
 		google.protobuf.Timestamp timestamp = 5;

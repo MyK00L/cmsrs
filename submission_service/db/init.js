@@ -2,14 +2,14 @@ db.createCollection("submissions", {
   validator: {
     $jsonSchema: {
       bsonType: "object",
-      required: ["authorUsername", "problemId", "created", "source", "state"],
-      _id: { bsonType: "string" }, // submission id
+      required: ["user", "problemId", "created", "source", "state"],
+      _id: { bsonType: "int" }, // submission id
       properties: {
-        authorUsername: { bsonType: "string" },
+        user: { bsonType: "string" },
         problemId: { bsonType: "int" },
         created: { bsonType: "timestamp" },
         source: { bsonType: "binData" },
-        state: { enum: ["Pending","Evaluated"] },
+        state: { enum: ["Pending","Evaluated","Aborted"] },
         compilation: {
           bsonType: "object",
           required: ["outcome", "timeMs", "memoryB"],
@@ -71,5 +71,5 @@ db.createCollection("submissions", {
   }
 })
 
-// create index for field authorUsername
-db.collection.createIndex( { authorUsername: "text" } )
+// create index for field user
+db.collection.createIndex( { user: "text" } )
