@@ -29,12 +29,12 @@ pub mod contest {
                 description: value.get("description").unwrap().to_string(),
                 start_time: value.get("startTime").map(|x| {
                     x.as_timestamp()
-                        .map(convert::mongo::timestamp_to_systime)
+                        .map(utils::mongo::timestamp_to_systime)
                         .unwrap()
                 }),
                 end_time: value.get("endTime").map(|x| {
                     x.as_timestamp()
-                        .map(convert::mongo::timestamp_to_systime)
+                        .map(utils::mongo::timestamp_to_systime)
                         .unwrap()
                 }),
             }
@@ -80,11 +80,11 @@ pub mod contest {
             result.insert("description", m.description);
             result.insert(
                 "startTime",
-                m.start_time.map(convert::mongo::systime_to_timestamp),
+                m.start_time.map(utils::mongo::systime_to_timestamp),
             );
             result.insert(
                 "endTime",
-                m.end_time.map(convert::mongo::systime_to_timestamp),
+                m.end_time.map(utils::mongo::systime_to_timestamp),
             );
             result
         }
@@ -168,7 +168,7 @@ pub mod chat {
             } else if m.is_question() {
                 resp.insert("from", m.get_recipient());
             }
-            resp.insert("created", convert::mongo::systime_to_timestamp(m.sent_at));
+            resp.insert("created", utils::mongo::systime_to_timestamp(m.sent_at));
             resp
         }
     }
@@ -181,7 +181,7 @@ pub mod chat {
                 body: d.get_str("text").unwrap().to_owned(),
                 to: d.get_str("to").map(|x| x.to_owned()).ok(),
                 from: d.get_str("from").map(|x| x.to_owned()).ok(),
-                sent_at: convert::mongo::timestamp_to_systime(d.get_timestamp("created").unwrap()),
+                sent_at: utils::mongo::timestamp_to_systime(d.get_timestamp("created").unwrap()),
                 _thread: None,
             }
         }
