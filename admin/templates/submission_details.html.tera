@@ -20,7 +20,7 @@
 		<p>lang: {{lang}}</p>
 		<textarea readonly="readonly">{{code}}</textarea>
 		{% if evaluation %}
-		<p>compilation: {{evaluation.compilation_outcome}} {{evaluation.compilation_secs}}s {{evaluation.compilation_bytes}}b {{evaluation.compilation_error}}</p>
+		<p>compilation: {{evaluation.compilation_outcome}} {{evaluation.compilation_millis}}ms {{evaluation.compilation_bytes}}b {{evaluation.compilation_error}}</p>
 		<p>{{evaluation.overall_score}}</p>
 		<details>
 			<summary>testcases</summary>
@@ -28,7 +28,7 @@
 			<details>
 				<summary>Subtask {{sr.n}}: {{sr.score}}</summary>
 				{% for tr in sr.testcase_results %}
-				<p>{{tr.verdict}} {{tr.outcome}}</p>
+				<p>{{tr.outcome}} {{tr.verdict}} {{tr.millis}}ms {{tr.bytes}}b</p>
 				{% endfor %}
 			</details>
 			{% endfor %}
