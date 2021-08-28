@@ -1,12 +1,12 @@
-use protos::service::{contest,submission};
 use protos::service::contest::contest_server::Contest;
 use protos::service::submission::submission_server::Submission;
+use protos::service::{contest, submission};
 use rocket::form::{Form, Strict};
 use rocket::fs::{relative, NamedFile};
-use rocket::http::{Cookie, CookieJar};
+use rocket::http::{Cookie, CookieJar, Status};
 use rocket::outcome::IntoOutcome;
 use rocket::request::FromRequest;
-use rocket::response::Redirect;
+use rocket::response::{status, Redirect};
 use rocket::serde::Serialize;
 use rocket::*;
 use rocket_dyn_templates::Template;
@@ -59,7 +59,7 @@ async fn set_user_form(
     _admin: Admin,
     user: Form<Strict<AddUserForm>>,
     contest_client: &State<ContestClient>,
-) -> Result<Redirect, String> {
+) -> Result<Redirect, status::Custom<String>> {
     let contest_client = contest_client.inner().clone();
     let req = contest::SetUserRequest {
         username: user.username.clone(),
@@ -68,7 +68,10 @@ async fn set_user_form(
     };
     match contest_client.set_user(tonic::Request::new(req)).await {
         Ok(_) => Ok(Redirect::to("/users")),
-        Err(err) => Err(format!("Error in sending request:\n{:?}", err)),
+        Err(err) => Err(status::Custom(
+            Status::InternalServerError,
+            format!("Error in rpc request:\n{:?}", err),
+        )),
     }
 }
 
@@ -85,7 +88,7 @@ async fn reply_form(
     _admin: Admin,
     message: Form<Strict<ReplyForm>>,
     contest_client: &State<ContestClient>,
-) -> Result<Redirect, String> {
+) -> Result<Redirect, status::Custom<String>> {
     let contest_client = contest_client.inner().clone();
     let req = contest::AddMessageRequest {
         message: contest::Message {
@@ -104,12 +107,12 @@ async fn reply_form(
     };
     match contest_client.add_message(tonic::Request::new(req)).await {
         Ok(_) => Ok(Redirect::to(uri!(questions_template))),
-        Err(err) => Err(format!("Error in sending request:\n{:?}", err)),
+        Err(err) => Err(status::Custom(
+            Status::InternalServerError,
+            format!("Error in rpc request:\n{:?}", err),
+        )),
     }
 }
-
-
-// TODO: respond with response instead of option
 
 // templates
 
@@ -119,23 +122,29 @@ struct TemplateSubmissionDetails {
     code: String,
 }
 #[get("/submission/<id>")]
-async fn submission_details_template(_admin: Admin, submission_client: &State<SubmissionClient>, id: u64) -> Option<Template> {
+async fn submission_details_template(
+    _admin: Admin,
+    submission_client: &State<SubmissionClient>,
+    id: u64,
+) -> Result<Template, status::Custom<String>> {
     let submission_client = submission_client.inner().clone();
     match submission_client
         .get_submission_details(tonic::Request::new(
-            submission::GetSubmissionDetailsRequest{submission_id:id},
+            submission::GetSubmissionDetailsRequest { submission_id: id },
         ))
         .await
-        .ok()
     {
-        Some(response) => {
+        Ok(response) => {
             let res = response.into_inner();
             let submission_details = TemplateSubmissionDetails {
                 code: String::from_utf8(res.sub.source.code).unwrap(),
             };
-            Some(Template::render("submission_details", submission_details))
+            Ok(Template::render("submission_details", submission_details))
         }
-        None => None,
+        Err(err) => Err(status::Custom(
+            Status::InternalServerError,
+            format!("Error in rpc request:\n{:?}", err),
+        )),
     }
 }
 
@@ -155,16 +164,18 @@ struct TemplateQuestions {
     questions: Vec<TemplateQuestion>,
 }
 #[get("/questions")]
-async fn questions_template(_admin: Admin, contest_client: &State<ContestClient>) -> Option<Template> {
+async fn questions_template(
+    _admin: Admin,
+    contest_client: &State<ContestClient>,
+) -> Result<Template, status::Custom<String>> {
     let contest_client = contest_client.inner().clone();
     match contest_client
         .get_question_list(tonic::Request::new(
             contest::GetQuestionListRequest::default(),
         ))
         .await
-        .ok()
     {
-        Some(response) => {
+        Ok(response) => {
             let questions = TemplateQuestions {
                 questions: response
                     .into_inner()
@@ -176,9 +187,9 @@ async fn questions_template(_admin: Admin, contest_client: &State<ContestClient>
                         time: match SystemTime::try_from(q.sent_at.clone()) {
                             Ok(t) => match SystemTime::now().duration_since(t) {
                                 Ok(elapsed) => format!("{}s ago", elapsed.as_secs()),
-                                Err(_) => String::from("err"),
+                                Err(_) => String::from("errs ago"),
                             },
-                            Err(_) => String::from("err"),
+                            Err(_) => String::from("errs ago"),
                         },
                         user: q.from.clone().unwrap_or_else(|| String::from("")),
                         subject: q.subject.clone(),
@@ -186,12 +197,14 @@ async fn questions_template(_admin: Admin, contest_client: &State<ContestClient>
                     })
                     .collect(),
             };
-            Some(Template::render("questions", questions))
+            Ok(Template::render("questions", questions))
         }
-        None => None,
+        Err(err) => Err(status::Custom(
+            Status::InternalServerError,
+            format!("Error in rpc request:\n{:?}", err),
+        )),
     }
 }
-
 
 #[derive(Serialize)]
 #[serde(crate = "rocket::serde")]
@@ -208,16 +221,18 @@ struct TemplateSubmissions {
     submission_list: Vec<TemplateSubmissionsItem>,
 }
 #[get("/submissions")]
-async fn submissions_template(_admin: Admin, submission_client: &State<SubmissionClient>) -> Option<Template> {
+async fn submissions_template(
+    _admin: Admin,
+    submission_client: &State<SubmissionClient>,
+) -> Result<Template, status::Custom<String>> {
     let submission_client = submission_client.inner().clone();
     match submission_client
         .get_submission_list(tonic::Request::new(
             submission::GetSubmissionListRequest::default(),
         ))
         .await
-        .ok()
     {
-        Some(response) => {
+        Ok(response) => {
             let submissions = TemplateSubmissions {
                 submission_list: response
                     .into_inner()
@@ -227,8 +242,9 @@ async fn submissions_template(_admin: Admin, submission_client: &State<Submissio
                         submission_id: q.submission_id,
                         problem_id: q.submission_id,
                         user: q.user.clone(),
-                        state: format!("{:?}",q.state), // TODO: convert to enum
-                        time: match SystemTime::try_from(q.timestamp.clone()) { // TODO: render times as absolute times
+                        state: format!("{:?}", q.state), // TODO: convert to enum
+                        time: match SystemTime::try_from(q.timestamp.clone()) {
+                            // TODO: render times as absolute times
                             Ok(t) => match SystemTime::now().duration_since(t) {
                                 Ok(elapsed) => format!("{}s ago", elapsed.as_secs()),
                                 Err(_) => String::from("err"),
@@ -238,9 +254,12 @@ async fn submissions_template(_admin: Admin, submission_client: &State<Submissio
                     })
                     .collect(),
             };
-            Some(Template::render("submissions", submissions))
+            Ok(Template::render("submissions", submissions))
         }
-        None => None,
+        Err(err) => Err(status::Custom(
+            Status::InternalServerError,
+            format!("Error in rpc request:\n{:?}", err),
+        )),
     }
 }
 
@@ -275,26 +294,28 @@ async fn statics_redirect(_path: PathBuf) -> Redirect {
 fn rocket() -> _ {
     let mut contest_client = contest::MockContest::default();
     let mut submission_client = submission::MockSubmission::default();
-    submission_client.get_submission_list_set(submission::GetSubmissionListResponse{
-        list: vec![
-            submission::get_submission_list_response::Item{
-                submission_id: 42,
-                user: String::from("pippo"),
-                problem_id: 2,
-                state: submission::SubmissionState::Evaluated as i32,
-                timestamp: SystemTime::now().into(),
-                overall_score: Some(submission::get_submission_list_response::item::OverallScore::DoubleScore(42.0))
-            }
-        ]
-    });
-    submission_client.get_submission_details_set(submission::GetSubmissionDetailsResponse{
-        sub:protos::evaluation::Submission{
+    submission_client.get_submission_list_set(submission::GetSubmissionListResponse {
+        list: vec![submission::get_submission_list_response::Item {
+            submission_id: 42,
             user: String::from("pippo"),
             problem_id: 2,
-            source: protos::common::Source{
-                code:"#define OII\nint main(){\n\treturn 0;\n}".as_bytes().to_vec(),
+            state: submission::SubmissionState::Evaluated as i32,
+            timestamp: SystemTime::now().into(),
+            overall_score: Some(
+                submission::get_submission_list_response::item::OverallScore::DoubleScore(42.0),
+            ),
+        }],
+    });
+    submission_client.get_submission_details_set(submission::GetSubmissionDetailsResponse {
+        sub: protos::evaluation::Submission {
+            user: String::from("pippo"),
+            problem_id: 2,
+            source: protos::common::Source {
+                code: "#define OII\nint main(){\n\treturn 0;\n}"
+                    .as_bytes()
+                    .to_vec(),
                 ..Default::default()
-            }
+            },
         },
         ..Default::default()
     });
