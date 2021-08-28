@@ -10,10 +10,11 @@ use rocket::response::{status, Redirect};
 use rocket::serde::Serialize;
 use rocket::*;
 use rocket_dyn_templates::Template;
-use std::convert::TryFrom;
+use std::convert::TryInto;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use utils::gen_uuid;
+//use std::convert::TryFrom;
 
 const PASS: &str = "1234";
 type ContestClient = contest::MockContest;
@@ -118,8 +119,36 @@ async fn reply_form(
 
 #[derive(Serialize)]
 #[serde(crate = "rocket::serde")]
+struct TemplateTestcaseResult {
+    verdict: String,
+    outcome: String,
+}
+#[derive(Serialize)]
+#[serde(crate = "rocket::serde")]
+struct TemplateSubtaskResult {
+    n: u64,
+    score: String,
+    testcase_results: Vec<TemplateTestcaseResult>,
+}
+#[derive(Serialize)]
+#[serde(crate = "rocket::serde")]
+struct TemplateSubmissionEvaluation {
+    compilation_outcome: String,
+    compilation_secs: u64,
+    compilation_bytes: u64,
+    compilation_error: String,
+    overall_score: String,
+    subtask_results: Vec<TemplateSubtaskResult>,
+}
+#[derive(Serialize)]
+#[serde(crate = "rocket::serde")]
 struct TemplateSubmissionDetails {
+    state: String,
+    user: String,
+    problem_id: u64,
+    lang: String,
     code: String,
+    evaluation: Option<TemplateSubmissionEvaluation>,
 }
 #[get("/submission/<id>")]
 async fn submission_details_template(
@@ -137,7 +166,53 @@ async fn submission_details_template(
         Ok(response) => {
             let res = response.into_inner();
             let submission_details = TemplateSubmissionDetails {
-                code: String::from_utf8(res.sub.source.code).unwrap(),
+                state: format!(
+                    "{:?}",
+                    submission::SubmissionState::from_i32(res.state).unwrap()
+                ),
+                user: res.sub.user.to_string(),
+                problem_id: res.sub.problem_id,
+                lang: format!(
+                    "{:?}",
+                    protos::common::ProgrammingLanguage::from_i32(res.sub.source.lang).unwrap()
+                ),
+                code: String::from_utf8(res.sub.source.code.clone())
+                    .unwrap_or(format!("{:?}", res.sub.source.code)),
+                evaluation: match res.res {
+                    Some(res) => Some(TemplateSubmissionEvaluation {
+                        compilation_outcome: res.compilation_result.outcome.to_string(),
+                        compilation_secs: res
+                            .compilation_result
+                            .used_resources
+                            .time
+                            .seconds
+                            .try_into()
+                            .unwrap_or(0),
+                        compilation_bytes: res.compilation_result.used_resources.memory_bytes,
+                        compilation_error: res
+                            .compilation_result
+                            .error_message
+                            .unwrap_or(String::from("")),
+                        overall_score: format!("{:?}", res.overall_score.unwrap()),
+                        subtask_results: res
+                            .subtask_results
+                            .iter()
+                            .map(|sr| TemplateSubtaskResult {
+                                n: 0,
+                                score: format!("{:?}", sr.subtask_score.as_ref().unwrap()),
+                                testcase_results: sr
+                                    .testcase_results
+                                    .iter()
+                                    .map(|tr| TemplateTestcaseResult {
+                                        verdict: format!("{:?}", tr.verdict.as_ref().unwrap()),
+                                        outcome: tr.outcome.to_string(),
+                                    })
+                                    .collect(),
+                            })
+                            .collect(),
+                    }),
+                    None => None,
+                },
             };
             Ok(Template::render("submission_details", submission_details))
         }
@@ -184,13 +259,7 @@ async fn questions_template(
                     .map(|q| TemplateQuestion {
                         id: q.id,
                         problem_id: q.problem_id,
-                        time: match SystemTime::try_from(q.sent_at.clone()) {
-                            Ok(t) => match SystemTime::now().duration_since(t) {
-                                Ok(elapsed) => format!("{}s ago", elapsed.as_secs()),
-                                Err(_) => String::from("errs ago"),
-                            },
-                            Err(_) => String::from("errs ago"),
-                        },
+                        time: utils::render_prost_timestamp(q.sent_at.clone(), "%F %X"),
                         user: q.from.clone().unwrap_or_else(|| String::from("")),
                         subject: q.subject.clone(),
                         text: q.text.clone(),
@@ -243,14 +312,7 @@ async fn submissions_template(
                         problem_id: q.submission_id,
                         user: q.user.clone(),
                         state: format!("{:?}", q.state), // TODO: convert to enum
-                        time: match SystemTime::try_from(q.timestamp.clone()) {
-                            // TODO: render times as absolute times
-                            Ok(t) => match SystemTime::now().duration_since(t) {
-                                Ok(elapsed) => format!("{}s ago", elapsed.as_secs()),
-                                Err(_) => String::from("err"),
-                            },
-                            Err(_) => String::from("err"),
-                        },
+                        time: utils::render_prost_timestamp(q.timestamp.clone(), "%F %X"),
                     })
                     .collect(),
             };

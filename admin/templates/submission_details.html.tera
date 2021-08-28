@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 	<head>
-		<title>submissions</title>
+		<title>submission details</title>
 		<meta charset="UTF-8">
 	</head>
 	<body>
@@ -14,6 +14,25 @@
 			<a href="/users">users</a>
 		</nav>
 		<hr>
+		<p>state: {{state}}</p>
+		<p>user: {{user}}</p>
+		<p>problem: {{problem_id}}</p>
+		<p>lang: {{lang}}</p>
 		<textarea readonly="readonly">{{code}}</textarea>
+		{% if evaluation %}
+		<p>compilation: {{evaluation.compilation_outcome}} {{evaluation.compilation_secs}}s {{evaluation.compilation_bytes}}b {{evaluation.compilation_error}}</p>
+		<p>{{evaluation.overall_score}}</p>
+		<details>
+			<summary>testcases</summary>
+			{% for sr in evaluation.subtask_results %}
+			<details>
+				<summary>Subtask {{sr.n}}: {{sr.score}}</summary>
+				{% for tr in sr.testcase_results %}
+				<p>{{tr.verdict}} {{tr.outcome}}</p>
+				{% endfor %}
+			</details>
+			{% endfor %}
+		</details>
+		{% endif %}
 	</body>
 </html>
