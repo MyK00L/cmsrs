@@ -63,18 +63,17 @@ async fn update_contest_form(
     contest: Form<Strict<UpdateContestForm>>,
     contest_client: &State<ContestClient>,
 ) -> Result<Redirect, status::Custom<String>> {
-    // TODO: fix date parsing
     let contest_client = contest_client.inner().clone();
     let req = contest::SetContestMetadataRequest {
         metadata: contest::ContestMetadata {
             name: contest.name.clone(),
             description: contest.description.clone(),
             start_time: chrono::prelude::Utc
-                .datetime_from_str(&contest.start_time, "%Y-%m-%dT%H:%M:%S")
+                .datetime_from_str(&contest.start_time, "%FT%T")
                 .ok()
                 .map(|t| SystemTime::from(t).into()),
             end_time: chrono::prelude::Utc
-                .datetime_from_str(&contest.end_time, "%Y-%m-%dT%H:%M:%S")
+                .datetime_from_str(&contest.end_time, "%FT%T")
                 .ok()
                 .map(|t| SystemTime::from(t).into()),
         },
@@ -413,12 +412,12 @@ async fn contest_template(
                 name: res.name,
                 description: res.description,
                 start_time: match res.start_time {
-                    Some(t) => utils::render_prost_timestamp(t, "%FT%T%.3f"),
-                    None => String::from(""),
+                    Some(t) => utils::render_prost_timestamp(t, "%FT%T"),
+                    None => String::from("4242-12-25T16:08:04"),
                 },
                 end_time: match res.end_time {
-                    Some(t) => utils::render_prost_timestamp(t, "%FT%T%.3f"),
-                    None => String::from(""),
+                    Some(t) => utils::render_prost_timestamp(t, "%FT%T"),
+                    None => String::from("4242-12-25T16:08:04"),
                 },
             };
             Ok(Template::render("contest", contest))
