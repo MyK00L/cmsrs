@@ -45,9 +45,9 @@ db.createCollection("users", {
         $jsonSchema: {
             bsonType: "object",
             _id: { bsonType: "string" }, // username
-            required: ["fullName", "password"],
+            required: ["fullname", "password"],
             properties: {
-                fullName: { bsonType: "string" },
+                fullname: { bsonType: "string" },
                 password: { bsonType: "string" },
             }
         }
