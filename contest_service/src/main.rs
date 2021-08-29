@@ -39,10 +39,10 @@ async fn init_contest_service_db(db: Database) -> Result<(), Box<dyn std::error:
                     "bsonType": "object",
                     "required": ["name", "description"],
                     "properties": {
-                        "name": { "bsonType": "string", "description": "description for name"},
-                        "description": { "bsonType": "string", "description": "description for description" },
-                        "startTime": { "bsonType": "timestamp", "description": "description for sT" }, // missing means there is no start time
-                        "endTime": { "bsonType": "timestamp", "description": "description for eT" } // missing means there is no end time
+                        "name": { "bsonType": "string" },
+                        "description": { "bsonType": "string" },
+                        "startTime": { "bsonType": "timestamp" }, // missing means there is no start time
+                        "endTime": { "bsonType": "timestamp" } // missing means there is no end time
                     }
                 }
             })
