@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>contest</title>
+		<meta charset="UTF-8">
+	</head>
+	<body>
+	<nav>
+			<a href="/home">home</a> |
+			<a href="/questions">questions</a> |
+			<a href="/submissions">submissions</a> |
+			<a href="/contest">contest</a> |
+			<a href="/problems">problems</a> |
+			<a href="/users">users</a>
+	<hr>
+	</nav>
+		<form action="/form/update_contest" method="post" enctype="multipart/form-data">
+			<label>Name <input type="text" name="name" value="{{name}}" required></label><br>
+			<label>Description <input type="text" name="description" value="{{description}}" required></label><br>
+			<label>Start <input type="datetime-local" name="start_time" value="{{start_time}}" required></label><br>
+			<label>End <input type="datetime-local" name="end_time" value="{{end_time}}" required></label><br>
+			<input type="submit" value="update">
+		</form>
+	</body>
+</html>

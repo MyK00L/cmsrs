@@ -1,3 +1,4 @@
+use chrono::TimeZone;
 use protos::service::contest::contest_server::Contest;
 use protos::service::submission::submission_server::Submission;
 use protos::service::{contest, submission};
@@ -46,6 +47,47 @@ async fn login_form(cookies: &CookieJar<'_>, login: Form<Strict<LoginForm>>) -> 
         Redirect::to("/home")
     } else {
         Redirect::to(uri!(root))
+    }
+}
+
+#[derive(FromForm)]
+struct UpdateContestForm {
+    name: String,
+    description: String,
+    start_time: String,
+    end_time: String,
+}
+#[post("/form/update_contest", data = "<contest>")]
+async fn update_contest_form(
+    _admin: Admin,
+    contest: Form<Strict<UpdateContestForm>>,
+    contest_client: &State<ContestClient>,
+) -> Result<Redirect, status::Custom<String>> {
+    // TODO: fix date parsing
+    let contest_client = contest_client.inner().clone();
+    let req = contest::SetContestMetadataRequest {
+        metadata: contest::ContestMetadata {
+            name: contest.name.clone(),
+            description: contest.description.clone(),
+            start_time: chrono::prelude::Utc
+                .datetime_from_str(&contest.start_time, "%Y-%m-%dT%H:%M:%S")
+                .ok()
+                .map(|t| SystemTime::from(t).into()),
+            end_time: chrono::prelude::Utc
+                .datetime_from_str(&contest.end_time, "%Y-%m-%dT%H:%M:%S")
+                .ok()
+                .map(|t| SystemTime::from(t).into()),
+        },
+    };
+    match contest_client
+        .set_contest_metadata(tonic::Request::new(req))
+        .await
+    {
+        Ok(_) => Ok(Redirect::to("/contest")),
+        Err(err) => Err(status::Custom(
+            Status::InternalServerError,
+            format!("Error in rpc request:\n{:?}", err),
+        )),
     }
 }
 
@@ -182,7 +224,13 @@ async fn submission_details_template(
                     .unwrap_or(format!("{:?}", res.sub.source.code)),
                 evaluation: match res.res {
                     Some(res) => Some(TemplateSubmissionEvaluation {
-                        compilation_outcome: format!("{:?}",protos::evaluation::compilation_result::Outcome::from_i32(res.compilation_result.outcome).unwrap()),
+                        compilation_outcome: format!(
+                            "{:?}",
+                            protos::evaluation::compilation_result::Outcome::from_i32(
+                                res.compilation_result.outcome
+                            )
+                            .unwrap()
+                        ),
                         compilation_millis: (res.compilation_result.used_resources.time.seconds
                             * 1000
                             + (res.compilation_result.used_resources.time.nanos as i64) / 1000000)
@@ -191,8 +239,9 @@ async fn submission_details_template(
                         compilation_bytes: res.compilation_result.used_resources.memory_bytes,
                         compilation_error: res
                             .compilation_result
-                            .error_message.clone()
-                            .unwrap_or(String::from("")),
+                            .error_message
+                            .clone()
+                            .unwrap_or_else(|| String::from("")),
                         overall_score: format!("{:?}", res.overall_score.as_ref().unwrap()),
                         subtask_results: res
                             .subtask_results
@@ -213,7 +262,8 @@ async fn submission_details_template(
                                             .unwrap()
                                         ),
                                         millis: (tr.used_resources.time.seconds * 1000
-                                            + (res.compilation_result.used_resources.time.nanos as i64)
+                                            + (res.compilation_result.used_resources.time.nanos
+                                                as i64)
                                                 / 1000000)
                                             .try_into()
                                             .unwrap_or(0),
@@ -337,6 +387,49 @@ async fn submissions_template(
     }
 }
 
+#[derive(Serialize)]
+#[serde(crate = "rocket::serde")]
+struct TemplateContest {
+    name: String,
+    description: String,
+    start_time: String,
+    end_time: String,
+}
+#[get("/contest")]
+async fn contest_template(
+    _admin: Admin,
+    contest_client: &State<ContestClient>,
+) -> Result<Template, status::Custom<String>> {
+    let contest_client = contest_client.inner().clone();
+    match contest_client
+        .get_contest_metadata(tonic::Request::new(
+            contest::GetContestMetadataRequest::default(),
+        ))
+        .await
+    {
+        Ok(response) => {
+            let res = response.into_inner().metadata;
+            let contest = TemplateContest {
+                name: res.name,
+                description: res.description,
+                start_time: match res.start_time {
+                    Some(t) => utils::render_prost_timestamp(t, "%FT%T%.3f"),
+                    None => String::from(""),
+                },
+                end_time: match res.end_time {
+                    Some(t) => utils::render_prost_timestamp(t, "%FT%T%.3f"),
+                    None => String::from(""),
+                },
+            };
+            Ok(Template::render("contest", contest))
+        }
+        Err(err) => Err(status::Custom(
+            Status::InternalServerError,
+            format!("Error in rpc request:\n{:?}", err),
+        )),
+    }
+}
+
 // static
 
 #[get("/")]
@@ -419,6 +512,14 @@ fn rocket() -> _ {
         }),
     });
     contest_client.add_message_set(contest::AddMessageResponse::default());
+    contest_client.get_contest_metadata_set(contest::GetContestMetadataResponse {
+        metadata: contest::ContestMetadata {
+            name: String::from("contest"),
+            description: String::from("wow awesome contest"),
+            start_time: Some(SystemTime::now().into()),
+            end_time: None,
+        },
+    });
     contest_client.get_question_list_set(contest::GetQuestionListResponse {
         questions: vec![
             contest::Message {
@@ -451,9 +552,11 @@ fn rocket() -> _ {
                 questions_template,
                 submissions_template,
                 submission_details_template,
-                login_form,
+                contest_template,
+                update_contest_form,
                 reply_form,
                 set_user_form,
+                login_form
             ],
         )
         .attach(Template::fairing())
