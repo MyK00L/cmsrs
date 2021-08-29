@@ -2,22 +2,21 @@ version: "3.3"
 
 services:
   contest_service_db:
-    image: mongo:4.4.8
+    image: mongo:5.0.0
     restart: always
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: example
       MONGO_INITDB_DATABASE: contestdb
-    volumes:
-      - ./contest_service/db/init.js:/docker-entrypoint-initdb.d/init.js
-      # - contest_service_db_volume:/data/db
-    ports: 
+    # volumes:
+    #   - contest_service_db_volume:/data/db
+    ports:
       - 27017:27017
   contest_service:
     build:
       context: .
       dockerfile: ./contest_service/Dockerfile
-    ports: 
+    ports:
       - 50051:50051
     depends_on: 
       - contest_service_db
