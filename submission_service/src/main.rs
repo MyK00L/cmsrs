@@ -5,7 +5,7 @@ use futures::stream::StreamExt;
 
 use ::utils::{gen_uuid, mongo::*};
 use mongodb::{Client, bson::{Binary, Bson, Document, bson, doc, spec::{BinarySubtype, ElementType}}, options::{ClientOptions, FindOptions}};
-use protos::{*, self, common::Resources, evaluation::{CompilationResult, EvaluationResult, SubtaskResult, TestcaseResult}, prost_types::{Duration}, service::{dispatcher::MockDispatcher}};
+use protos::{*, self, common::Resources, evaluation::{CompilationResult, EvaluationResult, SubtaskResult, TestcaseResult}, service::{dispatcher::MockDispatcher}};
 use protos::service::submission::*;
 use protos::scoring::*;
 use protos::service::submission::submission_server::*;
@@ -16,6 +16,7 @@ use tonic::{Request, Response, Status, transport::*};
 #[cfg(test)]
 mod tests;
 
+const DUMMY_MESSAGE: String = String::new();
 // TODO: remove credentials to connect to db.
 const CONNECTION_STRING: &str = "mongodb://root:example@submission_service_db:27017/";
 
@@ -49,7 +50,7 @@ impl SubmissionService {
     }
 }
 
-fn score_option_bson_to_struct(opt_bson_score: Option<&Bson>) -> OneOfScore {
+fn score_option_bson_to_struct(opt_bson_score: Option<&Bson>, expected: bool, expect_message: String) -> OneOfScore {
     OneOfScore {
         score: 
             if let Some(bson_score) = opt_bson_score {
@@ -61,7 +62,11 @@ fn score_option_bson_to_struct(opt_bson_score: Option<&Bson>) -> OneOfScore {
                     _ => panic! ("score cannot have this type")
                 }
             } else {
-                None
+                if expected {
+                    panic!("{}", expect_message.as_str())
+                } else {
+                    None
+                }
             }
     }
 }
@@ -86,7 +91,7 @@ fn get_item_from_doc(doc: Document) -> get_submission_list_response::Item {
         problem_id: doc.get_i64("problemId").unwrap() as u64,
         timestamp: timestamp_to_systime(doc.get_timestamp("created").unwrap()).into(),
         state: state_str_to_i32[doc.get_str("state").expect(expected_field("state").as_str())],
-        score: score_option_bson_to_struct(doc.get("overallScore"))
+        score: score_option_bson_to_struct(doc.get("overallScore"), false, DUMMY_MESSAGE)
     }
 }
 
@@ -110,16 +115,18 @@ fn create_pending_submission_document(
         }
 }
 
-fn duration_to_time_ns(duration: Duration) -> i64 {
-    let mut normalized_duration = duration.clone();
-    normalized_duration.normalize();
-    i64::min(i32::MAX.into(), normalized_duration.seconds) * 1_000_000_000 + (normalized_duration.nanos as i64)
+fn duration_to_time_ns(duration: common::Duration) -> i64 {
+    if duration.secs > (i32::MAX as u64) {
+        (i32::MAX as i64) * 1_000_000_000 + (duration.nanos as i64)
+    } else {
+        (duration.secs as i64)* 1_000_000_000 + (duration.nanos as i64)
+    }
 }
 
-fn time_ns_to_duration(time_ns: i64) -> Duration {
-    Duration { 
-        seconds: time_ns / 1_000_000_000, 
-        nanos: (time_ns % 1_000_000_000) as i32
+fn time_ns_to_duration(time_ns: i64) -> common::Duration {
+    common::Duration { 
+        secs: (time_ns / 1_000_000_000) as u64, 
+        nanos: (time_ns % 1_000_000_000) as u32
     }
 }
 
@@ -232,7 +239,7 @@ fn single_testcase_db_to_struct(testcase_doc: &Document) -> TestcaseResult {
             memory_bytes: testcase_doc.get_i64("memoryB").expect(expected_field("memoryB").as_str()) as u64,
         },
         score:
-            score_option_bson_to_struct(testcase_doc.get("score")) // expected
+            score_option_bson_to_struct(testcase_doc.get("score"), true, expected_field("score")) // expected
     }
 }
 
@@ -251,7 +258,7 @@ fn single_subtask_db_to_struct(subtask_doc: &Document) -> SubtaskResult {
             })
             .collect::<Vec<TestcaseResult>>(),
         score: 
-            score_option_bson_to_struct(Some(subtask_score_bson))
+            score_option_bson_to_struct(Some(subtask_score_bson), false, DUMMY_MESSAGE)
     }
 }
 
@@ -290,7 +297,7 @@ fn document_to_evaluation_result_struct(submission_doc: Document) -> EvaluationR
                 vec![]
             },
         score: 
-            score_option_bson_to_struct(submission_doc.get("overallScore")) // expected
+            score_option_bson_to_struct(submission_doc.get("overallScore"), true, expected_field("overallScore")) // expected
     }
 
 }
