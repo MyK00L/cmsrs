@@ -29,12 +29,12 @@ pub mod contest {
                 description: value.get("description").unwrap().to_string(),
                 start_time: value.get("startTime").map(|x| {
                     x.as_timestamp()
-                        .map(convert::mongo::timestamp_to_systime)
+                        .map(utils::mongo::timestamp_to_systime)
                         .unwrap()
                 }),
                 end_time: value.get("endTime").map(|x| {
                     x.as_timestamp()
-                        .map(convert::mongo::timestamp_to_systime)
+                        .map(utils::mongo::timestamp_to_systime)
                         .unwrap()
                 }),
             }
@@ -46,12 +46,8 @@ pub mod contest {
                 metadata: protos::service::contest::ContestMetadata {
                     name: md.name,
                     description: md.description,
-                    start_time: md
-                        .start_time
-                        .map(|x| protos::prost_types::Timestamp::try_from(x).unwrap()), // This should not break,
-                    end_time: md
-                        .end_time
-                        .map(|x| protos::prost_types::Timestamp::try_from(x).unwrap()), // This should not break,
+                    start_time: md.start_time.map(protos::common::Timestamp::from),
+                    end_time: md.end_time.map(protos::common::Timestamp::from),
                 },
             })
         }
@@ -80,11 +76,11 @@ pub mod contest {
             result.insert("description", m.description);
             result.insert(
                 "startTime",
-                m.start_time.map(convert::mongo::systime_to_timestamp),
+                m.start_time.map(utils::mongo::systime_to_timestamp),
             );
             result.insert(
                 "endTime",
-                m.end_time.map(convert::mongo::systime_to_timestamp),
+                m.end_time.map(utils::mongo::systime_to_timestamp),
             );
             result
         }
@@ -150,7 +146,7 @@ pub mod chat {
                 problem_id: msg.problem_id,
                 subject: msg.subject.clone(),
                 text: msg.body.clone(),
-                sent_at: protos::prost_types::Timestamp::from(msg.sent_at),
+                sent_at: protos::common::Timestamp::from(msg.sent_at),
                 from: msg.from,
                 to: msg.to,
             }
@@ -168,7 +164,7 @@ pub mod chat {
             } else if m.is_question() {
                 resp.insert("from", m.get_recipient());
             }
-            resp.insert("created", convert::mongo::systime_to_timestamp(m.sent_at));
+            resp.insert("created", utils::mongo::systime_to_timestamp(m.sent_at));
             resp
         }
     }
@@ -181,7 +177,7 @@ pub mod chat {
                 body: d.get_str("text").unwrap().to_owned(),
                 to: d.get_str("to").map(|x| x.to_owned()).ok(),
                 from: d.get_str("from").map(|x| x.to_owned()).ok(),
-                sent_at: convert::mongo::timestamp_to_systime(d.get_timestamp("created").unwrap()),
+                sent_at: utils::mongo::timestamp_to_systime(d.get_timestamp("created").unwrap()),
                 _thread: None,
             }
         }

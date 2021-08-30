@@ -1,0 +1,151 @@
+syntax = "proto2";
+
+package service.evaluation;
+
+import "common.proto";
+import "scoring.proto";
+
+// Schema-defining messages
+
+// Problems, subtasks, testcases IO files and evaluation related files are stored
+// in the filesystem using a gerarchy of nested folders.
+
+enum ProblemType {
+    BATCH = 0;
+    OUTPUT_ONLY = 1;
+    INTERACTIVE = 2;
+    OTHER = 3;
+}
+message ProblemLimits {
+    required uint64 runtime_time_limit_nanos = 1;    //TODO Fix with common.Resources when serialization works
+    required uint64 runtime_memory_limit_bytes = 2;
+    optional uint64 compilation_time_limit_nanos = 3;
+    optional uint64 source_size_limit_bytes = 4;
+}
+message ProblemEvaluationInfo {
+    required ProblemType type = 1;
+    required ProblemLimits limits = 2;
+}
+message ProblemScoringInfo {
+    repeated scoring.Subtask subtask_scorings = 3;
+    required scoring.Problem problem_scoring = 4;
+    required double problem_score = 5;   // This is a redundant information obtained by adding all subtask max scores
+}
+
+// Communication messages for large files and utils
+
+message Subtask {
+    message Testcase {
+        required uint64 id = 1;
+        optional bytes input = 2;
+        optional bytes output = 3;
+    }
+    required uint64 id = 1;
+    required scoring.Subtask scoring = 2;
+    repeated Testcase testcases = 3;
+}
+
+message EvaluationFile {
+    enum Type {
+        GENERIC = 0;
+        CHECKER = 1;
+        INTERACTOR = 2;
+    }
+    required Type type = 1;
+    required common.Source file = 2;
+}
+
+message Failure {
+    required string error = 1;
+}
+
+// RPC messages
+
+message GetProblemScoringInfoRequest {
+    required uint64 problem_id = 1;
+}
+message GetProblemScoringInfoResponse {
+    message Success {
+        required ProblemScoringInfo info = 1;
+    }
+    oneof response {
+        Success success = 1;
+        Failure failure = 2;
+    }
+}
+
+message GetProblemEvaluationInfoRequest {
+    required uint64 problem_id = 1;
+}
+message GetProblemEvaluationInfoResponse {
+    message Success {
+        required ProblemEvaluationInfo info = 1;
+    }
+    oneof response {
+        Success success = 1;
+        Failure failure = 2;
+    }
+}
+
+message GetProblemTestcasesRequest {
+    required uint64 problem_id = 1;
+}
+message GetProblemTestcasesResponse {
+    message Success {
+        repeated Subtask subtasks = 1;
+    }
+    oneof response {
+        Success success = 1;
+        Failure failure = 2;
+    }
+}
+
+message GetProblemEvaluationFileRequest {
+    required uint64 problem_id = 1;
+    required EvaluationFile.Type file_type = 2;
+}
+message GetProblemEvaluationFileResponse {
+    message Success {
+        required EvaluationFile file = 1;
+    }
+    oneof response {
+        Success success = 1;
+        Failure failure = 2;
+    }
+}
+
+message GetUserScoringMethodRequest {}
+message GetUserScoringMethodResponse {
+    required scoring.User method = 1;
+}
+
+message SetProblemInfoRequest {
+    required uint64 problem_id = 1;
+    required ProblemType type = 2;
+    required ProblemLimits limits = 3;
+    repeated Subtask subtasks = 4;
+    repeated EvaluationFile evaluation_files = 5;
+    required scoring.Problem problem_scoring = 6;
+}
+message SetProblemInfoResponse {
+    message Success {}
+    oneof response {
+        Success success = 1;
+        Failure failure = 2;
+    }
+}
+
+message SetUserScoringMethodRequest {
+    required scoring.User method = 1;
+}
+message SetUserScoringMethodResponse {}
+
+service Evaluation {
+    rpc get_problem_scoring_info(GetProblemScoringInfoRequest) returns (GetProblemScoringInfoResponse);
+    rpc get_problem_evaluation_info(GetProblemEvaluationInfoRequest) returns (GetProblemEvaluationInfoResponse);
+    rpc get_problem_testcases(GetProblemTestcasesRequest) returns (GetProblemTestcasesResponse);
+    rpc get_problem_evaluation_file(GetProblemEvaluationFileRequest) returns (GetProblemEvaluationFileResponse);
+    rpc get_user_scoring_method(GetUserScoringMethodRequest) returns (GetUserScoringMethodResponse);
+    rpc set_problem_info(SetProblemInfoRequest) returns (SetProblemInfoResponse);
+    rpc set_user_scoring_method(SetUserScoringMethodRequest) returns (SetUserScoringMethodResponse);
+}
