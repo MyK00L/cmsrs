@@ -46,12 +46,8 @@ pub mod contest {
                 metadata: protos::service::contest::ContestMetadata {
                     name: md.name,
                     description: md.description,
-                    start_time: md
-                        .start_time
-                        .map(|x| protos::prost_types::Timestamp::try_from(x).unwrap()), // This should not break,
-                    end_time: md
-                        .end_time
-                        .map(|x| protos::prost_types::Timestamp::try_from(x).unwrap()), // This should not break,
+                    start_time: md.start_time.map(protos::common::Timestamp::from),
+                    end_time: md.end_time.map(protos::common::Timestamp::from),
                 },
             })
         }
@@ -150,7 +146,7 @@ pub mod chat {
                 problem_id: msg.problem_id,
                 subject: msg.subject.clone(),
                 text: msg.body.clone(),
-                sent_at: protos::prost_types::Timestamp::from(msg.sent_at),
+                sent_at: protos::common::Timestamp::from(msg.sent_at),
                 from: msg.from,
                 to: msg.to,
             }
