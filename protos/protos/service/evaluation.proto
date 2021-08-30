@@ -1,4 +1,4 @@
-syntax = "proto3";
+syntax = "proto2";
 
 package service.evaluation;
 
@@ -11,8 +11,9 @@ import "common.proto";
 // in the filesystem using a gerarchy of nested folders.
 
 message Subtask {
-	scoring.Subtask scoring = 2;
-	repeated uint64 testcases = 3;
+	required uint64 id = 1;
+	required scoring.Subtask scoring = 2;
+	repeated uint64 testcases_id = 3;
 }
 
 message Problem { // all problem metadata, no files
@@ -22,97 +23,109 @@ message Problem { // all problem metadata, no files
 		INTERACTIVE = 2;
 		OTHER = 3;
 	}
-	uint64 id = 1;
-	scoring.Problem scoring = 2;
-	Type type = 3;
-	common.Resources execution_limits = 4;
-	common.Resources compilation_limits = 5;
+	required uint64 id = 1;
+	required scoring.Problem scoring = 2;
+	required Type type = 3;
+	required common.Resources execution_limits = 4;
+	required common.Resources compilation_limits = 5;
 	repeated Subtask subtasks = 6;
-	repeated uint64 evaluation_files = 7;
+}
+
+// Only for updates/creation of metedata (not actually stored)
+message Contest {
+	repeated Problem problems = 1;
+	required scoring.User user_scoring_method = 2;
 }
 
 // Communication messages for large files (keep as few as possible)
 
 message Testcase {
-	uint64 id = 1;
+	required uint64 id = 1;
 	optional bytes input = 2;
 	optional bytes output = 3;
 }
 
 message EvaluationFile {
 	enum Type {
-		GENERIC = 0;
-		CHECKER = 1;
-		INTERACTOR = 2;
+		CHECKER = 0;
+		INTERACTOR = 1;
 	}
-	uint64 id = 1;
-	Type type = 2;
-	common.Source source = 3;
+	required Type type = 1;
+	required common.Source source = 2;
 }
 
 // RPC messages
 
-// vv sets admin only, gets admin, submission and scoreboard vv
 message GetUserScoringRequest {}
 message GetUserScoringResponse {
-	scoring.User method = 1;
+	required scoring.User method = 1;
 }
 message SetUserScoringRequest {
-	scoring.User method = 1;
+	required scoring.User method = 1;
 }
 message SetUserScoringResponse {}
 
 
 message GetProblemRequest {
-	uint64 problem_id = 1;
+	required uint64 problem_id = 1;
 }
 message GetProblemResponse {
-	Problem info = 1;
+	required Problem info = 1;
 }
-message SetProblemRequest {
-	Problem problem = 1;
+
+message SetContestRequest {
+	required Contest info = 1;
 }
-message SetProblemResponse {}
+message SetContestResponse {}
 
 // vv admin only vv we are gonna need to do streaming stuff for these
 message GetTestcaseRequest {
-	uint64 testcase_id = 1;
+	required uint64 problem_id = 1;
+	required uint64 testcase_id = 2;
 }
 message GetTestcaseResponse {
-	Testcase testcase = 1;
+	required Testcase testcase = 1;
+}
+message GetProblemTestcasesRequest {
+	required uint64 problem_id = 1;
+}
+message GetProblemTestcasesResponse {
+	repeated Testcase testcases = 1;
 }
 message SetTestcaseRequest {
-	Testcase testcase = 1;
+	required uint64 problem_id = 1;
+	oneof command {
+		Testcase add_testcase = 2;
+		Testcase update_testcase = 3;
+		uint64 delete_testcase_id = 4;
+	}
 }
 message SetTestcaseResponse {}
 
-message GetEvaluationFileRequest {
-	uint64 evaluation_file_id = 1;
+message GetProblemEvaluationFileRequest {
+	required uint64 problem_id = 1;
+	required EvaluationFile.Type type = 2;
 }
-message GetEvaluationFileResponse {
-	EvaluationFile file = 1;
+message GetProblemEvaluationFileResponse {
+	required EvaluationFile file = 1;
 }
-message SetEvaluationFileRequest {
-	EvaluationFile file = 1;
+message SetProblemEvaluationFileRequest {
+	required uint64 problem_id = 1;
+	oneof command {
+		EvaluationFile add_evaluation_file = 2;
+		EvaluationFile update_evaluation_file = 3;
+	}
 }
-message SetEvaluationFileResponse {}
-
-// about SetThing:
-// existing id = update, new id = add
-// oneof { add Thing, update Thing, remove id }
-// three different functions
-// ?
-
-// separate function for evaluation info only?
+message SetProblemEvaluationFileResponse {}
 
 service Evaluation {
 	rpc get_user_scoring(GetUserScoringRequest) returns (GetUserScoringResponse);
-	rpc set_user_scoring(SetUserScoringRequest) returns (SetUserScoringResponse);
 	rpc get_problem(GetProblemRequest) returns (GetProblemResponse);
-	rpc set_problem(SetProblemRequest) returns (SetProblemResponse);
+	rpc set_contest(SetContestRequest) returns (SetContestResponse);
 	rpc get_testcase(GetTestcaseRequest) returns (GetTestcaseResponse);
+	rpc get_problem_testcases(GetProblemTestcasesRequest) returns (GetProblemTestcasesResponse);
 	rpc set_testcase(SetTestcaseRequest) returns (SetTestcaseResponse);
-	rpc get_evaluation_file(GetEvaluationFileRequest) returns (GetEvaluationFileResponse);
-	rpc set_evaluation_file(SetEvaluationFileRequest) returns (SetEvaluationFileResponse);
+	rpc get_problem_evaluation_file(GetProblemEvaluationFileRequest) returns (GetProblemEvaluationFileResponse);
+	rpc set_problem_evaluation_file(SetProblemEvaluationFileRequest) returns (SetProblemEvaluationFileResponse);
 }
 

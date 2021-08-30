@@ -13,46 +13,53 @@ impl Evaluation for EvaluationService {
     ) -> Result<Response<GetUserScoringResponse>, Status> {
         todo!()
     }
-    async fn set_user_scoring(
-        &self,
-        _request: Request<SetUserScoringRequest>,
-    ) -> Result<Response<SetUserScoringResponse>, Status> {
-        todo!()
-    }
+
     async fn get_problem(
         &self,
         _request: Request<GetProblemRequest>,
     ) -> Result<Response<GetProblemResponse>, Status> {
         todo!()
     }
-    async fn set_problem(
+
+    async fn set_contest(
         &self,
-        _request: Request<SetProblemRequest>,
-    ) -> Result<Response<SetProblemResponse>, Status> {
+        _request: Request<SetContestRequest>,
+    ) -> Result<Response<SetContestResponse>, Status> {
         todo!()
     }
+
     async fn get_testcase(
         &self,
         _request: Request<GetTestcaseRequest>,
     ) -> Result<Response<GetTestcaseResponse>, Status> {
         todo!()
     }
+
+    async fn get_problem_testcases(
+        &self,
+        _request: Request<GetProblemTestcasesRequest>,
+    ) -> Result<Response<GetProblemTestcasesResponse>, Status> {
+        todo!()
+    }
+
     async fn set_testcase(
         &self,
         _request: Request<SetTestcaseRequest>,
     ) -> Result<Response<SetTestcaseResponse>, Status> {
         todo!()
     }
-    async fn get_evaluation_file(
+
+    async fn get_problem_evaluation_file(
         &self,
-        _request: Request<GetEvaluationFileRequest>,
-    ) -> Result<Response<GetEvaluationFileResponse>, Status> {
+        _request: Request<GetProblemEvaluationFileRequest>,
+    ) -> Result<Response<GetProblemEvaluationFileResponse>, Status> {
         todo!()
     }
-    async fn set_evaluation_file(
+
+    async fn set_problem_evaluation_file(
         &self,
-        _request: Request<SetEvaluationFileRequest>,
-    ) -> Result<Response<SetEvaluationFileResponse>, Status> {
+        _request: Request<SetProblemEvaluationFileRequest>,
+    ) -> Result<Response<SetProblemEvaluationFileResponse>, Status> {
         todo!()
     }
 }
