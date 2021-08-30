@@ -6,6 +6,7 @@ use std::convert::TryInto;
 use std::time::SystemTime;
 
 pub mod mongo;
+pub mod storage;
 
 #[cfg(test)]
 mod tests;
