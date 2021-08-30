@@ -40,3 +40,10 @@ message User {
 	required Method main = 1; // users will be ranked by decreasing (main,tiebreakers[0],tiebreakers[1],...)
 	repeated Method tiebreakers = 2;
 }
+
+message OneOfScore {
+	oneof score {
+		bool bool_score = 1;
+		double double_score = 2;
+	}
+}
