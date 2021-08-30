@@ -3,12 +3,11 @@ use std::{collections::HashMap, time::SystemTime};
 
 use futures::stream::StreamExt;
 
-use convert::mongo::*;
-
-use ::utils::gen_uuid;
+use ::utils::{gen_uuid, mongo::*};
 use mongodb::{Client, bson::{Binary, Bson, Document, bson, doc, spec::{BinarySubtype, ElementType}}, options::{ClientOptions, FindOptions}};
-use protos::{*, self, common::Resources, evaluation::{CompilationResult, EvaluationResult, SubtaskResult, TestcaseResult, subtask_result}, prost_types::Duration, service::{dispatcher::MockDispatcher}};
+use protos::{*, self, common::Resources, evaluation::{CompilationResult, EvaluationResult, SubtaskResult, TestcaseResult}, prost_types::{Duration}, service::{dispatcher::MockDispatcher}};
 use protos::service::submission::*;
+use protos::scoring::*;
 use protos::service::submission::submission_server::*;
 use protos::service::dispatcher::dispatcher_server::*;
 use protos::utils::*;
@@ -50,28 +49,44 @@ impl SubmissionService {
     }
 }
 
-type ScoreOneof = get_submission_list_response::item::OverallScore;
+fn score_option_bson_to_struct(opt_bson_score: Option<&Bson>) -> OneOfScore {
+    OneOfScore {
+        score: 
+            if let Some(bson_score) = opt_bson_score {
+                match bson_score.element_type() {
+                    ElementType::Double => 
+                        Some(one_of_score::Score::DoubleScore(bson_score.as_f64().unwrap())),
+                    ElementType::Boolean =>
+                        Some(one_of_score::Score::BoolScore(bson_score.as_bool().unwrap())),
+                    _ => panic! ("score cannot have this type")
+                }
+            } else {
+                None
+            }
+    }
+}
+
+fn score_struct_to_bson(score_struct: OneOfScore) -> Option<Bson> {
+    match score_struct.score {
+        Some(one_of_score::Score::DoubleScore(double_score)) => Some(Bson::Double(double_score)), 
+        Some(one_of_score::Score::BoolScore(bool_score)) => Some(Bson::Boolean(bool_score)), 
+        _ => None
+    }
+}
 
 fn get_item_from_doc(doc: Document) -> get_submission_list_response::Item {
+    let mut state_str_to_i32: HashMap<&str, i32> = HashMap::new();
+    state_str_to_i32.insert("PENDING", 0);
+    state_str_to_i32.insert("EVALUATED", 1);
+    state_str_to_i32.insert("ABORTED", 2);
+
     get_submission_list_response::Item{
         submission_id: doc.get_i64("_id").unwrap() as u64,
         user: doc.get_str("user").unwrap().to_string(),
         problem_id: doc.get_i64("problemId").unwrap() as u64,
         timestamp: timestamp_to_systime(doc.get_timestamp("created").unwrap()).into(),
-        overall_score: {
-            let opt_score = doc.get("overallScore");
-            if let Some(score) = opt_score {
-                match score.element_type() {
-                    ElementType::Double => 
-                        Some(ScoreOneof::DoubleScore(score.as_f64().unwrap())),
-                    ElementType::Boolean =>
-                        Some(ScoreOneof::BoolScore(score.as_bool().unwrap())),
-                    _ => None
-                }
-            } else {
-                None
-            }
-        }
+        state: state_str_to_i32[doc.get_str("state").expect(expected_field("state").as_str())],
+        score: score_option_bson_to_struct(doc.get("overallScore"))
     }
 }
 
@@ -86,7 +101,7 @@ fn create_pending_submission_document(
         doc! {
             "_id": convert_to_i64(gen_uuid()),
             "problemId": problem_id as i64,
-            "created": convert::mongo::systime_to_timestamp(SystemTime::now()),
+            "created": systime_to_timestamp(SystemTime::now()),
             "source": Bson::Binary(Binary {
                     subtype: BinarySubtype::Generic,
                     bytes: source_code
@@ -121,34 +136,11 @@ fn compilation_data_to_db_obj(compilation_result: CompilationResult) -> Bson {
     db_obj_document.into()
 }
 
-fn get_score(score: subtask_result::SubtaskScore) -> Bson {
-    match score {
-        subtask_result::SubtaskScore::BoolScore(bool_score) => 
-            bson! (bool_score),
-        subtask_result::SubtaskScore::DoubleScore(double_score) => 
-            bson! (double_score)
-    }
-}
-
-fn get_score_testcase(score: evaluation::testcase_result::Score) -> Bson {
-    match score {
-        evaluation::testcase_result::Score::BoolScore(bool_score) => 
-            bson! (bool_score),
-        evaluation::testcase_result::Score::DoubleScore(double_score) => 
-            bson! (double_score)
-    }
-}
-
 fn testcase_data_to_db_obj(testcase_data: &TestcaseResult) -> Bson {
     let outcomes = ["NONE", "OK", "TLE", "MLE", "RTE", "CHECKER_ERROR"];
     bson! ({
         "outcome": outcomes[testcase_data.outcome as usize],
-        "score": 
-            get_score_testcase(
-                testcase_data.score
-                    .clone()
-                    .expect("This should not happen. If compilation succeeds, then every testcase has a score")
-            ),
+        "score": score_struct_to_bson(testcase_data.score.clone()).unwrap(), // required in proto definition
         "timeNs": duration_to_time_ns(testcase_data.used_resources.time.clone()),
         "memoryB": convert_to_i64(testcase_data.used_resources.memory_bytes)
     })
@@ -156,7 +148,7 @@ fn testcase_data_to_db_obj(testcase_data: &TestcaseResult) -> Bson {
 
 fn subtask_data_to_db_obj(subtask_data: &SubtaskResult) -> Bson {
     bson! ({
-        "subtaskScore": get_score(subtask_data.subtask_score.clone().expect(expected_field("subtaskScore").as_str())),
+        "subtaskScore": score_struct_to_bson(subtask_data.score.clone()),// expected ?????????????????????????
         "testcases": 
             subtask_data.testcase_results
                 .iter()
@@ -185,16 +177,12 @@ fn insert_evaluation_data_into_document(
             );
             // the Dispatcher MUST guarantee that the overall score is present even
             // if for some testcases bad stuff happened
-            let score = evaluation_result.overall_score.clone()
+            doc_updated.insert(
+                "overallScore", 
+                score_struct_to_bson(evaluation_result.score.clone())
                     .expect("This should not happen. Dispatcher should guarantee 
-                            that score exists if compilation succeeded.");
-            
-            match score {
-                evaluation::evaluation_result::OverallScore::BoolScore(bool_score) => 
-                    doc_updated.insert("overallScore", bool_score),
-                evaluation::evaluation_result::OverallScore::DoubleScore(double_score) => 
-                    doc_updated.insert("overallScore", double_score)
-            };
+                        that score exists if compilation succeeded.")
+            );
         }
 }
 
@@ -243,16 +231,8 @@ fn single_testcase_db_to_struct(testcase_doc: &Document) -> TestcaseResult {
             time: time_ns_to_duration(testcase_doc.get_i64("timeNs").expect(expected_field("timeNs").as_str())),
             memory_bytes: testcase_doc.get_i64("memoryB").expect(expected_field("memoryB").as_str()) as u64,
         },
-        score: {
-            let score_bson = testcase_doc.get("score").expect(expected_field("score").as_str());
-            match score_bson.element_type() {
-                ElementType::Boolean => 
-                    Some(evaluation::testcase_result::Score::BoolScore(score_bson.as_bool().unwrap())),
-                ElementType::Double => 
-                    Some(evaluation::testcase_result::Score::DoubleScore(score_bson.as_f64().unwrap())),
-                _ => panic! ("score cannot have this type")
-            }
-        },
+        score:
+            score_option_bson_to_struct(testcase_doc.get("score")) // expected
     }
 }
 
@@ -270,14 +250,8 @@ fn single_subtask_db_to_struct(subtask_doc: &Document) -> SubtaskResult {
                 single_testcase_db_to_struct(testcase)
             })
             .collect::<Vec<TestcaseResult>>(),
-        subtask_score: 
-            match subtask_score_bson.element_type() {
-                ElementType::Boolean => 
-                    Some(evaluation::subtask_result::SubtaskScore::BoolScore(subtask_score_bson.as_bool().unwrap())),
-                ElementType::Double => 
-                    Some(evaluation::subtask_result::SubtaskScore::DoubleScore(subtask_score_bson.as_f64().unwrap())),
-                _ => panic! ("subtaskScore cannot have this type")
-            },
+        score: 
+            score_option_bson_to_struct(Some(subtask_score_bson))
     }
 }
 
@@ -315,16 +289,8 @@ fn document_to_evaluation_result_struct(submission_doc: Document) -> EvaluationR
             } else {
                 vec![]
             },
-        overall_score: {
-            let score_bson = submission_doc.get("overallScore").expect(expected_field("overallScore").as_str());
-            match score_bson.element_type() {
-                ElementType::Boolean => 
-                    Some(evaluation::evaluation_result::OverallScore::BoolScore(score_bson.as_bool().unwrap())),
-                ElementType::Double => 
-                    Some(evaluation::evaluation_result::OverallScore::DoubleScore(score_bson.as_f64().unwrap())),
-                _ => panic! ("subtaskScore cannot have this type")
-            }
-        }
+        score: 
+            score_option_bson_to_struct(submission_doc.get("overallScore")) // expected
     }
 
 }

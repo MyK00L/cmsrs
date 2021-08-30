@@ -16,7 +16,6 @@ mongodb = "2.0.0-beta.3"
 argon2 = "0.2"
 rand_core = { version = "0.6", features = ["std"] }
 futures = "0.3"
-convert = { path = "../convert" }
 utils = { path = "../utils" }
 
 [dev-dependencies]
