@@ -21,6 +21,13 @@ services:
       - 50051:50051
     depends_on: 
       - contest_service_db
+  
+  evaluation_service:
+    build:
+      context: .
+      dockerfile: ./evaluation_service/Dockerfile
+    ports: 
+      - 50051:50051
 
   submission_service_db:
     image: mongo
