@@ -3,6 +3,7 @@ syntax = "proto2";
 package evaluation;
 
 import "common.proto";
+import "scoring.proto";
 
 message Submission {
 	required string user = 1;
@@ -16,15 +17,11 @@ message TestcaseResult {
 		TLE = 2; // time limit exceeded
 		MLE = 3; // memory limit exceeded
 		RTE = 4; // runtime error
-		CE = 5; // compilation error
-		CHECKER_ERROR = 6; // separate different errors?
+		CHECKER_ERROR = 5; // separate different errors?
 	}
 	required Outcome outcome = 1;
-	oneof verdict {
-		bool ac = 2;
-		double score = 3;
-	}
-	required common.Resources used_resources = 4;
+	required scoring.OneOfScore score = 2;
+	required common.Resources used_resources = 3;
 }
 message CompilationResult {
 	enum Outcome {
@@ -42,17 +39,12 @@ message CompilationResult {
 
 message SubtaskResult {
 	repeated TestcaseResult testcase_results = 1;
-	oneof subtask_score {
-		bool bool_score = 3;
-		double double_score = 4;
-	}
+	required scoring.OneOfScore score = 2;
 }
 
 message EvaluationResult {
 	required CompilationResult compilation_result = 1;
-	repeated SubtaskResult subtask_results = 2;
-	oneof overall_score {
-		bool bool_score = 3;
-		double double_score = 4;
-	}
+	// if compilation doesn't succeed, then subtask_results is empty
+	repeated SubtaskResult subtask_results = 2; 
+	required scoring.OneOfScore score = 3;
 }
