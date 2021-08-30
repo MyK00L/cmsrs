@@ -46,8 +46,8 @@ pub mod contest {
                 metadata: protos::service::contest::ContestMetadata {
                     name: md.name,
                     description: md.description,
-                    start_time: md.start_time.map(|x| protos::common::Timestamp::from(x)),
-                    end_time: md.end_time.map(|x| protos::common::Timestamp::from(x)),
+                    start_time: md.start_time.map(protos::common::Timestamp::from),
+                    end_time: md.end_time.map(protos::common::Timestamp::from),
                 },
             })
         }
