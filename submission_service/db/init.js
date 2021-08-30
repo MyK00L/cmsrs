@@ -2,20 +2,30 @@ db.createCollection("submissions", {
   validator: {
     $jsonSchema: {
       bsonType: "object",
-      required: ["user", "problemId", "created", "source", "state"],
-      _id: { bsonType: "int" }, // submission id
+      required: ["_id", "user", "problemId", "created", "source", "programmingLanguage", "state"],
       properties: {
+        _id: { bsonType: "int" }, // submission id
         user: { bsonType: "string" },
         problemId: { bsonType: "int" },
         created: { bsonType: "timestamp" },
         source: { bsonType: "binData" },
-        state: { enum: ["Pending","Evaluated","Aborted"] },
+        programmingLanguage: { 
+          bsonType: "string",
+          enum: ["RUST", "CPP"] // ...
+        },
+        state: { 
+          bsonType: "string",
+          enum: ["PENDING","EVALUATED","ABORTED"]
+        },
         compilation: {
           bsonType: "object",
-          required: ["outcome", "timeMs", "memoryB"],
+          required: ["outcome", "timeNs", "memoryB"],
           properties: {
-            outcome: { bsonType: "string" },
-            timeMs: { bsonType: "int" },
+            outcome: { 
+              bsonType: "string",
+              enum: ["NONE", "SUCCESS", "REJECTED", "TLE", "MLE", "RTE"]
+            },
+            timeNs: { bsonType: "int" },
             memoryB: { bsonType: "int" },
             error: { bsonType: "string" }
           }
@@ -40,16 +50,18 @@ db.createCollection("submissions", {
                     bsonType: "array",
                     items: {
                       bsonType: "object",
-                      required: ["testcaseOutcome", "timeMs", "memoryB"],
+                      required: ["outcome", "score", "timeNs", "memoryB"], 
                       properties: {
-                        testcaseOutcome: {
-                          bsonType: "object",
-                          required: ["verdict"],
-                          properties: {
-                              verdict: { bsonType : "string" } ,
-                              score: { bsonType: "double" },
-                          }
-                        }, // TestcaseResult.outcome + TestcaseResult.verdict
+                        outcome: {
+                          bsonType: "string",
+                          enum: ["NONE", "OK", "TLE", "MLE", "CHECKER_ERROR"]
+                        }, // TestcaseResult.outcome
+                        score: { 
+                          oneOf: [ 
+                            { bsonType: "bool"},
+                            { bsonType: "double"}
+                          ]
+                        }, //TestcaseResult.score
                         timeNs: { bsonType: "int" }, // TestcaseResult.used_resources
                         memoryB: { bsonType: "int" }, // TestcaseResult.used_resources
                       }
