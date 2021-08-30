@@ -24,7 +24,7 @@ message GetSubmissionListResponse {
 		required string user = 2;
 		required uint64 problem_id = 3;
 		required SubmissionState state = 4;
-		required google.protobuf.Timestamp timestamp = 5;
+		required common.Timestamp timestamp = 5;
 		oneof overall_score {
 			bool bool_score = 6;
 			double double_score = 7;

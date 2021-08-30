@@ -7,6 +7,28 @@ mod mock_macro;
 
 pub mod common {
     tonic::include_proto!("common");
+    impl From<std::time::Duration> for Duration {
+        fn from(d: std::time::Duration) -> Self {
+            Duration{secs: d.as_secs(), nanos: d.subsec_nanos()}
+        }
+    }
+    impl From<Duration> for std::time::Duration {
+        fn from(d: Duration) -> std::time::Duration {
+            std::time::Duration::new(d.secs,d.nanos)
+        }
+    }
+    impl From<std::time::SystemTime> for Timestamp {
+        fn from(t: std::time::SystemTime) -> Self {
+            let d = t.duration_since(std::time::SystemTime::UNIX_EPOCH).unwrap_or(std::time::Duration::new(0,0));
+            Timestamp{secs: d.as_secs(), nanos: d.subsec_nanos()}
+        }
+    }
+    impl From<Timestamp> for std::time::SystemTime {
+        fn from(t: Timestamp) -> std::time::SystemTime {
+            let d = std::time::Duration::from(Duration{secs: t.secs, nanos: t.nanos});
+            std::time::SystemTime::UNIX_EPOCH + d
+        }
+    }
 }
 pub mod evaluation {
     tonic::include_proto!("evaluation");
