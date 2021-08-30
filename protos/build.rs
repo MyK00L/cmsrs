@@ -8,6 +8,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ".scoring",
             "#[derive(::serde::Serialize,::serde::Deserialize)]",
         )
+        .type_attribute(
+            ".common.Source",
+            "#[derive(::serde::Serialize,::serde::Deserialize)]",
+        )
         .compile(
             &[
                 "protos/common.proto",

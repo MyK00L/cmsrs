@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package service.evaluation;
 
+import public "google/protobuf/duration.proto";
+import "common.proto";
 import "scoring.proto";
 
 // Schema-defining messages
@@ -16,10 +18,10 @@ enum ProblemType {
     OTHER = 3;
 }
 message ProblemLimits {
-    uint64 runtime_time_limit_ns = 1;
-    uint64 runtime_memory_limit_B = 2;
-    optional uint64 compile_time_limit_ns = 3;
-    optional uint64 source_size_limit_B = 4;
+    uint64 runtime_time_limit_nanos = 1;    //TODO Fix with common.Resources when serialization works
+    uint64 runtime_memory_limit_bytes = 2;
+    optional uint64 compilation_time_limit_nanos = 3;
+    optional uint64 source_size_limit_bytes = 4;
 }
 message ProblemEvaluationInfo {
     ProblemType type = 1;
@@ -51,8 +53,7 @@ message EvaluationFile {
         INTERACTOR = 2;
     }
     Type type = 1;
-    optional string extension = 2;  // if no extension, then its an executable file
-    bytes content = 3;
+    common.Source file = 2;
 }
 
 message Failure {
