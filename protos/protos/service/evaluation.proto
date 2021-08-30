@@ -1,4 +1,4 @@
-syntax = "proto3";
+syntax = "proto2";
 
 package service.evaluation;
 
@@ -18,31 +18,31 @@ enum ProblemType {
     OTHER = 3;
 }
 message ProblemLimits {
-    uint64 runtime_time_limit_nanos = 1;    //TODO Fix with common.Resources when serialization works
-    uint64 runtime_memory_limit_bytes = 2;
+    required uint64 runtime_time_limit_nanos = 1;    //TODO Fix with common.Resources when serialization works
+    required uint64 runtime_memory_limit_bytes = 2;
     optional uint64 compilation_time_limit_nanos = 3;
     optional uint64 source_size_limit_bytes = 4;
 }
 message ProblemEvaluationInfo {
-    ProblemType type = 1;
-    ProblemLimits limits = 2;
+    required ProblemType type = 1;
+    required ProblemLimits limits = 2;
 }
 message ProblemScoringInfo {
     repeated scoring.Subtask subtask_scorings = 3;
-    scoring.Problem problem_scoring = 4;
-    double problem_score = 5;   // This is a redundant information obtained by adding all subtask max scores
+    required scoring.Problem problem_scoring = 4;
+    required double problem_score = 5;   // This is a redundant information obtained by adding all subtask max scores
 }
 
 // Communication messages for large files and utils
 
 message Subtask {
     message Testcase {
-        uint64 id = 1;
+        required uint64 id = 1;
         optional bytes input = 2;
         optional bytes output = 3;
     }
-    uint64 id = 1;
-    scoring.Subtask scoring = 2;
+    required uint64 id = 1;
+    required scoring.Subtask scoring = 2;
     repeated Testcase testcases = 3;
 }
 
@@ -52,22 +52,22 @@ message EvaluationFile {
         CHECKER = 1;
         INTERACTOR = 2;
     }
-    Type type = 1;
-    common.Source file = 2;
+    required Type type = 1;
+    required common.Source file = 2;
 }
 
 message Failure {
-    string error = 1;
+    required string error = 1;
 }
 
 // RPC messages
 
 message GetProblemScoringInfoRequest {
-    uint64 problem_id = 1;
+    required uint64 problem_id = 1;
 }
 message GetProblemScoringInfoResponse {
     message Success {
-        ProblemScoringInfo info = 1;
+        required ProblemScoringInfo info = 1;
     }
     oneof response {
         Success success = 1;
@@ -76,11 +76,11 @@ message GetProblemScoringInfoResponse {
 }
 
 message GetProblemEvaluationInfoRequest {
-    uint64 problem_id = 1;
+    required uint64 problem_id = 1;
 }
 message GetProblemEvaluationInfoResponse {
     message Success {
-        ProblemEvaluationInfo info = 1;
+        required ProblemEvaluationInfo info = 1;
     }
     oneof response {
         Success success = 1;
@@ -89,7 +89,7 @@ message GetProblemEvaluationInfoResponse {
 }
 
 message GetProblemTestcasesRequest {
-    uint64 problem_id = 1;
+    required uint64 problem_id = 1;
 }
 message GetProblemTestcasesResponse {
     message Success {
@@ -102,12 +102,12 @@ message GetProblemTestcasesResponse {
 }
 
 message GetProblemEvaluationFileRequest {
-    uint64 problem_id = 1;
-    EvaluationFile.Type file_type = 2;
+    required uint64 problem_id = 1;
+    required EvaluationFile.Type file_type = 2;
 }
 message GetProblemEvaluationFileResponse {
     message Success {
-        EvaluationFile file = 1;
+        required EvaluationFile file = 1;
     }
     oneof response {
         Success success = 1;
@@ -117,16 +117,16 @@ message GetProblemEvaluationFileResponse {
 
 message GetUserScoringMethodRequest {}
 message GetUserScoringMethodResponse {
-    scoring.User method = 1;
+    required scoring.User method = 1;
 }
 
 message SetProblemInfoRequest {
-    uint64 problem_id = 1;
-    ProblemType type = 2;
-    ProblemLimits limits = 3;
+    required uint64 problem_id = 1;
+    required ProblemType type = 2;
+    required ProblemLimits limits = 3;
     repeated Subtask subtasks = 4;
     repeated EvaluationFile evaluation_files = 5;
-    scoring.Problem problem_scoring = 6;
+    required scoring.Problem problem_scoring = 6;
 }
 message SetProblemInfoResponse {
     message Success {}
@@ -137,7 +137,7 @@ message SetProblemInfoResponse {
 }
 
 message SetUserScoringMethodRequest {
-    scoring.User method = 1;
+    required scoring.User method = 1;
 }
 message SetUserScoringMethodResponse {}
 

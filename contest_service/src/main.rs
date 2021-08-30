@@ -132,7 +132,7 @@ impl Contest for ContestService {
             .map(mappings::problem::ProblemData::from)
             .map(|x| {
                 Response::new(GetProblemResponse {
-                    info: Some(x.get_problem().into()),
+                    info: x.get_problem().into(),
                     statement: x.get_statement(),
                 })
             })

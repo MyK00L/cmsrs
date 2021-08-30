@@ -1,14 +1,14 @@
-syntax = "proto3";
+syntax = "proto2";
 
 package service.dispatcher;
 
 import "evaluation.proto";
 
 message EvaluateSubmissionRequest {
-	evaluation.Submission sub = 1;
+	required evaluation.Submission sub = 1;
 }
 message EvaluateSubmissionResponse {
-	evaluation.EvaluationResult res = 1;
+	required evaluation.EvaluationResult res = 1;
 }
 service Dispatcher {
 	rpc evaluate_submission(EvaluateSubmissionRequest) returns (EvaluateSubmissionResponse);
