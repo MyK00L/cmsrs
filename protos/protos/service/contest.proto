@@ -1,8 +1,8 @@
 syntax = "proto2";
 
-package service.contest;
+import "common.proto";
 
-import "google/protobuf/timestamp.proto";
+package service.contest;
 
 message AuthUserRequest {
 	required string username = 1;
@@ -25,8 +25,8 @@ message AuthUserResponse {
 message ContestMetadata {
 	required string name = 1;
 	required string description = 2;
-	optional google.protobuf.Timestamp start_time = 3;
-	optional google.protobuf.Timestamp end_time = 4;
+	optional common.Timestamp start_time = 3;
+	optional common.Timestamp end_time = 4;
 }
 message GetContestMetadataRequest {}
 message GetContestMetadataResponse {
@@ -53,7 +53,7 @@ message Message { // questions and announcements are the same
 	required string text = 4;
 	optional string from = 5;
 	optional string to = 6;
-	required google.protobuf.Timestamp sent_at = 7;
+	required common.Timestamp sent_at = 7;
 }
 message GetAnnouncementListRequest {
 	optional uint64 problem_id = 1;
