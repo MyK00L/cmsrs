@@ -2,7 +2,6 @@ syntax = "proto2";
 
 package service.evaluation;
 
-import public "google/protobuf/duration.proto";
 import "common.proto";
 import "scoring.proto";
 
