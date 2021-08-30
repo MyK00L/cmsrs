@@ -11,11 +11,9 @@ use rocket::response::{status, Redirect};
 use rocket::serde::Serialize;
 use rocket::*;
 use rocket_dyn_templates::Template;
-use std::convert::TryInto;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use utils::gen_uuid;
-//use std::convert::TryFrom;
 
 const PASS: &str = "1234";
 type ContestClient = contest::MockContest;
@@ -180,7 +178,7 @@ struct TemplateSubmissionEvaluation {
     compilation_millis: u64,
     compilation_bytes: u64,
     compilation_error: String,
-    overall_score: String,
+    score: String,
     subtask_results: Vec<TemplateSubtaskResult>,
 }
 #[derive(Serialize)]
@@ -230,29 +228,27 @@ async fn submission_details_template(
                             )
                             .unwrap()
                         ),
-                        compilation_millis: (res.compilation_result.used_resources.time.seconds
+                        compilation_millis: (res.compilation_result.used_resources.time.secs
                             * 1000
-                            + (res.compilation_result.used_resources.time.nanos as i64) / 1000000)
-                            .try_into()
-                            .unwrap_or(0),
+                            + res.compilation_result.used_resources.time.nanos as u64 / 1000000),
                         compilation_bytes: res.compilation_result.used_resources.memory_bytes,
                         compilation_error: res
                             .compilation_result
                             .error_message
                             .clone()
                             .unwrap_or_else(|| String::from("")),
-                        overall_score: format!("{:?}", res.overall_score.as_ref().unwrap()),
+                        score: format!("{:?}", res.score),
                         subtask_results: res
                             .subtask_results
                             .iter()
                             .map(|sr| TemplateSubtaskResult {
                                 n: 0,
-                                score: format!("{:?}", sr.subtask_score.as_ref().unwrap()),
+                                score: format!("{:?}", sr.score),
                                 testcase_results: sr
                                     .testcase_results
                                     .iter()
                                     .map(|tr| TemplateTestcaseResult {
-                                        verdict: format!("{:?}", tr.verdict.as_ref().unwrap()),
+                                        verdict: format!("{:?}", tr.score),
                                         outcome: format!(
                                             "{:?}",
                                             protos::evaluation::testcase_result::Outcome::from_i32(
@@ -260,12 +256,10 @@ async fn submission_details_template(
                                             )
                                             .unwrap()
                                         ),
-                                        millis: (tr.used_resources.time.seconds * 1000
-                                            + (res.compilation_result.used_resources.time.nanos
-                                                as i64)
-                                                / 1000000)
-                                            .try_into()
-                                            .unwrap_or(0),
+                                        millis: (tr.used_resources.time.secs * 1000
+                                            + res.compilation_result.used_resources.time.nanos
+                                                as u64
+                                                / 1000000),
                                         bytes: tr.used_resources.memory_bytes,
                                     })
                                     .collect(),
@@ -320,7 +314,7 @@ async fn questions_template(
                     .map(|q| TemplateQuestion {
                         id: q.id,
                         problem_id: q.problem_id,
-                        time: utils::render_prost_timestamp(q.sent_at.clone(), "%F %X"),
+                        time: utils::render_protos_timestamp(q.sent_at.clone(), "%F %X"),
                         user: q.from.clone().unwrap_or_else(|| String::from("")),
                         subject: q.subject.clone(),
                         text: q.text.clone(),
@@ -373,7 +367,7 @@ async fn submissions_template(
                         problem_id: q.submission_id,
                         user: q.user.clone(),
                         state: format!("{:?}", q.state), // TODO: convert to enum
-                        time: utils::render_prost_timestamp(q.timestamp.clone(), "%F %X"),
+                        time: utils::render_protos_timestamp(q.timestamp.clone(), "%F %X"),
                     })
                     .collect(),
             };
@@ -412,11 +406,11 @@ async fn contest_template(
                 name: res.name,
                 description: res.description,
                 start_time: match res.start_time {
-                    Some(t) => utils::render_prost_timestamp(t, "%FT%T"),
+                    Some(t) => utils::render_protos_timestamp(t, "%FT%T"),
                     None => String::from("4242-12-25T16:08:04"),
                 },
                 end_time: match res.end_time {
-                    Some(t) => utils::render_prost_timestamp(t, "%FT%T"),
+                    Some(t) => utils::render_protos_timestamp(t, "%FT%T"),
                     None => String::from("4242-12-25T16:08:04"),
                 },
             };
@@ -467,9 +461,9 @@ fn rocket() -> _ {
             problem_id: 2,
             state: submission::SubmissionState::Evaluated as i32,
             timestamp: SystemTime::now().into(),
-            overall_score: Some(
-                submission::get_submission_list_response::item::OverallScore::DoubleScore(42.0),
-            ),
+            score: protos::scoring::OneOfScore {
+                score: Some(protos::scoring::one_of_score::Score::DoubleScore(42.69)),
+            },
         }],
     });
     submission_client.get_submission_details_set(submission::GetSubmissionDetailsResponse {
@@ -494,20 +488,22 @@ fn rocket() -> _ {
                     testcase_results: vec![
                         protos::evaluation::TestcaseResult {
                             outcome: protos::evaluation::testcase_result::Outcome::Ok as i32,
-                            verdict: Some(protos::evaluation::testcase_result::Verdict::Ac(true)),
+                            score: protos::scoring::OneOfScore {
+                                score: Some(protos::scoring::one_of_score::Score::BoolScore(true))
+                            },
                             ..Default::default()
                         };
                         9
                     ],
-                    subtask_score: Some(
-                        protos::evaluation::subtask_result::SubtaskScore::DoubleScore(42.69)
-                    )
+                    score: protos::scoring::OneOfScore {
+                        score: Some(protos::scoring::one_of_score::Score::DoubleScore(42.69))
+                    }
                 };
                 5
             ],
-            overall_score: Some(
-                protos::evaluation::evaluation_result::OverallScore::DoubleScore(3.3),
-            ),
+            score: protos::scoring::OneOfScore {
+                score: Some(protos::scoring::one_of_score::Score::DoubleScore(3.3)),
+            },
         }),
     });
     contest_client.add_message_set(contest::AddMessageResponse::default());

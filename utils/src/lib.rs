@@ -20,10 +20,13 @@ pub fn gen_uuid() -> u64 {
             & 0xffffffff) as u64)
 }
 
-pub fn render_prost_timestamp(timestamp: prost_types::Timestamp, format_string: &str) -> String {
+pub fn render_protos_timestamp(
+    timestamp: protos::common::Timestamp,
+    format_string: &str,
+) -> String {
     let naive = chrono::prelude::NaiveDateTime::from_timestamp(
-        timestamp.seconds,
-        timestamp.nanos.try_into().unwrap_or(0),
+        timestamp.secs.try_into().unwrap(),
+        timestamp.nanos,
     );
     let datetime = chrono::prelude::DateTime::<chrono::Utc>::from_utc(naive, chrono::Utc);
     datetime.format(format_string).to_string()
