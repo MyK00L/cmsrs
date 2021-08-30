@@ -41,13 +41,14 @@ pub mod service {
     pub mod evaluation {
         tonic::include_proto!("service.evaluation");
         rpc_mock_server!(evaluation_server::Evaluation; MockEvaluation;
-        (get_problem_scoring_info,GetProblemScoringInfoRequest,GetProblemScoringInfoResponse),
-        (get_problem_evaluation_info,GetProblemEvaluationInfoRequest,GetProblemEvaluationInfoResponse),
-        (get_problem_testcases,GetProblemTestcasesRequest,GetProblemTestcasesResponse),
-        (get_problem_evaluation_file,GetProblemEvaluationFileRequest,GetProblemEvaluationFileResponse),
-        (get_user_scoring_method,GetUserScoringMethodRequest,GetUserScoringMethodResponse),
-        (set_problem_info,SetProblemInfoRequest,SetProblemInfoResponse),
-        (set_user_scoring_method,SetUserScoringMethodRequest,SetUserScoringMethodResponse)
+        (get_user_scoring,GetUserScoringRequest,GetUserScoringResponse),
+        (set_user_scoring,SetUserScoringRequest,SetUserScoringResponse),
+        (get_problem,GetProblemRequest,GetProblemResponse),
+        (set_problem,SetProblemRequest,SetProblemResponse),
+        (get_testcase,GetTestcaseRequest,GetTestcaseResponse),
+        (set_testcase,SetTestcaseRequest,SetTestcaseResponse),
+        (get_evaluation_file,GetEvaluationFileRequest,GetEvaluationFileResponse),
+        (set_evaluation_file,SetEvaluationFileRequest,SetEvaluationFileResponse)
         );
     }
     pub mod submission {

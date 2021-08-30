@@ -1,6 +1,6 @@
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     tonic_build::configure()
-        .type_attribute(
+        /*.type_attribute(
             ".service.evaluation",
             "#[derive(::serde::Serialize,::serde::Deserialize)]",
         )
@@ -11,7 +11,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .type_attribute(
             ".common.Source",
             "#[derive(::serde::Serialize,::serde::Deserialize)]",
-        )
+        )*/
         .compile(
             &[
                 "protos/common.proto",

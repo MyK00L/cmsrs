@@ -7,46 +7,52 @@ pub struct EvaluationService {}
 
 #[tonic::async_trait]
 impl Evaluation for EvaluationService {
-    async fn get_problem_scoring_info(
+    async fn get_user_scoring(
         &self,
-        _request: Request<GetProblemScoringInfoRequest>,
-    ) -> Result<Response<GetProblemScoringInfoResponse>, Status> {
+        _request: Request<GetUserScoringRequest>,
+    ) -> Result<Response<GetUserScoringResponse>, Status> {
         todo!()
     }
-    async fn get_problem_evaluation_info(
+    async fn set_user_scoring(
         &self,
-        _request: Request<GetProblemEvaluationInfoRequest>,
-    ) -> Result<Response<GetProblemEvaluationInfoResponse>, Status> {
+        _request: Request<SetUserScoringRequest>,
+    ) -> Result<Response<SetUserScoringResponse>, Status> {
         todo!()
     }
-    async fn get_problem_testcases(
+    async fn get_problem(
         &self,
-        _request: Request<GetProblemTestcasesRequest>,
-    ) -> Result<Response<GetProblemTestcasesResponse>, Status> {
+        _request: Request<GetProblemRequest>,
+    ) -> Result<Response<GetProblemResponse>, Status> {
         todo!()
     }
-    async fn get_problem_evaluation_file(
+    async fn set_problem(
         &self,
-        _request: Request<GetProblemEvaluationFileRequest>,
-    ) -> Result<Response<GetProblemEvaluationFileResponse>, Status> {
+        _request: Request<SetProblemRequest>,
+    ) -> Result<Response<SetProblemResponse>, Status> {
         todo!()
     }
-    async fn get_user_scoring_method(
+    async fn get_testcase(
         &self,
-        _request: Request<GetUserScoringMethodRequest>,
-    ) -> Result<Response<GetUserScoringMethodResponse>, Status> {
+        _request: Request<GetTestcaseRequest>,
+    ) -> Result<Response<GetTestcaseResponse>, Status> {
         todo!()
     }
-    async fn set_problem_info(
+    async fn set_testcase(
         &self,
-        _request: Request<SetProblemInfoRequest>,
-    ) -> Result<Response<SetProblemInfoResponse>, Status> {
+        _request: Request<SetTestcaseRequest>,
+    ) -> Result<Response<SetTestcaseResponse>, Status> {
         todo!()
     }
-    async fn set_user_scoring_method(
+    async fn get_evaluation_file(
         &self,
-        _request: Request<SetUserScoringMethodRequest>,
-    ) -> Result<Response<SetUserScoringMethodResponse>, Status> {
+        _request: Request<GetEvaluationFileRequest>,
+    ) -> Result<Response<GetEvaluationFileResponse>, Status> {
+        todo!()
+    }
+    async fn set_evaluation_file(
+        &self,
+        _request: Request<SetEvaluationFileRequest>,
+    ) -> Result<Response<SetEvaluationFileResponse>, Status> {
         todo!()
     }
 }
