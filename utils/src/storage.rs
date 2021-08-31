@@ -2,6 +2,9 @@ use std::fs::{DirBuilder, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
+use serde::{Deserialize, Serialize};
+use bincode;
+
 pub struct FsStorageHelper {
     root: PathBuf,
 }
@@ -84,10 +87,27 @@ impl FsStorageHelper {
             .map(|_| path)
     }
 
+    pub fn save_file_object<T: Serialize>(
+        &self,
+        path: Option<&Path>,
+        file_name: &str,
+        extension: &str,
+        content: T,
+    ) -> Result<PathBuf, Box<dyn std::error::Error>> {
+        let serialized = bincode::serialize(&content)?;
+        Ok(self.save_file(path, file_name, extension, &serialized)?)
+    }
+
     pub fn read_file(&self, path: &Path) -> Result<Vec<u8>, std::io::Error> {
         File::open(path).and_then(|mut file| {
             let mut buffer = vec![];
             file.read_to_end(&mut buffer).map(|_| buffer)
         })
     }
+
+    // pub fn read_file_object<'a, T: Deserialize<'a>>(&self, path: &Path) -> Result<T, Box<dyn std::error::Error>> {
+    //     let buffer = self.read_file(path)?;
+    //     let des = bincode::deserialize::<'a>(&buffer)?;
+    //     Ok(des)
+    // }
 }
