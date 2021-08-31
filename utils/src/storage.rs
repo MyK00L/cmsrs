@@ -3,7 +3,7 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 use bincode;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 pub struct FsStorageHelper {
     root: PathBuf,
@@ -98,16 +98,27 @@ impl FsStorageHelper {
         Ok(self.save_file(path, file_name, extension, &serialized)?)
     }
 
-    pub fn read_file(&self, path: &Path) -> Result<Vec<u8>, std::io::Error> {
+    pub fn read_file<'a>(
+        &self,
+        path: &Path,
+        buffer: &'a mut Vec<u8>,
+    ) -> Result<(), std::io::Error> {
         File::open(path).and_then(|mut file| {
-            let mut buffer = vec![];
-            file.read_to_end(&mut buffer).map(|_| buffer)
+            file.read_to_end(buffer)?;
+            Ok(())
         })
     }
 
-    // pub fn read_file_object<'a, T: Deserialize<'a>>(&self, path: &Path) -> Result<T, Box<dyn std::error::Error>> {
-    //     let buffer = self.read_file(path)?;
-    //     let des = bincode::deserialize::<'a>(&buffer)?;
-    //     Ok(des)
-    // }
+    pub fn read_file_object<'a, T>(
+        &self,
+        path: &Path,
+        buffer: &'a mut Vec<u8>,
+    ) -> Result<T, Box<dyn std::error::Error>>
+    where
+        T: Deserialize<'a>,
+    {
+        self.read_file(path, buffer)?;
+        let des = bincode::deserialize(buffer)?;
+        Ok(des)
+    }
 }
