@@ -2,8 +2,8 @@ syntax = "proto2";
 
 package service.evaluation;
 
-import "scoring.proto";
 import "common.proto";
+import "scoring.proto";
 
 // Schema-defining messages
 

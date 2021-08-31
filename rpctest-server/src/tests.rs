@@ -12,7 +12,9 @@ fn string_test() {
     let channel = ServiceBuilder::new().service(TestServer::new(mock_test));
     let test_client = TestClient::new(channel);
     let t = MyTest { test_client };
-    let request = tonic::Request::new(TestStringRequest { str: format!("42") });
+    let request = tonic::Request::new(TestStringRequest {
+        str: "42".to_string(),
+    });
     assert_eq!(
         TestStringResponse {
             str: String::from("Hello 42")
@@ -29,7 +31,9 @@ fn mock_with_err() {
     let channel = ServiceBuilder::new().service(TestServer::new(mock_test));
     let test_client = TestClient::new(channel);
     let t = MyTest { test_client };
-    let request = tonic::Request::new(TestStringRequest { str: format!("42") });
+    let request = tonic::Request::new(TestStringRequest {
+        str: "42".to_string(),
+    });
     eprintln!(
         "{:?}",
         block_on(t.test_string(request)).unwrap().into_inner()
