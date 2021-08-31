@@ -2,8 +2,8 @@ use std::fs::{DirBuilder, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
-use serde::{Deserialize, Serialize};
 use bincode;
+use serde::Serialize;
 
 pub struct FsStorageHelper {
     root: PathBuf,
