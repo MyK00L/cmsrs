@@ -1,9 +1,25 @@
 use protos::service::evaluation::{evaluation_server::*, *};
 use protos::utils::*;
 use tonic::{transport::*, Request, Response, Status};
+use utils::storage::FsStorageHelper;
+
+const ROOT_PATH: &str = "/evaluation_files";
+const SERIALIZED_EXTENSION: &str = ".ser";
+const USER_SCORING_FILE_NAME: &str = "user_scoring";
+const PROBLEMS_FOLDER_NAME: &str = "problems";
+const PROBLEM_METADATA_FILE_NAME: &str = "metadata";
+
+fn internal_error<T>(e: T) -> Status
+where
+    T: std::error::Error,
+{
+    Status::internal(format!("{:?}", e))
+}
 
 #[derive(Debug)]
-pub struct EvaluationService {}
+pub struct EvaluationService {
+    storage: FsStorageHelper,
+}
 
 #[tonic::async_trait]
 impl Evaluation for EvaluationService {
@@ -11,14 +27,60 @@ impl Evaluation for EvaluationService {
         &self,
         _request: Request<GetUserScoringRequest>,
     ) -> Result<Response<GetUserScoringResponse>, Status> {
-        todo!()
+        self.storage
+            .search_item(None, USER_SCORING_FILE_NAME, Some(SERIALIZED_EXTENSION))
+            .map_err(internal_error)
+            .and_then(|op| op.ok_or_else(|| Status::not_found("User scoring method not found")))
+            .and_then(|path| {
+                self.storage
+                    .read_file_object(&path)
+                    .map_err(|err| internal_error(err.as_ref()))
+            })
+            .map(|user| Response::new(GetUserScoringResponse { info: user }))
     }
 
     async fn get_problem(
         &self,
-        _request: Request<GetProblemRequest>,
+        request: Request<GetProblemRequest>,
     ) -> Result<Response<GetProblemResponse>, Status> {
-        todo!()
+        let request = request.into_inner();
+        self.storage
+            .search_item(None, PROBLEMS_FOLDER_NAME, None)
+            .map_err(internal_error)
+            .and_then(|op| op.ok_or_else(|| Status::not_found("Problems folder not found")))
+            .and_then(|path| {
+                self.storage
+                    .search_item(Some(&path), &request.problem_id.to_string(), None)
+                    .map_err(internal_error)
+            })
+            .and_then(|op| {
+                op.ok_or_else(|| {
+                    Status::not_found(format!("Problem not found [id: {}]", request.problem_id))
+                })
+            })
+            .and_then(|path| {
+                self.storage
+                    .search_item(
+                        Some(&path),
+                        PROBLEM_METADATA_FILE_NAME,
+                        Some(SERIALIZED_EXTENSION),
+                    )
+                    .map_err(internal_error)
+            })
+            .and_then(|op| {
+                op.ok_or_else(|| {
+                    Status::not_found(format!(
+                        "Problem metadata not found [id: {}]",
+                        request.problem_id
+                    ))
+                })
+            })
+            .and_then(|path| {
+                self.storage
+                    .read_file_object(&path)
+                    .map_err(|err| internal_error(err.as_ref()))
+            })
+            .map(|prob| Response::new(GetProblemResponse { info: prob }))
     }
 
     async fn set_contest(
@@ -67,7 +129,9 @@ impl Evaluation for EvaluationService {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = get_local_address(Service::EVALUATION).parse()?;
-    let evaluation_service = EvaluationService {};
+    let evaluation_service = EvaluationService {
+        storage: FsStorageHelper::new(std::path::Path::new(ROOT_PATH))?,
+    };
 
     println!("Starting evaluation server");
     Server::builder()

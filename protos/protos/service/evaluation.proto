@@ -59,7 +59,7 @@ message EvaluationFile {
 
 message GetUserScoringRequest {}
 message GetUserScoringResponse {
-    required scoring.User method = 1;
+    required scoring.User info = 1;
 }
 message SetUserScoringRequest {
     required scoring.User method = 1;

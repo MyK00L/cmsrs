@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use bincode;
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug)]
 pub struct FsStorageHelper {
     root: PathBuf,
 }
