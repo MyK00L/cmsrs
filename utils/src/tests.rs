@@ -154,13 +154,13 @@ fn save_search_and_read_file_fs_storage_helper_test() {
     let temp_dir = TempDir::default();
     let test_path = temp_dir.to_path_buf().join("test");
     let storage = storage::FsStorageHelper::new(&test_path).unwrap();
-    let mut buffer = vec![];
 
     let res = storage
         .save_file(None, "testfile", "txt", b"123")
         .and_then(|_| storage.search_item(None, "testfile", Some("txt")))
-        .and_then(|path| storage.read_file(&path.unwrap(), &mut buffer));
+        .and_then(|path| storage.read_file(&path.unwrap()));
     assert!(res.is_ok());
+    let buffer = res.unwrap();
     assert_eq!(buffer, b"123");
 }
 
@@ -187,12 +187,12 @@ fn save_and_read_file_fs_storage_helper_test() {
     let temp_dir = TempDir::default();
     let test_path = temp_dir.to_path_buf().join("test");
     let storage = storage::FsStorageHelper::new(&test_path).unwrap();
-    let mut buffer = vec![];
 
     let res = storage
         .save_file(None, "testfile", "txt", b"123")
-        .and_then(|path| storage.read_file(&path, &mut buffer));
+        .and_then(|path| storage.read_file(&path));
     assert!(res.is_ok());
+    let buffer = res.unwrap();
     assert_eq!(buffer, b"123");
 }
 
@@ -201,13 +201,12 @@ fn save_and_read_object_file_fs_storage_helper_test() {
     let temp_dir = TempDir::default();
     let test_path = temp_dir.to_path_buf().join("test");
     let storage = storage::FsStorageHelper::new(&test_path).unwrap();
-    let mut buffer = vec![];
-    let object = "testobject";
+    let object = String::from("testcontent");
 
     let res = storage
         .save_file_object(None, "testfile", "txt", object)
-        .and_then(|path| storage.read_file_object::<&str>(&path, &mut buffer));
+        .and_then(|path| storage.read_file_object::<String>(&path));
     assert!(res.is_ok());
     let unwrapped = res.unwrap();
-    assert_eq!(unwrapped, object);
+    assert_eq!(unwrapped, "testcontent");
 }

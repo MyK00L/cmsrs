@@ -98,27 +98,20 @@ impl FsStorageHelper {
         Ok(self.save_file(path, file_name, extension, &serialized)?)
     }
 
-    pub fn read_file<'a>(
-        &self,
-        path: &Path,
-        buffer: &'a mut Vec<u8>,
-    ) -> Result<(), std::io::Error> {
+    pub fn read_file(&self, path: &Path) -> Result<Vec<u8>, std::io::Error> {
         File::open(path).and_then(|mut file| {
-            file.read_to_end(buffer)?;
-            Ok(())
+            let mut buffer = vec![];
+            file.read_to_end(&mut buffer)?;
+            Ok(buffer)
         })
     }
 
-    pub fn read_file_object<'a, T>(
-        &self,
-        path: &Path,
-        buffer: &'a mut Vec<u8>,
-    ) -> Result<T, Box<dyn std::error::Error>>
+    pub fn read_file_object<T>(&self, path: &Path) -> Result<T, Box<dyn std::error::Error>>
     where
-        T: Deserialize<'a>,
+        for<'de> T: Deserialize<'de>,
     {
-        self.read_file(path, buffer)?;
-        let des = bincode::deserialize(buffer)?;
-        Ok(des)
+        let file = File::open(path)?;
+        let deserialized = bincode::deserialize_from(file)?;
+        Ok(deserialized)
     }
 }
