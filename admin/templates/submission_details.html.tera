@@ -21,7 +21,7 @@
 		<textarea readonly="readonly">{{code}}</textarea>
 		{% if evaluation %}
 		<p>compilation: {{evaluation.compilation_outcome}} {{evaluation.compilation_millis}}ms {{evaluation.compilation_bytes}}b {{evaluation.compilation_error}}</p>
-		<p>{{evaluation.overall_score}}</p>
+		<p>{{evaluation.score}}</p>
 		<details>
 			<summary>testcases</summary>
 			{% for sr in evaluation.subtask_results %}
