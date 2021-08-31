@@ -1,5 +1,5 @@
 use std::fs::{DirBuilder, File};
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 pub struct FsStorageHelper {
@@ -16,10 +16,6 @@ impl FsStorageHelper {
             })
     }
 
-    fn strip_to_root(&self, path: &Path) -> PathBuf {
-        path.strip_prefix(self.root.clone()).unwrap().to_path_buf()
-    }
-
     pub fn add_folder(
         &self,
         folder_name: &str,
@@ -30,52 +26,68 @@ impl FsStorageHelper {
             None => self.root.clone(),
         };
         let folder_path = ancestor_path.join(folder_name);
-        let new_path = self.strip_to_root(&folder_path);
         DirBuilder::new()
             .recursive(true)
-            .create(folder_path)
-            .map(|_| new_path)
+            .create(folder_path.clone())
+            .map(|_| folder_path)
     }
 
     pub fn search_item(
         &self,
-        folder_path: Option<&Path>,
+        path: Option<&Path>,
         item_name: &str,
+        extension: Option<&str>,
     ) -> Result<Option<PathBuf>, std::io::Error> {
-        let absolute_folder_path = match folder_path {
-            Some(ap) => self.root.join(ap),
+        let path = match path {
+            Some(p) => p.to_path_buf(),
             None => self.root.clone(),
         };
-        if absolute_folder_path.is_dir() {
-            return Ok(absolute_folder_path
+        if path.is_dir() {
+            return Ok(path
                 .read_dir()?
                 .flat_map(|res| res.map(|e| e.path()))
                 .find(|el| {
-                    el.file_stem()
-                        .filter(|&os| os.to_str().filter(|&s| s == item_name).is_some())
-                        .is_some()
-                })
-                .map(|path| self.strip_to_root(&path)));
+                    let ok_name = el
+                        .file_stem()
+                        .and_then(|os| os.to_str())
+                        .filter(|&name| name == item_name)
+                        .is_some();
+                    let ok_ext = match extension {
+                        Some(ext) => el
+                            .extension()
+                            .and_then(|os| os.to_str())
+                            .filter(|&extension| extension == ext)
+                            .is_some(),
+                        None => true,
+                    };
+                    ok_name && ok_ext
+                }));
         }
         Ok(None)
     }
 
     pub fn save_file(
         &self,
-        folder_path: &Path,
+        path: Option<&Path>,
         file_name: &str,
         extension: &str,
         content: &[u8],
-    ) -> Result<(), std::io::Error> {
-        let mut path = self.root.join(folder_path);
-        path.set_file_name(file_name);
+    ) -> Result<PathBuf, std::io::Error> {
+        let mut path = match path {
+            Some(p) => p.to_path_buf(),
+            None => self.root.clone(),
+        };
+        path = path.join(file_name);
         path.set_extension(extension);
-        let mut buffer = File::create(path)?;
-        buffer.write_all(content)?;
-        Ok(())
+        File::create(path.clone())
+            .and_then(|mut file| file.write_all(content))
+            .map(|_| path)
     }
 
-    pub fn read_file(&self, _path: &Path) -> Result<Vec<u8>, std::io::Error> {
-        todo!()
+    pub fn read_file(&self, path: &Path) -> Result<Vec<u8>, std::io::Error> {
+        File::open(path).and_then(|mut file| {
+            let mut buffer = vec![];
+            file.read_to_end(&mut buffer).map(|_| buffer)
+        })
     }
 }
