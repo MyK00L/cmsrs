@@ -20,16 +20,20 @@ impl FsStorageHelper {
             })
     }
 
+    fn get_root_path(&self, path: Option<&Path>) -> PathBuf {
+        match path {
+            Some(p) => p.to_path_buf(),
+            None => self.root.clone(),
+        }
+    }
+
     pub fn add_folder(
         &self,
         folder_name: &str,
         path: Option<&Path>,
     ) -> Result<PathBuf, std::io::Error> {
-        let ancestor_path = match path {
-            Some(ap) => self.root.join(ap),
-            None => self.root.clone(),
-        };
-        let folder_path = ancestor_path.join(folder_name);
+        let path = self.get_root_path(path);
+        let folder_path = path.join(folder_name);
         DirBuilder::new()
             .recursive(true)
             .create(folder_path.clone())
@@ -42,10 +46,7 @@ impl FsStorageHelper {
         item_name: &str,
         extension: Option<&str>,
     ) -> Result<Option<PathBuf>, std::io::Error> {
-        let path = match path {
-            Some(p) => p.to_path_buf(),
-            None => self.root.clone(),
-        };
+        let path = self.get_root_path(path);
         if path.is_dir() {
             return Ok(path
                 .read_dir()?
@@ -77,11 +78,7 @@ impl FsStorageHelper {
         extension: &str,
         content: &[u8],
     ) -> Result<PathBuf, std::io::Error> {
-        let mut path = match path {
-            Some(p) => p.to_path_buf(),
-            None => self.root.clone(),
-        };
-        path = path.join(file_name);
+        let mut path = self.get_root_path(path).join(file_name);
         path.set_extension(extension);
         File::create(path.clone())
             .and_then(|mut file| file.write_all(content))
