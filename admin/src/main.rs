@@ -407,11 +407,11 @@ async fn contest_template(
                 description: res.description,
                 start_time: match res.start_time {
                     Some(t) => utils::render_protos_timestamp(t, "%FT%T"),
-                    None => String::from("4242-12-25T16:08:04"),
+                    None => utils::render_protos_timestamp((SystemTime::now()+std::time::Duration::from_secs(86400)).into(),"%FT%T"),
                 },
                 end_time: match res.end_time {
                     Some(t) => utils::render_protos_timestamp(t, "%FT%T"),
-                    None => String::from("4242-12-25T16:08:04"),
+                    None => utils::render_protos_timestamp((SystemTime::now()+std::time::Duration::from_secs(93600)).into(),"%FT%T"),
                 },
             };
             Ok(Template::render("contest", contest))
