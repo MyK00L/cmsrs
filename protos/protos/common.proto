@@ -2,11 +2,17 @@ syntax = "proto2";
 
 package common;
 
-import public "google/protobuf/timestamp.proto";
-import public "google/protobuf/duration.proto";
+message Timestamp {
+	required uint64 secs = 1;
+	required uint32 nanos = 2;
+}
+message Duration {
+	required uint64 secs = 1;
+	required uint32 nanos = 2;
+}
 
 message Resources {
-	required google.protobuf.Duration time = 1;
+	required Duration time = 1;
 	required uint64 memory_bytes = 2;
 }
 
