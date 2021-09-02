@@ -1,11 +1,14 @@
+#![recursion_limit="256"]
+
+use rand::{Rng};
 use core::panic;
-use std::{collections::HashMap, time::SystemTime};
+use std::time::SystemTime;
 
 use futures::stream::StreamExt;
 
 use ::utils::{gen_uuid, mongo::*};
-use mongodb::{Client, bson::{Binary, Bson, Document, bson, doc, spec::{BinarySubtype, ElementType}}, options::{ClientOptions, FindOptions}};
-use protos::{*, self, common::Resources, evaluation::{CompilationResult, EvaluationResult, SubtaskResult, TestcaseResult}, service::{dispatcher::MockDispatcher}};
+use mongodb::{Client, Database, bson::{Binary, Bson, Document, bson, doc, spec::{BinarySubtype, ElementType}}, options::{ClientOptions, CreateCollectionOptions, FindOptions, ValidationAction, ValidationLevel}};
+use protos::{*, self, common::Resources, evaluation::{CompilationResult, EvaluationResult, SubtaskResult, TestcaseResult, compilation_result, testcase_result}, service::{dispatcher::{EvaluateSubmissionResponse, MockDispatcher}}};
 use protos::service::submission::*;
 use protos::scoring::*;
 use protos::service::submission::submission_server::*;
@@ -31,6 +34,130 @@ fn expected_field(field_name: &str) -> String {
     format!("This should not happen. In this context {} is a required field in db", field_name)
 }
 
+async fn init_contest_service_db(db: Database) -> Result<(), Box<dyn std::error::Error>> {
+    // TODO: consider using this validator syntax (might be slightly nicer):
+    // https://docs.mongodb.com/v5.0/core/schema-validation/#other-query-expressions
+    db.create_collection(
+        "submissions",
+        CreateCollectionOptions::builder()
+            .validator(doc! {
+                "$jsonSchema": {
+                    "bsonType": "object",
+                    "required": ["_id", "user", "problemId", "created", "source", "programmingLanguage", "state"],
+                    "properties": {
+                        "_id": { "bsonType": "long" }, // submission id
+                        "user": { "bsonType": "string" },
+                        "problemId": { "bsonType": "long" },
+                        "created": { "bsonType": "timestamp" },
+                        "source": { "bsonType": "binData" },
+                        "programmingLanguage": { 
+                            "bsonType": "int",
+                            "enum": [0, 1, 2]
+                            /*
+                            0 => NONE
+                            1 => RUST
+                            2 => CPP
+                            ...
+                            */
+                        },
+                        "state": { 
+                            "bsonType": "int",
+                            "enum": [0, 1, 2]
+                            /*
+                            0 => PENDING
+                            1 => EVALUATED
+                            2 => ABORTED
+                            */
+                        },
+                        "compilation": {
+                            "bsonType": "object",
+                            "required": ["outcome", "timeNs", "memoryB"],
+                            "properties": {
+                                "outcome": { 
+                                    "bsonType": "int",
+                                    "enum": [0, 1, 2, 3, 4, 5]
+                                    /*
+                                    0 => NONE
+                                    1 => SUCCESS
+                                    2 => REJECTED
+                                    3 => TLE
+                                    4 => MLE
+                                    5 => RTE
+                                    */
+                                },
+                                "timeNs": { "bsonType": "long" },
+                                "memoryB": { "bsonType": "long" },
+                                "error": { "bsonType": "string" }
+                            }
+                        }, // EvaluationResult.compilation_result
+                        "evaluation": {
+                            "bsonType": "object",
+                            "required": ["subtasks"],
+                            "properties": {
+                                "subtasks": {
+                                "bsonType": "array",
+                                "items": {
+                                    "bsonType": "object",
+                                    "required": ["testcases", "subtaskScore"],
+                                    "properties": {
+                                    "subtaskScore": { 
+                                        "oneOf": [ 
+                                            { "bsonType": "bool"},
+                                            { "bsonType": "double"}
+                                        ]
+                                    }, // SubtaskResult.subtask_score
+                                    "testcases": {
+                                        "bsonType": "array",
+                                        "items": {
+                                            "bsonType": "object",
+                                            "required": ["outcome", "score", "timeNs", "memoryB"], 
+                                            "properties": {
+                                                "outcome": {
+                                                    "bsonType": "int",
+                                                    "enum": [0, 1, 2, 3, 4, 5]
+                                                    /*
+                                                    0 => NONE
+                                                    1 => OK
+                                                    2 => TLE
+                                                    3 => MLE
+                                                    4 => RTE
+                                                    5 => CHECKER_ERROR
+                                                    */
+                                                }, // TestcaseResult.outcome
+                                                "score": { 
+                                                    "oneOf": [ 
+                                                        { "bsonType": "bool"},
+                                                        { "bsonType": "double"}
+                                                    ]
+                                                }, //TestcaseResult.score
+                                                "timeNs": { "bsonType": "long" }, // TestcaseResult.used_resources
+                                                "memoryB": { "bsonType": "long" }, // TestcaseResult.used_resources
+                                        }
+                                        }
+                                    } // SubtaskResult.testcase_results
+                                    }
+                                }
+                                }
+                            } // EvaluationResult.subtask_results
+                        },
+                        "overallScore": { 
+                            "oneOf": [ 
+                                { "bsonType": "bool"},
+                                { "bsonType": "double"}
+                            ]
+                        } // EvaluationResult.overall_score
+                    }
+                }
+            })
+            .validation_action(ValidationAction::Error)
+            .validation_level(ValidationLevel::Strict)
+            .build()
+    )
+    .await?;
+    
+    Ok(())
+}
+
 #[derive(Debug)]
 pub struct SubmissionService {
     db_client: Client,
@@ -38,8 +165,10 @@ pub struct SubmissionService {
 
 impl SubmissionService {
     async fn new() -> Result<Self, Box<dyn std::error::Error>> {
+        let db_client = Client::with_options(ClientOptions::parse(CONNECTION_STRING).await?)?;
+        init_contest_service_db(db_client.database("submissionsdb")).await?;
         Ok(Self {
-            db_client: Client::with_options(ClientOptions::parse(CONNECTION_STRING).await?)?,
+            db_client: db_client,
         })
     }
 
@@ -80,17 +209,12 @@ fn score_struct_to_bson(score_struct: OneOfScore) -> Option<Bson> {
 }
 
 fn get_item_from_doc(doc: Document) -> get_submission_list_response::Item {
-    let mut state_str_to_i32: HashMap<&str, i32> = HashMap::new();
-    state_str_to_i32.insert("PENDING", 0);
-    state_str_to_i32.insert("EVALUATED", 1);
-    state_str_to_i32.insert("ABORTED", 2);
-
     get_submission_list_response::Item{
         submission_id: doc.get_i64("_id").unwrap() as u64,
         user: doc.get_str("user").unwrap().to_string(),
         problem_id: doc.get_i64("problemId").unwrap() as u64,
         timestamp: timestamp_to_systime(doc.get_timestamp("created").unwrap()).into(),
-        state: state_str_to_i32[doc.get_str("state").expect(expected_field("state").as_str())],
+        state: doc.get_i32("state").expect(expected_field("state").as_str()),
         score: score_option_bson_to_struct(doc.get("overallScore"), false, DUMMY_MESSAGE)
     }
 }
@@ -99,20 +223,19 @@ fn convert_to_i64(x: u64) -> i64 {
     x as i64
 }
 
-fn create_pending_submission_document(
-    problem_id: u64,
-    source_code: Vec<u8>
-) -> Document {
-        doc! {
-            "_id": convert_to_i64(gen_uuid()),
-            "problemId": problem_id as i64,
-            "created": systime_to_timestamp(SystemTime::now()),
-            "source": Bson::Binary(Binary {
-                    subtype: BinarySubtype::Generic,
-                    bytes: source_code
-            }),
-            "state": "PENDING"
-        }
+fn create_pending_submission_document(submission: evaluation::Submission) -> Document {
+    doc! {
+        "_id": convert_to_i64(gen_uuid()),
+        "user": submission.user,
+        "problemId": submission.problem_id as i64,
+        "created": systime_to_timestamp(SystemTime::now()),
+        "source": Bson::Binary(Binary {
+                subtype: BinarySubtype::Generic,
+                bytes: submission.source.code
+        }),
+        "state": SubmissionState::Pending as i32,
+        "programmingLanguage": submission.source.lang
+    }
 }
 
 fn duration_to_time_ns(duration: common::Duration) -> i64 {
@@ -131,9 +254,8 @@ fn time_ns_to_duration(time_ns: i64) -> common::Duration {
 }
 
 fn compilation_data_to_db_obj(compilation_result: CompilationResult) -> Bson {
-    let outcomes = ["None", "Success", "Rejected", "Tle", "Mle", "Rte"];
     let mut db_obj_document = doc! {
-        "outcome": outcomes[compilation_result.outcome as usize],
+        "outcome": compilation_result.outcome,
         "timeNs": duration_to_time_ns(compilation_result.used_resources.time),
         "memoryB": convert_to_i64(compilation_result.used_resources.memory_bytes),
     };
@@ -144,10 +266,9 @@ fn compilation_data_to_db_obj(compilation_result: CompilationResult) -> Bson {
 }
 
 fn testcase_data_to_db_obj(testcase_data: &TestcaseResult) -> Bson {
-    let outcomes = ["NONE", "OK", "TLE", "MLE", "RTE", "CHECKER_ERROR"];
     bson! ({
-        "outcome": outcomes[testcase_data.outcome as usize],
-        "score": score_struct_to_bson(testcase_data.score.clone()).unwrap(), // required in proto definition
+        "outcome": testcase_data.outcome,
+        "score": score_struct_to_bson(testcase_data.score.clone()).unwrap(),
         "timeNs": duration_to_time_ns(testcase_data.used_resources.time.clone()),
         "memoryB": convert_to_i64(testcase_data.used_resources.memory_bytes)
     })
@@ -155,7 +276,7 @@ fn testcase_data_to_db_obj(testcase_data: &TestcaseResult) -> Bson {
 
 fn subtask_data_to_db_obj(subtask_data: &SubtaskResult) -> Bson {
     bson! ({
-        "subtaskScore": score_struct_to_bson(subtask_data.score.clone()),// expected ?????????????????????????
+        "subtaskScore": score_struct_to_bson(subtask_data.score.clone()),// TODO instead of this, we should invoke the lib function to calculate the submission score
         "testcases": 
             subtask_data.testcase_results
                 .iter()
@@ -168,7 +289,7 @@ fn insert_evaluation_data_into_document(
     doc_updated: &mut Document, 
     evaluation_result: &EvaluationResult) {
         doc_updated.insert("compilation", compilation_data_to_db_obj(evaluation_result.compilation_result.clone()));
-        if evaluation_result.compilation_result.outcome == 1 {
+        if evaluation_result.compilation_result.outcome == compilation_result::Outcome::Success as i32 {
             // if compilation succeeded, then fill evaluation and score fields
             doc_updated.insert("evaluation", 
                 bson! ({
@@ -182,28 +303,21 @@ fn insert_evaluation_data_into_document(
                             .collect::<Bson>()
                 })
             );
-            // the Dispatcher MUST guarantee that the overall score is present even
-            // if for some testcases bad stuff happened
+
+            // TODO instead of this, we should invoke the lib function to calculate the submission score
             doc_updated.insert(
                 "overallScore", 
                 score_struct_to_bson(evaluation_result.score.clone())
                     .expect("This should not happen. Dispatcher should guarantee 
-                        that score exists if compilation succeeded.")
-            );
+                        that score exists if compilation succeeded."));
+        } else {
+            doc_updated.insert("overallScore", Bson::Double(0f64));
         }
 }
 
 fn compilation_doc_to_struct(compilation_doc: &Document) -> CompilationResult {
-    let mut compilation_outcome_str_to_i32: HashMap<&str, i32> = HashMap::new();
-    compilation_outcome_str_to_i32.insert("NONE", 0);
-    compilation_outcome_str_to_i32.insert("SUCCESS", 1);
-    compilation_outcome_str_to_i32.insert("REJECTED", 2);
-    compilation_outcome_str_to_i32.insert("TLE", 3);
-    compilation_outcome_str_to_i32.insert("MLE", 4);
-    compilation_outcome_str_to_i32.insert("RTE", 5);
-    
     CompilationResult {
-        outcome: compilation_outcome_str_to_i32[compilation_doc.get_str("outcome").expect(expected_field("compilation").as_str())],
+        outcome: compilation_doc.get_i32("outcome").expect(expected_field("compilation").as_str()),
         used_resources: Resources {
             time: time_ns_to_duration(compilation_doc.get_i64("timeNs").expect(expected_field("timeNs").as_str())),
             memory_bytes: compilation_doc.get_i64("memoryB").expect(expected_field("memoryB").as_str()) as u64,
@@ -222,18 +336,9 @@ fn compilation_doc_to_struct(compilation_doc: &Document) -> CompilationResult {
 }
 
 fn single_testcase_db_to_struct(testcase_doc: &Document) -> TestcaseResult {
-    let mut testcase_outcome_str_to_i32: HashMap<&str, i32> = HashMap::new();
-    testcase_outcome_str_to_i32.insert("NONE", 0);
-    testcase_outcome_str_to_i32.insert("OK", 1);
-    testcase_outcome_str_to_i32.insert("TLE", 2);
-    testcase_outcome_str_to_i32.insert("MLE", 3);
-    testcase_outcome_str_to_i32.insert("RTE", 4);
-    testcase_outcome_str_to_i32.insert("CHECKER_ERROR", 5);
-    
     TestcaseResult {
-        outcome: testcase_outcome_str_to_i32[
-            testcase_doc.get_str("outcome").expect(expected_field("outcome").as_str())
-        ],
+        outcome:
+            testcase_doc.get_i32("outcome").expect(expected_field("outcome").as_str()),
         used_resources: Resources {
             time: time_ns_to_duration(testcase_doc.get_i64("timeNs").expect(expected_field("timeNs").as_str())),
             memory_bytes: testcase_doc.get_i64("memoryB").expect(expected_field("memoryB").as_str()) as u64,
@@ -302,20 +407,45 @@ fn document_to_evaluation_result_struct(submission_doc: Document) -> EvaluationR
 
 }
 
+fn generate_testcase_result() -> TestcaseResult {
+    let mut gen = rand::thread_rng();
+    let outcome = gen.gen::<i32>().checked_abs().unwrap_or(0) % 6;
+    TestcaseResult {
+        outcome: outcome,
+        score: if outcome == testcase_result::Outcome::Ok as i32 {
+            OneOfScore { score: Some(one_of_score::Score::BoolScore(true)) }
+        } else {
+            OneOfScore { score: Some(one_of_score::Score::BoolScore(false)) }
+        },
+        used_resources: Resources { time: time_ns_to_duration(gen.gen()), memory_bytes: gen.gen() },
+    }
+}
+
+fn generate_subtask_result() -> SubtaskResult {
+    SubtaskResult {
+        testcase_results: vec![
+            generate_testcase_result(),
+            generate_testcase_result(),
+            generate_testcase_result(),
+            generate_testcase_result(),
+            generate_testcase_result()
+        ],
+        score: OneOfScore { score: Some(one_of_score::Score::DoubleScore(0f64)) } // TODO this must be calculated with the lib function
+    }
+}
+
 #[tonic::async_trait]
 impl Submission for SubmissionService {
     async fn evaluate_submission(
         &self, 
         request: Request<EvaluateSubmissionRequest>
-    ) -> Result<Response<EvaluateSubmissionResponse>, Status> { 
+    ) -> Result<Response<protos::service::submission::EvaluateSubmissionResponse>, Status> { 
+        // TODO is grpcurl gives default value to proto required fields, when not specified
         let evaluate_submission_request = request.into_inner();
         let submission = evaluate_submission_request.sub;
         // 1) write into dabatase with Pending state
         
-        let doc_filter = create_pending_submission_document(
-            submission.problem_id, 
-            submission.source.code.clone()
-        );
+        let doc_filter = create_pending_submission_document(submission.clone());
         let id = doc_filter.get_i64("_id").unwrap();
 
         self
@@ -325,7 +455,32 @@ impl Submission for SubmissionService {
             .map_err(internal_error)?;
 
 	    // 2) redirect request to the dispatcher and await response
-        let mock_dispatcher = MockDispatcher::default();
+        let mut mock_dispatcher = MockDispatcher::default();
+        
+        mock_dispatcher.evaluate_submission_set(
+            EvaluateSubmissionResponse {
+                res: EvaluationResult {
+                    compilation_result: CompilationResult { 
+                        outcome: compilation_result::Outcome::Success as i32,
+                        used_resources: Resources { 
+                            time: time_ns_to_duration(1), 
+                            memory_bytes: 1u64 
+                        },
+                        error_message: None
+                    },
+                    subtask_results: vec![
+                        generate_subtask_result(),
+                        generate_subtask_result(),
+                        generate_subtask_result(),
+                        generate_subtask_result(),
+                        generate_subtask_result(),
+                        generate_subtask_result()
+                    ],
+                    score: OneOfScore { score: Some(one_of_score::Score::DoubleScore(0f64)) }, // TODO this must be calculated with the lib function
+                },
+            }
+        );
+
         let evaluation_result = 
             match mock_dispatcher.evaluate_submission(
                 Request::new(
@@ -339,13 +494,15 @@ impl Submission for SubmissionService {
                 Err(err) => {
                     // update state of the submission in the database to ABORTED 
                     let mut doc_updated = doc_filter.clone();
-                    doc_updated.insert("state", "ABORTED");
+                    doc_updated.insert("state", SubmissionState::Aborted as i32);
+                    
+                    // set overall_score to 0?
 
                     self
                         .get_collection()
                         .update_one(
                             doc_filter,
-                            doc_updated,
+                            doc! { "$set": doc_updated },
                             None
                         )
                         .await
@@ -355,17 +512,23 @@ impl Submission for SubmissionService {
                 }
             };
 
+        // TODO invoke RPC of evaluation service for scoring details
+        // from the Dispatcher I get the scores of the testcases
+
+        // lib function for calculating subtask scores starting from the testcases' scores
+        // lib function for calculating submission score starting from subtasks' scores 
+
 	    // 3) write values returned by the dispatcher into database
 	    //    changing the state to EVALUATED
         let mut doc_updated = doc_filter.clone();
-        doc_updated.insert("state", "EVALUATED");
+        doc_updated.insert("state", SubmissionState::Evaluated as i32);
         insert_evaluation_data_into_document(&mut doc_updated, &evaluation_result);
 
         let modified_count = self
             .get_collection()
             .update_one(
                 doc_filter, // not necessary, _id is already enough
-                doc_updated,
+                doc! { "$set": doc_updated },
                 None
             )
             .await
@@ -375,7 +538,7 @@ impl Submission for SubmissionService {
         assert_eq!(modified_count, 1u64);
 
         Ok(Response::new(
-            EvaluateSubmissionResponse {
+            protos::service::submission::EvaluateSubmissionResponse {
                 res: evaluation_result,
                 submission_id: id as u64,
             }
@@ -434,16 +597,7 @@ impl Submission for SubmissionService {
     async fn get_submission_details(
         &self,
         request: Request<GetSubmissionDetailsRequest>
-    ) -> Result<Response<GetSubmissionDetailsResponse>, Status> { 
-        let mut state_str_to_i32: HashMap<&str, i32> = HashMap::new();
-        state_str_to_i32.insert("PENDING", 0);
-        state_str_to_i32.insert("EVALUATED", 1);
-        state_str_to_i32.insert("ABORTED", 2);
-
-        let mut prog_lang_str_to_i32: HashMap<&str, i32> = HashMap::new();
-        prog_lang_str_to_i32.insert("RUST", 0);
-        prog_lang_str_to_i32.insert("CPP", 1);
-
+    ) -> Result<Response<GetSubmissionDetailsResponse>, Status> {
         let submission_details_request = request.into_inner();
         let submission_id = submission_details_request.submission_id;
         let opt_document = self
@@ -459,7 +613,7 @@ impl Submission for SubmissionService {
         
         match opt_document {
             Some(document) => {
-                let state_str = document.get_str("state")
+                let state = document.get_i32("state")
                     .expect("This should not happen. \'state\' is a required field in db");
                 
                 Ok(Response::new(
@@ -471,10 +625,9 @@ impl Submission for SubmissionService {
                             problem_id: document.get_i64("problemId")
                                 .expect(expected_field("problemId").as_str()) as u64,
                             source: common::Source {
-                                lang: prog_lang_str_to_i32[
-                                    document.get_str("programmingLanguage")
-                                        .expect(expected_field("programmingLanguage").as_str())
-                                ],
+                                lang:
+                                    document.get_i32("programmingLanguage")
+                                        .expect(expected_field("programmingLanguage").as_str()),
                                 code: {
                                     let bson_source = document.get("source")
                                         .expect(expected_field("source").as_str());
@@ -485,8 +638,8 @@ impl Submission for SubmissionService {
                                 }
                             }
                         },
-                        state: state_str_to_i32[state_str],
-                        res: if state_str == "EVALUATED" {
+                        state: state,
+                        res: if state == SubmissionState::Evaluated as i32 {
                                 Some(document_to_evaluation_result_struct(document))
                             } else {
                                 None
