@@ -1,5 +1,10 @@
 use super::*;
 
+use protos::scoring::{self, OneOfScore, Subtask, subtask, one_of_score, Problem, testcase_result};
+use protos::service::evaluation::*;
+use protos::evaluation::{SubtaskResult, TestcaseResult};
+use protos::common::{Resources, Duration};
+
 fn get_test_time() -> std::time::SystemTime {
     std::time::UNIX_EPOCH
         + std::time::Duration::from_secs(10)
@@ -34,4 +39,39 @@ fn convert_from_mongo_timestamp_test() {
         increment: 0,
     };
     assert_eq!(mongo::timestamp_to_systime(mongo_test_time), test_time);
+}
+
+fn get_bool_testcase(result: bool) -> TestcaseResult {
+    TestcaseResult {
+        outcome: testcase_result::Outcome::Ok as i32,
+        score: OneOfScore { score: Some(one_of_score::Score::BoolScore(result)) },
+        used_resources: Resources { time: Duration{ secs: 0, nanos: 0 }, memory_bytes: 0u64 },
+    }
+}
+
+#[test]
+fn evaluate_bool_subtask_with_min_test() {
+    let subtask_result = SubtaskResult {
+        testcase_results: vec![
+            get_bool_testcase(true),
+            get_bool_testcase(true),
+            get_bool_testcase(true),
+            get_bool_testcase(false),
+            get_bool_testcase(true)
+        ],
+        score: OneOfScore { score: Some(one_of_score::Score::DoubleScore(0f64)) }
+    };
+
+    let scoring_method = Subtask {
+        method: subtask::Method::Min as i32,
+        max_score: 100f64
+    };
+
+    /*assert_eq!(
+        evaluate_subtask_score(
+            subtask_result.testcase_results,
+            scoring_method
+        ),
+        subtask_result.score
+    )*/
 }
