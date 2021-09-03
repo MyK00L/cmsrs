@@ -6,6 +6,8 @@ use std::time::SystemTime;
 
 use futures::stream::StreamExt;
 
+#[path="mappings.rs"] // TODO fix this 
+pub mod mappings;
 use ::utils::{gen_uuid, mongo::*};
 use mongodb::{Client, Database, bson::{Binary, Bson, Document, bson, doc, spec::{BinarySubtype, ElementType}}, options::{ClientOptions, CreateCollectionOptions, FindOptions, ValidationAction, ValidationLevel}};
 use protos::{*, self, common::Resources, evaluation::{CompilationResult, EvaluationResult, SubtaskResult, TestcaseResult, compilation_result, testcase_result}, service::{dispatcher::{EvaluateSubmissionResponse, MockDispatcher}}};
@@ -155,6 +157,124 @@ async fn init_contest_service_db(db: Database) -> Result<(), Box<dyn std::error:
     )
     .await?;
     
+    db.create_collection(
+        "submissions-serde-test",
+        CreateCollectionOptions::builder()
+            .validator(doc! {
+                "$jsonSchema": {
+                    "bsonType": "object",
+                    "required": ["_id", "user", "problemId", "created", "source", "programmingLanguage", "state"],
+                    "properties": {
+                        "_id": { "bsonType": "long" }, // submission id
+                        "user": { "bsonType": "string" },
+                        "problemId": { "bsonType": "long" },
+                        "created": { "bsonType": "timestamp" },
+                        "source": { "bsonType": "binData" },
+                        "programmingLanguage": { 
+                            "bsonType": "int",
+                            "enum": [0, 1, 2]
+                            /*
+                            0 => NONE
+                            1 => RUST
+                            2 => CPP
+                            ...
+                            */
+                        },
+                        "state": { 
+                            "bsonType": "int",
+                            "enum": [0, 1, 2]
+                            /*
+                            0 => PENDING
+                            1 => EVALUATED
+                            2 => ABORTED
+                            */
+                        },
+                        "compilation": {
+                            "bsonType": "object",
+                            "required": ["outcome", "timeNs", "memoryB"],
+                            "properties": {
+                                "outcome": { 
+                                    "bsonType": "int",
+                                    "enum": [0, 1, 2, 3, 4, 5]
+                                    /*
+                                    0 => NONE
+                                    1 => SUCCESS
+                                    2 => REJECTED
+                                    3 => TLE
+                                    4 => MLE
+                                    5 => RTE
+                                    */
+                                },
+                                "timeNs": { "bsonType": "long" },
+                                "memoryB": { "bsonType": "long" },
+                                "error": { "bsonType": "string" }
+                            }
+                        }, // EvaluationResult.compilation_result
+                        "evaluation": {
+                            "bsonType": "object",
+                            "required": ["subtasks"],
+                            "properties": {
+                                "subtasks": {
+                                "bsonType": "array",
+                                "items": {
+                                    "bsonType": "object",
+                                    "required": ["testcases", "subtaskScore"],
+                                    "properties": {
+                                    "subtaskScore": { 
+                                        "oneOf": [ 
+                                            { "bsonType": "bool"},
+                                            { "bsonType": "double"}
+                                        ]
+                                    }, // SubtaskResult.subtask_score
+                                    "testcases": {
+                                        "bsonType": "array",
+                                        "items": {
+                                            "bsonType": "object",
+                                            "required": ["outcome", "score", "timeNs", "memoryB"], 
+                                            "properties": {
+                                                "outcome": {
+                                                    "bsonType": "int",
+                                                    "enum": [0, 1, 2, 3, 4, 5]
+                                                    /*
+                                                    0 => NONE
+                                                    1 => OK
+                                                    2 => TLE
+                                                    3 => MLE
+                                                    4 => RTE
+                                                    5 => CHECKER_ERROR
+                                                    */
+                                                }, // TestcaseResult.outcome
+                                                "score": { 
+                                                    "oneOf": [ 
+                                                        { "bsonType": "bool"},
+                                                        { "bsonType": "double"}
+                                                    ]
+                                                }, //TestcaseResult.score
+                                                "timeNs": { "bsonType": "long" }, // TestcaseResult.used_resources
+                                                "memoryB": { "bsonType": "long" }, // TestcaseResult.used_resources
+                                        }
+                                        }
+                                    } // SubtaskResult.testcase_results
+                                    }
+                                }
+                                }
+                            } // EvaluationResult.subtask_results
+                        },
+                        "overallScore": { 
+                            "oneOf": [ 
+                                { "bsonType": "bool"},
+                                { "bsonType": "double"}
+                            ]
+                        } // EvaluationResult.overall_score
+                    }
+                }
+            })
+            .validation_action(ValidationAction::Error)
+            .validation_level(ValidationLevel::Strict)
+            .build()
+    )
+    .await?;
+
     Ok(())
 }
 
@@ -175,7 +295,13 @@ impl SubmissionService {
     fn get_collection(&self) -> mongodb::Collection<Document> {
         self.db_client
             .database("submissionsdb")
-            .collection::<Document>("submissions")
+            .collection::<Document>("submissions-serde-test")
+    }
+
+    fn get_typed_collection(&self) -> mongodb::Collection<mappings::SubmissionObj> {
+        self.db_client
+            .database("submissionsdb")
+            .collection::<mappings::SubmissionObj>("submissions-serde-test")
     }
 }
 
