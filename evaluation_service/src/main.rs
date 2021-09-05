@@ -139,9 +139,74 @@ impl Evaluation for EvaluationService {
 
     async fn get_testcase(
         &self,
-        _request: Request<GetTestcaseRequest>,
+        request: Request<GetTestcaseRequest>,
     ) -> Result<Response<GetTestcaseResponse>, Status> {
-        todo!()
+        let request = request.into_inner();
+        let problem_id = request.problem_id;
+        let testcase_id = request.testcase_id;
+
+        // Get testcase's problem path
+        let problem_path = self
+            .storage
+            .search_item(None, PROBLEMS_FOLDER_NAME, None)
+            .map_err(internal_error)
+            .and_then(|op| op.ok_or_else(|| Status::not_found("Problems folder not found")))
+            .and_then(|path| {
+                self.storage
+                    .search_item(Some(&path), &problem_id.to_string(), None)
+                    .map_err(internal_error)
+            })
+            .and_then(|op| {
+                op.ok_or_else(|| {
+                    Status::not_found(format!("Problem not found [id: {}]", problem_id))
+                })
+            })?;
+
+        // Get testcases folder
+        let testcases_path = self
+            .storage
+            .search_item(Some(&problem_path), TESTCASES_FOLDER_NAME, None)?
+            .ok_or_else(|| {
+                Status::not_found(format!(
+                    "Testcases folder not found [problem id: {}]",
+                    problem_id
+                ))
+            })?;
+
+        // Get testcase folder
+        let tc_path = self
+            .storage
+            .search_item(Some(&testcases_path), &testcase_id.to_string(), None)?
+            .ok_or_else(|| {
+                Status::not_found(format!(
+                    "Testcase folder not found [problem id: {}, id: {}]",
+                    problem_id, testcase_id
+                ))
+            })?;
+
+        // Get input and output files (if present)
+        let input_path =
+            self.storage
+                .search_item(Some(&tc_path), INPUT_FILE_NAME, Some(IO_EXTENSION))?;
+        let input_bytes = match input_path {
+            Some(ip) => Some(self.storage.read_file(&ip)?),
+            None => None,
+        };
+        let output_path =
+            self.storage
+                .search_item(Some(&tc_path), OUTPUT_FILE_NAME, Some(IO_EXTENSION))?;
+        let output_bytes = match output_path {
+            Some(op) => Some(self.storage.read_file(&op)?),
+            None => None,
+        };
+
+        Ok(Response::new(GetTestcaseResponse {
+            testcase: Testcase {
+                id: testcase_id,
+                input: input_bytes,
+                output: output_bytes,
+            },
+        }))
     }
 
     async fn get_problem_testcases(
@@ -231,22 +296,27 @@ impl Evaluation for EvaluationService {
                     })?;
                 subtask.testcases_id.push(tc.id);
 
-                // Save testcase files into storage
+                // Save testcase files into storage (only if present)
                 let tc_path = self
                     .storage
                     .add_folder(&tc.id.to_string(), Some(&testcases_path))?;
-                self.storage.save_file(
-                    Some(&tc_path),
-                    INPUT_FILE_NAME,
-                    IO_EXTENSION,
-                    tc.input(),
-                )?;
-                self.storage.save_file(
-                    Some(&tc_path),
-                    OUTPUT_FILE_NAME,
-                    IO_EXTENSION,
-                    tc.output(),
-                )?;
+
+                if tc.input.is_some() {
+                    self.storage.save_file(
+                        Some(&tc_path),
+                        INPUT_FILE_NAME,
+                        IO_EXTENSION,
+                        tc.input(),
+                    )?;
+                }
+                if tc.output.is_some() {
+                    self.storage.save_file(
+                        Some(&tc_path),
+                        OUTPUT_FILE_NAME,
+                        IO_EXTENSION,
+                        tc.output(),
+                    )?;
+                }
             }
             Command::UpdateTestcase(tc) => {
                 let tc_path =
