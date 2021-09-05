@@ -11,7 +11,7 @@ const PROBLEM_METADATA_FILE_NAME: &str = "metadata";
 
 fn internal_error<T>(e: T) -> Status
 where
-    T: std::error::Error,
+    T: core::fmt::Debug + core::fmt::Display,
 {
     Status::internal(format!("{:?}", e))
 }
@@ -85,9 +85,42 @@ impl Evaluation for EvaluationService {
 
     async fn set_contest(
         &self,
-        _request: Request<SetContestRequest>,
+        request: Request<SetContestRequest>,
     ) -> Result<Response<SetContestResponse>, Status> {
-        todo!()
+        let request = request.into_inner();
+        let user_scoring_method = request.info.user_scoring_method;
+        let problems = request.info.problems;
+
+        // Save user scoring method
+        self.storage
+            .save_file_object(
+                None,
+                USER_SCORING_FILE_NAME,
+                SERIALIZED_EXTENSION,
+                user_scoring_method,
+            )
+            .map_err(internal_error)?;
+
+        // Save problems
+        let problems_path = self
+            .storage
+            .search_item(None, PROBLEMS_FOLDER_NAME, None)?
+            .ok_or_else(|| Status::not_found("Problems folder not found"))?;
+        for p in problems {
+            let p_path = self
+                .storage
+                .add_folder(&p.id.to_string(), Some(&problems_path))
+                .map_err(internal_error)?;
+            self.storage
+                .save_file_object(
+                    Some(&p_path),
+                    PROBLEM_METADATA_FILE_NAME,
+                    SERIALIZED_EXTENSION,
+                    p,
+                )
+                .map_err(internal_error)?;
+        }
+        Ok(Response::new(SetContestResponse {}))
     }
 
     async fn get_testcase(
