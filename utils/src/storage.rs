@@ -112,4 +112,16 @@ impl FsStorageHelper {
         let deserialized = bincode::deserialize_from(file)?;
         Ok(deserialized)
     }
+
+    pub fn delete_item(&self, path: &Path) -> Result<(), std::io::Error> {
+        if path.is_file() {
+            return std::fs::remove_file(path);
+        } else if path.is_dir() {
+            return std::fs::remove_dir_all(path);
+        }
+        Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "Item not found",
+        ))
+    }
 }

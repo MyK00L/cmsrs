@@ -94,10 +94,11 @@ message GetProblemTestcasesResponse {
 }
 message SetTestcaseRequest {
     required uint64 problem_id = 1;
+    required uint64 subtask_id = 2;
     oneof command {
-        Testcase add_testcase = 2;
-        Testcase update_testcase = 3;
-        uint64 delete_testcase_id = 4;
+        Testcase add_testcase = 3;
+        Testcase update_testcase = 4;
+        uint64 delete_testcase_id = 5;
     }
 }
 message SetTestcaseResponse {}

@@ -1,4 +1,4 @@
-use protos::service::evaluation::{evaluation_server::*, *};
+use protos::service::evaluation::{evaluation_server::*, set_testcase_request::Command, *};
 use protos::utils::*;
 use tonic::{transport::*, Request, Response, Status};
 use utils::storage::FsStorageHelper;
@@ -7,6 +7,10 @@ const ROOT_PATH: &str = "/evaluation_files";
 const SERIALIZED_EXTENSION: &str = ".ser";
 const USER_SCORING_FILE_NAME: &str = "user_scoring";
 const PROBLEMS_FOLDER_NAME: &str = "problems";
+const TESTCASES_FOLDER_NAME: &str = "testcases";
+const INPUT_FILE_NAME: &str = "input";
+const OUTPUT_FILE_NAME: &str = "output";
+const IO_EXTENSION: &str = "txt";
 const PROBLEM_METADATA_FILE_NAME: &str = "metadata";
 
 fn internal_error<T>(e: T) -> Status
@@ -106,7 +110,8 @@ impl Evaluation for EvaluationService {
             .storage
             .search_item(None, PROBLEMS_FOLDER_NAME, None)?
             .ok_or_else(|| Status::not_found("Problems folder not found"))?;
-        for p in problems {
+        for p in problems.iter() {
+            // Save problem metadata
             let p_path = self
                 .storage
                 .add_folder(&p.id.to_string(), Some(&problems_path))
@@ -119,6 +124,15 @@ impl Evaluation for EvaluationService {
                     p,
                 )
                 .map_err(internal_error)?;
+
+            // Create folders for testcases
+            let testcases_path = self
+                .storage
+                .add_folder(TESTCASES_FOLDER_NAME, Some(&p_path))?;
+            for tc_id in p.subtasks.iter().flat_map(|sub| sub.testcases_id.iter()) {
+                self.storage
+                    .add_folder(&tc_id.to_string(), Some(&testcases_path))?;
+            }
         }
         Ok(Response::new(SetContestResponse {}))
     }
@@ -139,9 +153,140 @@ impl Evaluation for EvaluationService {
 
     async fn set_testcase(
         &self,
-        _request: Request<SetTestcaseRequest>,
+        request: Request<SetTestcaseRequest>,
     ) -> Result<Response<SetTestcaseResponse>, Status> {
-        todo!()
+        let request = request.into_inner();
+        let problem_id = request.problem_id;
+        let subtask_id = request.subtask_id;
+
+        // Get testcase's problem path
+        let problem_path = self
+            .storage
+            .search_item(None, PROBLEMS_FOLDER_NAME, None)
+            .map_err(internal_error)
+            .and_then(|op| op.ok_or_else(|| Status::not_found("Problems folder not found")))
+            .and_then(|path| {
+                self.storage
+                    .search_item(Some(&path), &problem_id.to_string(), None)
+                    .map_err(internal_error)
+            })
+            .and_then(|op| {
+                op.ok_or_else(|| {
+                    Status::not_found(format!("Problem not found [id: {}]", problem_id))
+                })
+            })?;
+
+        // Get testcases folder
+        let testcases_path = self
+            .storage
+            .search_item(Some(&problem_path), TESTCASES_FOLDER_NAME, None)
+            .map_err(internal_error)
+            .and_then(|op| {
+                op.ok_or_else(|| {
+                    Status::not_found(format!(
+                        "Testcases folder not found [problem id: {}]",
+                        problem_id
+                    ))
+                })
+            })?;
+
+        match request.command.unwrap() {
+            Command::AddTestcase(tc) => {
+                // Check and add testcase to problem metadata
+                let mut problem_metadata: Problem = self
+                    .storage
+                    .search_item(
+                        Some(&problem_path),
+                        PROBLEM_METADATA_FILE_NAME,
+                        Some(SERIALIZED_EXTENSION),
+                    )?
+                    .ok_or_else(|| {
+                        Status::not_found(format!(
+                            "Testcases folder not found [problem id: {}]",
+                            problem_id
+                        ))
+                    })
+                    .and_then(|path| {
+                        self.storage.read_file_object(&path).map_err(internal_error)
+                    })?;
+
+                if problem_metadata
+                    .subtasks
+                    .iter()
+                    .flat_map(|subtask| subtask.testcases_id.iter())
+                    .any(|&tid| tid == tc.id)
+                {
+                    return Err(Status::already_exists(format!(
+                        "Testcase already exists [problem id: {}, id: {}]",
+                        problem_id, tc.id
+                    )));
+                }
+
+                let subtask = problem_metadata
+                    .subtasks
+                    .iter_mut()
+                    .find(|subtask| subtask.id == subtask_id)
+                    .ok_or_else(|| {
+                        Status::not_found(format!("Subtask not found [id: {}]", subtask_id))
+                    })?;
+                subtask.testcases_id.push(tc.id);
+
+                // Save testcase files into storage
+                let tc_path = self
+                    .storage
+                    .add_folder(&tc.id.to_string(), Some(&testcases_path))?;
+                self.storage.save_file(
+                    Some(&tc_path),
+                    INPUT_FILE_NAME,
+                    IO_EXTENSION,
+                    tc.input(),
+                )?;
+                self.storage.save_file(
+                    Some(&tc_path),
+                    OUTPUT_FILE_NAME,
+                    IO_EXTENSION,
+                    tc.output(),
+                )?;
+            }
+            Command::UpdateTestcase(tc) => {
+                let tc_path =
+                    self.storage
+                        .search_item(Some(&testcases_path), &tc.id.to_string(), None)?;
+                if let Some(tc_path) = tc_path {
+                    self.storage.save_file(
+                        Some(&tc_path),
+                        INPUT_FILE_NAME,
+                        IO_EXTENSION,
+                        tc.input(),
+                    )?;
+                    self.storage.save_file(
+                        Some(&tc_path),
+                        OUTPUT_FILE_NAME,
+                        IO_EXTENSION,
+                        tc.output(),
+                    )?;
+                } else {
+                    return Err(Status::not_found(format!(
+                        "Testcase not found [id: {}]",
+                        tc.id
+                    )));
+                }
+            }
+            Command::DeleteTestcaseId(tc_id) => {
+                let tc_path =
+                    self.storage
+                        .search_item(Some(&testcases_path), &tc_id.to_string(), None)?;
+                if let Some(tc_path) = tc_path {
+                    self.storage.delete_item(&tc_path)?;
+                } else {
+                    return Err(Status::not_found(format!(
+                        "Testcase not found [id: {}]",
+                        tc_id
+                    )));
+                }
+            }
+        };
+        Ok(Response::new(SetTestcaseResponse {}))
     }
 
     async fn get_problem_evaluation_file(
