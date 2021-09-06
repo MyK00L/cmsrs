@@ -1,7 +1,9 @@
+use crate::scoring_lib::evaluate_subtask_score;
+
 use super::*;
 
-use protos::scoring::{self, OneOfScore, Subtask, subtask, one_of_score, Problem, testcase_result};
-use protos::service::evaluation::*;
+use protos::scoring::{self, OneOfScore, Subtask, subtask, one_of_score, Problem};
+use protos::evaluation::*;
 use protos::evaluation::{SubtaskResult, TestcaseResult};
 use protos::common::{Resources, Duration};
 
@@ -51,7 +53,8 @@ fn get_bool_testcase(result: bool) -> TestcaseResult {
 
 #[test]
 fn evaluate_bool_subtask_with_min_test() {
-    let subtask_result = SubtaskResult {
+    let max_score = 100f64;
+    let subtask_result_wrong = SubtaskResult {
         testcase_results: vec![
             get_bool_testcase(true),
             get_bool_testcase(true),
@@ -62,16 +65,102 @@ fn evaluate_bool_subtask_with_min_test() {
         score: OneOfScore { score: Some(one_of_score::Score::DoubleScore(0f64)) }
     };
 
-    let scoring_method = Subtask {
-        method: subtask::Method::Min as i32,
-        max_score: 100f64
+    let subtask_result_correct = SubtaskResult {
+        testcase_results: vec![
+            get_bool_testcase(true),
+            get_bool_testcase(true),
+            get_bool_testcase(true),
+            get_bool_testcase(true),
+            get_bool_testcase(true)
+        ],
+        score: OneOfScore { score: Some(one_of_score::Score::DoubleScore(max_score)) }
     };
 
-    /*assert_eq!(
+    let scoring_method = Subtask {
+        method: subtask::Method::Min as i32,
+        max_score: max_score
+    };
+
+    assert_eq!(
         evaluate_subtask_score(
-            subtask_result.testcase_results,
-            scoring_method
+            subtask_result_wrong.testcase_results,
+            &scoring_method
         ),
-        subtask_result.score
-    )*/
+        subtask_result_wrong.score
+    );
+
+    assert_eq!(
+        evaluate_subtask_score(
+            subtask_result_correct.testcase_results,
+            &scoring_method
+        ),
+        subtask_result_correct.score
+    );
+}
+
+
+#[test]
+fn evaluate_bool_subtask_with_sum_test() {
+    let max_score = 100f64;
+    let subtask_result_wrong = SubtaskResult {
+        testcase_results: vec![
+            get_bool_testcase(false),
+            get_bool_testcase(false),
+            get_bool_testcase(false),
+            get_bool_testcase(false),
+            get_bool_testcase(false)
+        ],
+        score: OneOfScore { score: Some(one_of_score::Score::DoubleScore(0f64)) }
+    };
+
+    let subtask_result_partial = SubtaskResult {
+        testcase_results: vec![
+            get_bool_testcase(false),
+            get_bool_testcase(true),
+            get_bool_testcase(true),
+            get_bool_testcase(false),
+            get_bool_testcase(true)
+        ],
+        score: OneOfScore { score: Some(one_of_score::Score::DoubleScore(max_score * 3f64 / 5f64)) }
+    };
+
+    let subtask_result_correct = SubtaskResult {
+        testcase_results: vec![
+            get_bool_testcase(true),
+            get_bool_testcase(true),
+            get_bool_testcase(true),
+            get_bool_testcase(true),
+            get_bool_testcase(true)
+        ],
+        score: OneOfScore { score: Some(one_of_score::Score::DoubleScore(max_score)) }
+    };
+
+    let scoring_method = Subtask {
+        method: subtask::Method::Sum as i32,
+        max_score: max_score
+    };
+
+    assert_eq!(
+        evaluate_subtask_score(
+            subtask_result_wrong.testcase_results,
+            &scoring_method
+        ),
+        subtask_result_wrong.score
+    );
+
+    assert_eq!(
+        evaluate_subtask_score(
+            subtask_result_partial.testcase_results,
+            &scoring_method
+        ),
+        subtask_result_partial.score
+    );
+
+    assert_eq!(
+        evaluate_subtask_score(
+            subtask_result_correct.testcase_results,
+            &scoring_method
+        ),
+        subtask_result_correct.score
+    );
 }

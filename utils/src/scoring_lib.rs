@@ -1,5 +1,3 @@
-pub mod scoring_lib;
-
 use core::panic;
 
 use protos::scoring::{self, OneOfScore, Subtask, one_of_score, Problem};
@@ -44,9 +42,9 @@ fn double_testcases(testcases: &Vec<TestcaseResult>) -> bool {
 
 pub fn evaluate_subtask_score(
     testcases: Vec<TestcaseResult>, 
-    scoring_method: Subtask
+    scoring_method: &Subtask
 ) -> OneOfScore {
-        let testcases_acc = if boolean_testcases(testcases) {
+        let testcases_acc = if boolean_testcases(&testcases) {
             // this subtask has boolean scores
             match scoring_method.method {
                 0 => { // Min
