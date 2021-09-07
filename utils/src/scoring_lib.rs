@@ -1,7 +1,6 @@
 use core::panic;
 
-use protos::scoring::{self, OneOfScore, Subtask, one_of_score, Problem};
-use protos::service::evaluation::*;
+use protos::scoring::{OneOfScore, Subtask, one_of_score};
 use protos::evaluation::{SubtaskResult, TestcaseResult};
 
 fn as_double(score: &OneOfScore) -> f64 {
