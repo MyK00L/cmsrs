@@ -8,6 +8,7 @@ const SERIALIZED_EXTENSION: &str = ".ser";
 const USER_SCORING_FILE_NAME: &str = "user_scoring";
 const PROBLEMS_FOLDER_NAME: &str = "problems";
 const TESTCASES_FOLDER_NAME: &str = "testcases";
+const EVALUATION_FILES_FOLDER_NAME: &str = "files";
 const INPUT_FILE_NAME: &str = "input";
 const OUTPUT_FILE_NAME: &str = "output";
 const IO_EXTENSION: &str = "txt";
@@ -133,6 +134,10 @@ impl Evaluation for EvaluationService {
                 self.storage
                     .add_folder(&tc_id.to_string(), Some(&testcases_path))?;
             }
+
+            // Create folder for evaluation files
+            self.storage
+                .add_folder(EVALUATION_FILES_FOLDER_NAME, Some(&p_path))?;
         }
         Ok(Response::new(SetContestResponse {}))
     }
