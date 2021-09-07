@@ -366,7 +366,7 @@ async fn submissions_template(
                         submission_id: q.submission_id,
                         problem_id: q.submission_id,
                         user: q.user.clone(),
-                        state: format!("{:?}", q.state), // TODO: convert to enum
+                        state: format!("{:?}", submission::SubmissionState::from_i32(q.state).unwrap()),
                         time: utils::render_protos_timestamp(q.timestamp.clone(), "%F %X"),
                     })
                     .collect(),
