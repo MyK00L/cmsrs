@@ -343,6 +343,41 @@ impl Evaluation for EvaluationService {
                 }
             }
             Command::DeleteTestcaseId(tc_id) => {
+                // Delete from problem metadata
+                let mut problem_metadata: Problem = self
+                    .storage
+                    .search_item(
+                        Some(&problem_path),
+                        PROBLEM_METADATA_FILE_NAME,
+                        Some(SERIALIZED_EXTENSION),
+                    )?
+                    .ok_or_else(|| {
+                        Status::not_found(format!(
+                            "Testcases folder not found [problem id: {}]",
+                            problem_id
+                        ))
+                    })
+                    .and_then(|path| {
+                        self.storage.read_file_object(&path).map_err(internal_error)
+                    })?;
+
+                let subtask = problem_metadata
+                    .subtasks
+                    .iter_mut()
+                    .find(|subtask| subtask.id == subtask_id)
+                    .ok_or_else(|| {
+                        Status::not_found(format!("Subtask not found [id: {}]", subtask_id))
+                    })?;
+                let index = subtask
+                    .testcases_id
+                    .iter()
+                    .position(|&id| id == tc_id)
+                    .ok_or_else(|| {
+                        Status::not_found(format!("Testcase not found [id: {}]", tc_id))
+                    })?;
+                subtask.testcases_id.remove(index);
+
+                // Delete from storage
                 let tc_path =
                     self.storage
                         .search_item(Some(&testcases_path), &tc_id.to_string(), None)?;
