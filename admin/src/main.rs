@@ -366,7 +366,10 @@ async fn submissions_template(
                         submission_id: q.submission_id,
                         problem_id: q.submission_id,
                         user: q.user.clone(),
-                        state: format!("{:?}", submission::SubmissionState::from_i32(q.state).unwrap()),
+                        state: format!(
+                            "{:?}",
+                            submission::SubmissionState::from_i32(q.state).unwrap()
+                        ),
                         time: utils::render_protos_timestamp(q.timestamp.clone(), "%F %X"),
                     })
                     .collect(),
@@ -400,18 +403,25 @@ async fn contest_template(
         ))
         .await
     {
-        Ok(response) => { // TODO: timezones
+        Ok(response) => {
+            // TODO: timezones
             let res = response.into_inner().metadata;
             let contest = TemplateContest {
                 name: res.name,
                 description: res.description,
                 start_time: match res.start_time {
                     Some(t) => utils::render_protos_timestamp(t, "%FT%T"),
-                    None => utils::render_protos_timestamp((SystemTime::now()+std::time::Duration::from_secs(86400)).into(),"%FT%T"),
+                    None => utils::render_protos_timestamp(
+                        (SystemTime::now() + std::time::Duration::from_secs(86400)).into(),
+                        "%FT%T",
+                    ),
                 },
                 end_time: match res.end_time {
                     Some(t) => utils::render_protos_timestamp(t, "%FT%T"),
-                    None => utils::render_protos_timestamp((SystemTime::now()+std::time::Duration::from_secs(93600)).into(),"%FT%T"),
+                    None => utils::render_protos_timestamp(
+                        (SystemTime::now() + std::time::Duration::from_secs(93600)).into(),
+                        "%FT%T",
+                    ),
                 },
             };
             Ok(Template::render("contest", contest))
