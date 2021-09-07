@@ -237,7 +237,7 @@ async fn submission_details_template(
                             .error_message
                             .clone()
                             .unwrap_or_else(|| String::from("")),
-                        score: format!("{:?}", res.score),
+                        score: format!("{:?}", res.score), // TODO: better scores formatting
                         subtask_results: res
                             .subtask_results
                             .iter()
@@ -400,7 +400,7 @@ async fn contest_template(
         ))
         .await
     {
-        Ok(response) => {
+        Ok(response) => { // TODO: timezones
             let res = response.into_inner().metadata;
             let contest = TemplateContest {
                 name: res.name,
