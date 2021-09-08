@@ -12,7 +12,7 @@ use mongodb::{
     },
     Client, Database,
 };
-use protos::service::dispatcher::dispatcher_server::*;
+use protos::{evaluation::EvaluationResult, service::dispatcher::dispatcher_server::*};
 use protos::service::evaluation::{evaluation_server::Evaluation, GetProblemRequest};
 use protos::service::submission::submission_server::*;
 use protos::service::submission::*;
@@ -39,7 +39,7 @@ where
 
 fn expected_field(field_name: &str) -> String {
     format!(
-        "This should not happen. In this context {} is a required field in db",
+        "This should not happen. In this context, {} is a required field in db",
         field_name
     )
 }
@@ -191,6 +191,37 @@ impl SubmissionService {
     }
 }
 
+async fn evaluate_scores(mut_evaluation_result: &mut EvaluationResult, problem_id: u64) -> Result<(), Status> {
+    let problem_metadata_request = GetProblemRequest {
+        problem_id: problem_id,
+    };
+    let mock_evaluation_server = mock_services::get_mock_evaluation(problem_id);
+
+    let problem_metadata = mock_evaluation_server
+        .get_problem(Request::new(problem_metadata_request))
+        .await?
+        .into_inner();
+
+    mut_evaluation_result
+        .subtask_results
+        .iter_mut()
+        .enumerate()
+        .for_each(|(i, subtask)| {
+            evaluate_subtask_score(
+                &subtask.testcase_results,
+                &problem_metadata.info.subtasks[i].scoring,
+                &mut subtask.score,
+            );
+        });
+
+    evaluate_submission_score(
+        &mut_evaluation_result.subtask_results,
+        &mut mut_evaluation_result.score,
+    );
+
+    Ok(())
+}
+
 #[tonic::async_trait]
 impl Submission for SubmissionService {
     async fn evaluate_submission(
@@ -239,33 +270,8 @@ impl Submission for SubmissionService {
 
         // evaluate subtasks' and submission's scores starting from testcases' scores
         // and problem metadata
-        let problem_metadata_request = GetProblemRequest {
-            problem_id: submission.problem_id,
-        };
-        let mock_evaluation_server = mock_services::get_mock_evaluation(submission.problem_id);
-
-        let problem_metadata = mock_evaluation_server
-            .get_problem(Request::new(problem_metadata_request))
-            .await?
-            .into_inner();
-
         let mut mut_evaluation_result = evaluation_result.clone();
-        mut_evaluation_result
-            .subtask_results
-            .iter_mut()
-            .enumerate()
-            .for_each(|(i, subtask)| {
-                evaluate_subtask_score(
-                    &subtask.testcase_results,
-                    &problem_metadata.info.subtasks[i].scoring,
-                    &mut subtask.score,
-                );
-            });
-
-        evaluate_submission_score(
-            &mut_evaluation_result.subtask_results,
-            &mut mut_evaluation_result.score,
-        );
+        evaluate_scores(&mut mut_evaluation_result, submission.problem_id).await?;
 
         // 3) write values returned by the dispatcher into database
         //    changing the state to EVALUATED
@@ -273,18 +279,15 @@ impl Submission for SubmissionService {
         doc_updated.insert("state", SubmissionState::Evaluated as i32);
         conversions::insert_evaluation_data_into_document(&mut doc_updated, &mut_evaluation_result);
 
-        let modified_count = self
+        self
             .get_collection()
             .update_one(
-                doc_filter, // not necessary, _id is already enough
+                doc! { "_id": id },
                 doc! { "$set": doc_updated },
                 None,
             )
             .await
-            .map_err(internal_error)?
-            .modified_count;
-        // modified_count MUST be 1
-        assert_eq!(modified_count, 1u64);
+            .map_err(internal_error)?;
 
         Ok(Response::new(
             protos::service::submission::EvaluateSubmissionResponse {
@@ -345,9 +348,7 @@ impl Submission for SubmissionService {
         let opt_document = self
             .get_collection()
             .find_one(
-                doc! {
-                    "_id": convert_to_i64(submission_id)
-                },
+                doc! { "_id": convert_to_i64(submission_id) },
                 None,
             )
             .await
@@ -357,7 +358,7 @@ impl Submission for SubmissionService {
             Some(document) => {
                 let state = document
                     .get_i32("state")
-                    .expect("This should not happen. \'state\' is a required field in db");
+                    .expect(expected_field("problemId").as_str());
 
                 Ok(Response::new(GetSubmissionDetailsResponse {
                     sub: evaluation::Submission {
