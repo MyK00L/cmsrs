@@ -61,7 +61,7 @@ fn evaluate_bool_subtask_with_sum(testcases: &[TestcaseResult], max_score: f64) 
         .filter(|score| *score)
         .count() as f64;
 
-    score_with_double(correct / (testcases.len() as f64) * max_score)
+    score_with_double(correct * max_score / (testcases.len() as f64))
 }
 
 fn evaluate_double_subtask_with_min(testcases: &[TestcaseResult], max_score: f64) -> OneOfScore {
