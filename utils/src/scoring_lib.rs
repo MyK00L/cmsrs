@@ -1,7 +1,7 @@
 use core::panic;
 
 use protos::evaluation::{SubtaskResult, TestcaseResult};
-use protos::scoring::{one_of_score, OneOfScore, Subtask};
+use protos::scoring::{OneOfScore, Subtask, one_of_score};
 
 fn as_double(score: &OneOfScore) -> f64 {
     match score.score {
@@ -42,67 +42,67 @@ fn double_testcases(testcases: &[TestcaseResult]) -> bool {
 }
 
 pub fn evaluate_subtask_score(
-    testcases: Vec<TestcaseResult>,
+    testcases: &Vec<TestcaseResult>,
     scoring_method: &Subtask,
-) -> OneOfScore {
-    let testcases_acc = if boolean_testcases(&testcases) {
-        // this subtask has boolean scores
-        match scoring_method.method {
-            0 => {
-                // Min
-                match testcases
-                    .iter()
-                    .map(|t| as_bool(&t.score))
-                    .fold(true, |a, b| a & b)
-                {
-                    true => 1f64,
-                    false => 0f64,
+    result: &mut OneOfScore) {
+        let testcases_acc = if boolean_testcases(&testcases) {
+            // this subtask has boolean scores
+            match scoring_method.method {
+                0 => {
+                    // Min
+                    match testcases
+                        .iter()
+                        .map(|t| as_bool(&t.score))
+                        .fold(true, |a, b| a & b)
+                    {
+                        true => 1f64,
+                        false => 0f64,
+                    }
                 }
-            }
-            1 => {
-                // Sum
-                let correct = testcases
-                    .iter()
-                    .map(|t| as_bool(&t.score))
-                    .filter(|score| *score)
-                    .count() as f64;
+                1 => {
+                    // Sum
+                    let correct = testcases
+                        .iter()
+                        .map(|t| as_bool(&t.score))
+                        .filter(|score| *score)
+                        .count() as f64;
 
-                correct / (testcases.len() as f64)
+                    correct / (testcases.len() as f64)
+                }
+                _ => panic!(),
             }
-            _ => panic!(),
-        }
-    } else if double_testcases(&testcases) {
-        // this subtask has double scores
-        let init = match scoring_method.method {
-            0 => 1f64, // Min
-            1 => 0f64, // Sum
-            _ => panic!(),
+        } else if double_testcases(&testcases) {
+            // this subtask has double scores
+            let init = match scoring_method.method {
+                0 => 1f64, // Min
+                1 => 0f64, // Sum
+                _ => panic!(),
+            };
+
+            testcases
+                .iter()
+                .map(|t| as_double(&t.score))
+                .fold(init, |a, b| {
+                    match scoring_method.method {
+                        0 => f64::min(a, b), // Min
+                        _ => a + b,          // Sum
+                    }
+                })
+        } else {
+            panic!("The type of the testcases scores is not consinstent")
         };
 
-        testcases
-            .iter()
-            .map(|t| as_double(&t.score))
-            .fold(init, |a, b| {
-                match scoring_method.method {
-                    0 => f64::min(a, b), // Min
-                    _ => a + b,          // Sum
-                }
-            })
-    } else {
-        panic!("The type of the testcases scores is not consinstent")
-    };
-
-    score_with_double(testcases_acc * scoring_method.max_score)
+        *result = score_with_double(testcases_acc * scoring_method.max_score);
 }
 
 /// Pre:
 ///      - the score of every single subtask has already been calculated
 ///      - subtasks' scores are all double
-pub fn evaluate_submission_score(subtasks: Vec<SubtaskResult>) -> OneOfScore {
-    score_with_double(
+pub fn evaluate_submission_score(subtasks: &Vec<SubtaskResult>, result: &mut OneOfScore) {
+    *result = score_with_double(
         subtasks
             .iter()
             .map(|t| as_double(&t.score))
             .fold(0f64, |a, b| a + b),
-    )
+    );
 }

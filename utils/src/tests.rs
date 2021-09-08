@@ -7,11 +7,29 @@ use protos::evaluation::*;
 use protos::evaluation::{SubtaskResult, TestcaseResult};
 use protos::scoring::{one_of_score, subtask, OneOfScore, Subtask};
 
+fn partial_score(correct: f64, total: f64) -> f64 {
+    correct / total
+}
+
 fn get_test_time() -> std::time::SystemTime {
     std::time::UNIX_EPOCH
         + std::time::Duration::from_secs(10)
         + std::time::Duration::from_nanos(101)
 }
+
+const DOUBLE_WRONG_ANSWER: f64 = 0f64;
+const DOUBLE_CORRECT_ANSWER: f64 = 1f64;
+
+const MIN_SCORING_METHOD: Subtask = Subtask {
+    method: subtask::Method::Min as i32,
+    max_score: 100f64,
+};
+
+const SUM_SCORING_METHOD: Subtask = Subtask {
+    method: subtask::Method::Sum as i32,
+    max_score: 100f64,
+};
+
 #[test]
 fn convert_to_mongo_timestamp_and_back_test() {
     let now = std::time::UNIX_EPOCH
@@ -72,8 +90,7 @@ fn get_double_testcase(result: f64) -> TestcaseResult {
 }
 
 #[test]
-fn evaluate_bool_subtask_with_min_test() {
-    let max_score = 100f64;
+fn evaluate_wrong_bool_subtask_with_min_test() {
     let subtask_result_wrong = SubtaskResult {
         testcase_results: vec![
             get_bool_testcase(true),
@@ -86,7 +103,14 @@ fn evaluate_bool_subtask_with_min_test() {
             score: Some(one_of_score::Score::DoubleScore(0f64)),
         },
     };
+    
+    let mut score = OneOfScore::default();
+    evaluate_subtask_score(&subtask_result_wrong.testcase_results, &MIN_SCORING_METHOD, &mut score);
+    assert_eq!(score, subtask_result_wrong.score);
+}
 
+#[test]
+fn evaluate_correct_bool_subtask_with_min_test() {
     let subtask_result_correct = SubtaskResult {
         testcase_results: vec![
             get_bool_testcase(true),
@@ -96,29 +120,17 @@ fn evaluate_bool_subtask_with_min_test() {
             get_bool_testcase(true),
         ],
         score: OneOfScore {
-            score: Some(one_of_score::Score::DoubleScore(max_score)),
+            score: Some(one_of_score::Score::DoubleScore(MIN_SCORING_METHOD.max_score)),
         },
     };
 
-    let scoring_method = Subtask {
-        method: subtask::Method::Min as i32,
-        max_score: max_score,
-    };
-
-    assert_eq!(
-        evaluate_subtask_score(subtask_result_wrong.testcase_results, &scoring_method),
-        subtask_result_wrong.score
-    );
-
-    assert_eq!(
-        evaluate_subtask_score(subtask_result_correct.testcase_results, &scoring_method),
-        subtask_result_correct.score
-    );
+    let mut score = OneOfScore::default();
+    evaluate_subtask_score(&subtask_result_correct.testcase_results, &MIN_SCORING_METHOD, &mut score);
+    assert_eq!(score, subtask_result_correct.score);
 }
 
 #[test]
-fn evaluate_bool_subtask_with_sum_test() {
-    let max_score = 100f64;
+fn evaluate_wrong_bool_subtask_with_sum_test() {
     let subtask_result_wrong = SubtaskResult {
         testcase_results: vec![
             get_bool_testcase(false),
@@ -132,6 +144,13 @@ fn evaluate_bool_subtask_with_sum_test() {
         },
     };
 
+    let mut score = OneOfScore::default();
+    evaluate_subtask_score(&subtask_result_wrong.testcase_results, &SUM_SCORING_METHOD, &mut score);
+    assert_eq!(score, subtask_result_wrong.score);
+}
+
+#[test]
+fn evaluate_partial_bool_subtask_with_sum_test() {
     let subtask_result_partial = SubtaskResult {
         testcase_results: vec![
             get_bool_testcase(false),
@@ -141,10 +160,17 @@ fn evaluate_bool_subtask_with_sum_test() {
             get_bool_testcase(true),
         ],
         score: OneOfScore {
-            score: Some(one_of_score::Score::DoubleScore(max_score * 3f64 / 5f64)),
+            score: Some(one_of_score::Score::DoubleScore(SUM_SCORING_METHOD.max_score * 3f64 / 5f64)),
         },
     };
 
+    let mut score = OneOfScore::default();
+    evaluate_subtask_score(&subtask_result_partial.testcase_results, &SUM_SCORING_METHOD, &mut score);
+    assert_eq!(score, subtask_result_partial.score);
+}
+
+#[test]
+fn evaluate_correct_bool_subtask_with_sum_test() {
     let subtask_result_correct = SubtaskResult {
         testcase_results: vec![
             get_bool_testcase(true),
@@ -154,169 +180,142 @@ fn evaluate_bool_subtask_with_sum_test() {
             get_bool_testcase(true),
         ],
         score: OneOfScore {
-            score: Some(one_of_score::Score::DoubleScore(max_score)),
+            score: Some(one_of_score::Score::DoubleScore(SUM_SCORING_METHOD.max_score)),
         },
     };
 
-    let scoring_method = Subtask {
-        method: subtask::Method::Sum as i32,
-        max_score: max_score,
-    };
-
-    assert_eq!(
-        evaluate_subtask_score(subtask_result_wrong.testcase_results, &scoring_method),
-        subtask_result_wrong.score
-    );
-
-    assert_eq!(
-        evaluate_subtask_score(subtask_result_partial.testcase_results, &scoring_method),
-        subtask_result_partial.score
-    );
-
-    assert_eq!(
-        evaluate_subtask_score(subtask_result_correct.testcase_results, &scoring_method),
-        subtask_result_correct.score
-    );
+    let mut score = OneOfScore::default();
+    evaluate_subtask_score(&subtask_result_correct.testcase_results, &SUM_SCORING_METHOD, &mut score);
+    assert_eq!(score, subtask_result_correct.score);
 }
 
 #[test]
-fn evaluate_double_subtask_with_sum_test() {
-    let num_of_tests = 5f64;
-    let max_score = 100f64;
-    let partial_score = |correct: f64, total: f64| correct / total;
-    let wrong_answer = 0f64;
-    let correct_answer = 1f64;
+fn evaluate_wrong_double_subtask_with_sum_test() {
     let subtask_result_wrong = SubtaskResult {
         testcase_results: vec![
-            get_double_testcase(wrong_answer),
-            get_double_testcase(wrong_answer),
-            get_double_testcase(wrong_answer),
-            get_double_testcase(wrong_answer),
-            get_double_testcase(wrong_answer),
+            get_double_testcase(DOUBLE_WRONG_ANSWER),
+            get_double_testcase(DOUBLE_WRONG_ANSWER),
+            get_double_testcase(DOUBLE_WRONG_ANSWER),
+            get_double_testcase(DOUBLE_WRONG_ANSWER),
+            get_double_testcase(DOUBLE_WRONG_ANSWER),
         ],
         score: OneOfScore {
-            score: Some(one_of_score::Score::DoubleScore(wrong_answer)),
+            score: Some(one_of_score::Score::DoubleScore(DOUBLE_WRONG_ANSWER)),
         },
     };
 
+    let mut score = OneOfScore::default();
+    evaluate_subtask_score(&subtask_result_wrong.testcase_results, &SUM_SCORING_METHOD, &mut score);
+    assert_eq!(score, subtask_result_wrong.score);
+}
+
+#[test]
+fn evaluate_partial_double_subtask_with_sum_test() {
+    let num_of_testcases = 5f64;
     let subtask_result_partial = SubtaskResult {
         testcase_results: vec![
-            get_double_testcase(partial_score(2f64, 5f64) / num_of_tests),
-            get_double_testcase(partial_score(3f64, 5f64) / num_of_tests),
-            get_double_testcase(wrong_answer),
-            get_double_testcase(correct_answer / num_of_tests),
-            get_double_testcase(partial_score(1f64, 5f64) / num_of_tests),
+            get_double_testcase(partial_score(2f64, 5f64) / num_of_testcases),
+            get_double_testcase(partial_score(3f64, 5f64) / num_of_testcases),
+            get_double_testcase(DOUBLE_WRONG_ANSWER),
+            get_double_testcase(DOUBLE_CORRECT_ANSWER / num_of_testcases),
+            get_double_testcase(partial_score(1f64, 5f64) / num_of_testcases),
         ],
         score: OneOfScore {
             score: Some(one_of_score::Score::DoubleScore(
-                max_score
-                    * ((correct_answer + partial_score(2f64 + 3f64 + 1f64, 5f64)) / num_of_tests),
+                SUM_SCORING_METHOD.max_score
+                    * ((DOUBLE_CORRECT_ANSWER + partial_score(2f64 + 3f64 + 1f64, 5f64)) / num_of_testcases),
             )),
         },
     };
 
-    let subtask_result_correct = SubtaskResult {
-        testcase_results: vec![
-            get_double_testcase(correct_answer / num_of_tests),
-            get_double_testcase(correct_answer / num_of_tests),
-            get_double_testcase(correct_answer / num_of_tests),
-            get_double_testcase(correct_answer / num_of_tests),
-            get_double_testcase(correct_answer / num_of_tests),
-        ],
-        score: OneOfScore {
-            score: Some(one_of_score::Score::DoubleScore(max_score)),
-        },
-    };
-
-    let scoring_method = Subtask {
-        method: subtask::Method::Sum as i32,
-        max_score: max_score,
-    };
-
-    assert_eq!(
-        evaluate_subtask_score(subtask_result_wrong.testcase_results, &scoring_method),
-        subtask_result_wrong.score
-    );
-
-    let got = evaluate_subtask_score(subtask_result_partial.testcase_results, &scoring_method);
-    let expected = subtask_result_partial.score;
-
-    println!("got: {0:?}, expected: {1:?}", got, expected);
+    let mut score = OneOfScore::default();
+    evaluate_subtask_score(&subtask_result_partial.testcase_results, &SUM_SCORING_METHOD, &mut score);
+    println!("got: {0:?}, expected: {1:?}", score, subtask_result_partial.score);
     // FLOATING POINT ERROR
-    assert_eq!(got, expected);
-
-    assert_eq!(
-        evaluate_subtask_score(subtask_result_correct.testcase_results, &scoring_method),
-        subtask_result_correct.score
-    );
+    assert_eq!(score, subtask_result_partial.score);
 }
 
 #[test]
-fn evaluate_double_subtask_with_min_test() {
-    let max_score = 100f64;
-    let partial_score = |correct: f64, total: f64| correct / total;
-    let wrong_answer = 0f64;
-    let correct_answer = 1f64;
-    let subtask_result_wrong = SubtaskResult {
+fn evaluate_correct_double_subtask_with_sum_test() {
+    let num_of_testcases = 5f64;
+    let subtask_result_correct = SubtaskResult {
         testcase_results: vec![
-            get_double_testcase(partial_score(3f64, 4f64)),
-            get_double_testcase(wrong_answer),
-            get_double_testcase(partial_score(1f64, 4f64)),
-            get_double_testcase(correct_answer),
-            get_double_testcase(correct_answer),
+            get_double_testcase(DOUBLE_CORRECT_ANSWER / num_of_testcases),
+            get_double_testcase(DOUBLE_CORRECT_ANSWER / num_of_testcases),
+            get_double_testcase(DOUBLE_CORRECT_ANSWER / num_of_testcases),
+            get_double_testcase(DOUBLE_CORRECT_ANSWER / num_of_testcases),
+            get_double_testcase(DOUBLE_CORRECT_ANSWER / num_of_testcases),
         ],
         score: OneOfScore {
-            score: Some(one_of_score::Score::DoubleScore(wrong_answer)),
+            score: Some(one_of_score::Score::DoubleScore(SUM_SCORING_METHOD.max_score)),
         },
     };
 
+    let mut score = OneOfScore::default();
+    evaluate_subtask_score(&subtask_result_correct.testcase_results, &SUM_SCORING_METHOD, &mut score);
+    assert_eq!(score, subtask_result_correct.score);
+}
+
+#[test]
+fn evaluate_wrong_double_subtask_with_min_test() {
+    let subtask_result_wrong = SubtaskResult {
+        testcase_results: vec![
+            get_double_testcase(partial_score(3f64, 4f64)),
+            get_double_testcase(DOUBLE_WRONG_ANSWER),
+            get_double_testcase(partial_score(1f64, 4f64)),
+            get_double_testcase(DOUBLE_CORRECT_ANSWER),
+            get_double_testcase(DOUBLE_CORRECT_ANSWER),
+        ],
+        score: OneOfScore {
+            score: Some(one_of_score::Score::DoubleScore(DOUBLE_WRONG_ANSWER)),
+        },
+    };
+
+    let mut score = OneOfScore::default();
+    evaluate_subtask_score(&subtask_result_wrong.testcase_results, &MIN_SCORING_METHOD, &mut score);
+    assert_eq!(score, subtask_result_wrong.score);
+}
+
+#[test]
+fn evaluate_partial_double_subtask_with_min_test() {
     let subtask_result_partial = SubtaskResult {
         testcase_results: vec![
             get_double_testcase(partial_score(1f64, 5f64)),
             get_double_testcase(partial_score(2f64, 5f64)),
             get_double_testcase(partial_score(3f64, 5f64)),
             get_double_testcase(partial_score(4f64, 5f64)),
-            get_double_testcase(correct_answer),
+            get_double_testcase(DOUBLE_CORRECT_ANSWER),
         ],
         score: OneOfScore {
             score: Some(one_of_score::Score::DoubleScore(
-                max_score * partial_score(1f64, 5f64),
+                MIN_SCORING_METHOD.max_score * partial_score(1f64, 5f64),
             )),
         },
     };
 
+    let mut score = OneOfScore::default();
+    evaluate_subtask_score(&subtask_result_partial.testcase_results, &MIN_SCORING_METHOD, &mut score);
+    assert_eq!(score, subtask_result_partial.score);
+}
+
+#[test]
+fn evaluate_correct_double_subtask_with_min_test() {
     let subtask_result_correct = SubtaskResult {
         testcase_results: vec![
-            get_double_testcase(correct_answer),
-            get_double_testcase(correct_answer),
-            get_double_testcase(correct_answer),
-            get_double_testcase(correct_answer),
-            get_double_testcase(correct_answer),
+            get_double_testcase(DOUBLE_CORRECT_ANSWER),
+            get_double_testcase(DOUBLE_CORRECT_ANSWER),
+            get_double_testcase(DOUBLE_CORRECT_ANSWER),
+            get_double_testcase(DOUBLE_CORRECT_ANSWER),
+            get_double_testcase(DOUBLE_CORRECT_ANSWER),
         ],
         score: OneOfScore {
-            score: Some(one_of_score::Score::DoubleScore(max_score)),
+            score: Some(one_of_score::Score::DoubleScore(MIN_SCORING_METHOD.max_score)),
         },
     };
 
-    let scoring_method = Subtask {
-        method: subtask::Method::Min as i32,
-        max_score: max_score,
-    };
-
-    assert_eq!(
-        evaluate_subtask_score(subtask_result_wrong.testcase_results, &scoring_method),
-        subtask_result_wrong.score
-    );
-
-    assert_eq!(
-        evaluate_subtask_score(subtask_result_partial.testcase_results, &scoring_method),
-        subtask_result_partial.score
-    );
-
-    assert_eq!(
-        evaluate_subtask_score(subtask_result_correct.testcase_results, &scoring_method),
-        subtask_result_correct.score
-    );
+    let mut score = OneOfScore::default();
+    evaluate_subtask_score(&subtask_result_correct.testcase_results, &MIN_SCORING_METHOD, &mut score);
+    assert_eq!(score, subtask_result_correct.score);
 }
 
 #[test]
@@ -358,14 +357,13 @@ fn evaluate_submission_score_test() {
         )),
     };
 
-    assert_eq!(
-        evaluate_submission_score(vec![
-            subtask_result_correct.clone(),
-            subtask_result_correct.clone(),
-            subtask_result_wrong.clone(),
-            subtask_result_wrong.clone(),
-            subtask_result_correct
-        ]),
-        submission_score
-    );
+    let mut score = OneOfScore::default();
+    evaluate_submission_score(&vec![
+        subtask_result_correct.clone(),
+        subtask_result_correct.clone(),
+        subtask_result_wrong.clone(),
+        subtask_result_wrong.clone(),
+        subtask_result_correct
+    ], &mut score);
+    assert_eq!(score, submission_score);
 }
