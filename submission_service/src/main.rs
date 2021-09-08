@@ -1,27 +1,34 @@
-#![recursion_limit="256"]
+#![recursion_limit = "256"]
 
-use rand::{Rng};
 use core::panic;
-use std::time::SystemTime;
 
 use futures::stream::StreamExt;
 
-#[path="mappings.rs"] // TODO fix this 
-pub mod mappings;
-use ::utils::{gen_uuid, mongo::*};
-use mongodb::{Client, Database, bson::{Binary, Bson, Document, bson, doc, spec::{BinarySubtype, ElementType}}, options::{ClientOptions, CreateCollectionOptions, FindOptions, ValidationAction, ValidationLevel}};
-use protos::{*, self, common::Resources, evaluation::{CompilationResult, EvaluationResult, SubtaskResult, TestcaseResult, compilation_result, testcase_result}, service::{dispatcher::{EvaluateSubmissionResponse, MockDispatcher}}};
-use protos::service::submission::*;
-use protos::scoring::*;
+use ::utils::scoring_lib::{evaluate_submission_score, evaluate_subtask_score};
+use mongodb::{
+    bson::{doc, Bson, Document},
+    options::{
+        ClientOptions, CreateCollectionOptions, FindOptions, ValidationAction, ValidationLevel,
+    },
+    Client, Database,
+};
+use protos::service::evaluation::{evaluation_server::Evaluation, GetProblemRequest};
 use protos::service::submission::submission_server::*;
-use protos::service::dispatcher::dispatcher_server::*;
+use protos::service::submission::*;
 use protos::utils::*;
-use tonic::{Request, Response, Status, transport::*};
+use protos::{self, *};
+use protos::{evaluation::EvaluationResult, service::dispatcher::dispatcher_server::*};
+use tonic::{transport::*, Request, Response, Status};
+
+mod mappings;
+
+mod conversions;
+
+mod mock_services;
 
 #[cfg(test)]
 mod tests;
 
-const DUMMY_MESSAGE: String = String::new();
 // TODO: remove credentials to connect to db.
 const CONNECTION_STRING: &str = "mongodb://root:example@submission_service_db:27017/";
 
@@ -33,7 +40,14 @@ where
 }
 
 fn expected_field(field_name: &str) -> String {
-    format!("This should not happen. In this context {} is a required field in db", field_name)
+    format!(
+        "This should not happen. In this context, {} is a required field in db",
+        field_name
+    )
+}
+
+fn convert_to_i64(x: u64) -> i64 {
+    x as i64
 }
 
 async fn init_contest_service_db(db: Database) -> Result<(), Box<dyn std::error::Error>> {
@@ -156,7 +170,7 @@ async fn init_contest_service_db(db: Database) -> Result<(), Box<dyn std::error:
             .build()
     )
     .await?;
-    
+
     db.create_collection(
         "submissions-serde-test",
         CreateCollectionOptions::builder()
@@ -287,9 +301,7 @@ impl SubmissionService {
     async fn new() -> Result<Self, Box<dyn std::error::Error>> {
         let db_client = Client::with_options(ClientOptions::parse(CONNECTION_STRING).await?)?;
         init_contest_service_db(db_client.database("submissionsdb")).await?;
-        Ok(Self {
-            db_client: db_client,
-        })
+        Ok(Self { db_client })
     }
 
     fn get_collection(&self) -> mongodb::Collection<Document> {
@@ -305,383 +317,116 @@ impl SubmissionService {
     }
 }
 
-fn score_option_bson_to_struct(opt_bson_score: Option<&Bson>, expected: bool, expect_message: String) -> OneOfScore {
-    OneOfScore {
-        score: 
-            if let Some(bson_score) = opt_bson_score {
-                match bson_score.element_type() {
-                    ElementType::Double => 
-                        Some(one_of_score::Score::DoubleScore(bson_score.as_f64().unwrap())),
-                    ElementType::Boolean =>
-                        Some(one_of_score::Score::BoolScore(bson_score.as_bool().unwrap())),
-                    _ => panic! ("score cannot have this type")
-                }
-            } else {
-                if expected {
-                    panic!("{}", expect_message.as_str())
-                } else {
-                    None
-                }
-            }
-    }
-}
+async fn evaluate_scores(
+    mut_evaluation_result: &mut EvaluationResult,
+    problem_id: u64,
+) -> Result<(), Status> {
+    let problem_metadata_request = GetProblemRequest { problem_id };
+    let mock_evaluation_server = mock_services::get_mock_evaluation(problem_id);
 
-fn score_struct_to_bson(score_struct: OneOfScore) -> Option<Bson> {
-    match score_struct.score {
-        Some(one_of_score::Score::DoubleScore(double_score)) => Some(Bson::Double(double_score)), 
-        Some(one_of_score::Score::BoolScore(bool_score)) => Some(Bson::Boolean(bool_score)), 
-        _ => None
-    }
-}
+    let problem_metadata = mock_evaluation_server
+        .get_problem(Request::new(problem_metadata_request))
+        .await?
+        .into_inner();
 
-fn get_item_from_doc(doc: Document) -> get_submission_list_response::Item {
-    get_submission_list_response::Item{
-        submission_id: doc.get_i64("_id").unwrap() as u64,
-        user: doc.get_str("user").unwrap().to_string(),
-        problem_id: doc.get_i64("problemId").unwrap() as u64,
-        timestamp: timestamp_to_systime(doc.get_timestamp("created").unwrap()).into(),
-        state: doc.get_i32("state").expect(expected_field("state").as_str()),
-        score: score_option_bson_to_struct(doc.get("overallScore"), false, DUMMY_MESSAGE)
-    }
-}
-
-fn convert_to_i64(x: u64) -> i64 {
-    x as i64
-}
-
-fn create_pending_submission_document(submission: evaluation::Submission) -> Document {
-    doc! {
-        "_id": convert_to_i64(gen_uuid()),
-        "user": submission.user,
-        "problemId": submission.problem_id as i64,
-        "created": systime_to_timestamp(SystemTime::now()),
-        "source": Bson::Binary(Binary {
-                subtype: BinarySubtype::Generic,
-                bytes: submission.source.code
-        }),
-        "state": SubmissionState::Pending as i32,
-        "programmingLanguage": submission.source.lang
-    }
-}
-
-fn duration_to_time_ns(duration: common::Duration) -> i64 {
-    if duration.secs > (i32::MAX as u64) {
-        (i32::MAX as i64) * 1_000_000_000 + (duration.nanos as i64)
-    } else {
-        (duration.secs as i64)* 1_000_000_000 + (duration.nanos as i64)
-    }
-}
-
-fn time_ns_to_duration(time_ns: i64) -> common::Duration {
-    common::Duration { 
-        secs: (time_ns / 1_000_000_000) as u64, 
-        nanos: (time_ns % 1_000_000_000) as u32
-    }
-}
-
-fn compilation_data_to_db_obj(compilation_result: CompilationResult) -> Bson {
-    let mut db_obj_document = doc! {
-        "outcome": compilation_result.outcome,
-        "timeNs": duration_to_time_ns(compilation_result.used_resources.time),
-        "memoryB": convert_to_i64(compilation_result.used_resources.memory_bytes),
-    };
-    if let Some(err_msg) = compilation_result.error_message {
-        db_obj_document.insert("error", err_msg);
-    }
-    db_obj_document.into()
-}
-
-fn testcase_data_to_db_obj(testcase_data: &TestcaseResult) -> Bson {
-    bson! ({
-        "outcome": testcase_data.outcome,
-        "score": score_struct_to_bson(testcase_data.score.clone()).unwrap(),
-        "timeNs": duration_to_time_ns(testcase_data.used_resources.time.clone()),
-        "memoryB": convert_to_i64(testcase_data.used_resources.memory_bytes)
-    })
-}
-
-fn subtask_data_to_db_obj(subtask_data: &SubtaskResult) -> Bson {
-    bson! ({
-        "subtaskScore": score_struct_to_bson(subtask_data.score.clone()),// TODO instead of this, we should invoke the lib function to calculate the submission score
-        "testcases": 
-            subtask_data.testcase_results
-                .iter()
-                .map(|testcase_data| testcase_data_to_db_obj(testcase_data))
-                .collect::<Bson>()
-    })
-}
-
-fn insert_evaluation_data_into_document(
-    doc_updated: &mut Document, 
-    evaluation_result: &EvaluationResult) {
-        doc_updated.insert("compilation", compilation_data_to_db_obj(evaluation_result.compilation_result.clone()));
-        if evaluation_result.compilation_result.outcome == compilation_result::Outcome::Success as i32 {
-            // if compilation succeeded, then fill evaluation and score fields
-            doc_updated.insert("evaluation", 
-                bson! ({
-                    "subtasks": 
-                        evaluation_result.subtask_results 
-                            .clone()
-                            .iter()
-                            .map(|subtask_data| {
-                                subtask_data_to_db_obj(subtask_data)
-                            })
-                            .collect::<Bson>()
-                })
+    mut_evaluation_result
+        .subtask_results
+        .iter_mut()
+        .enumerate()
+        .for_each(|(i, subtask)| {
+            evaluate_subtask_score(
+                &subtask.testcase_results,
+                &problem_metadata.info.subtasks[i].scoring,
+                &mut subtask.score,
             );
+        });
 
-            // TODO instead of this, we should invoke the lib function to calculate the submission score
-            doc_updated.insert(
-                "overallScore", 
-                score_struct_to_bson(evaluation_result.score.clone())
-                    .expect("This should not happen. Dispatcher should guarantee 
-                        that score exists if compilation succeeded."));
-        } else {
-            doc_updated.insert("overallScore", Bson::Double(0f64));
-        }
-}
+    evaluate_submission_score(
+        &mut_evaluation_result.subtask_results,
+        &mut mut_evaluation_result.score,
+    );
 
-fn compilation_doc_to_struct(compilation_doc: &Document) -> CompilationResult {
-    CompilationResult {
-        outcome: compilation_doc.get_i32("outcome").expect(expected_field("compilation").as_str()),
-        used_resources: Resources {
-            time: time_ns_to_duration(compilation_doc.get_i64("timeNs").expect(expected_field("timeNs").as_str())),
-            memory_bytes: compilation_doc.get_i64("memoryB").expect(expected_field("memoryB").as_str()) as u64,
-        },
-        error_message: 
-            match compilation_doc.get("error") {
-                Some(bson_string) => Some(
-                    bson_string.as_str()
-                        .expect("This should not happen. \'error\' must be stored as Bson::String")
-                        .to_string()
-                        .clone() // necessary?
-                    ),
-                None => None
-            }
-    }
-}
-
-fn single_testcase_db_to_struct(testcase_doc: &Document) -> TestcaseResult {
-    TestcaseResult {
-        outcome:
-            testcase_doc.get_i32("outcome").expect(expected_field("outcome").as_str()),
-        used_resources: Resources {
-            time: time_ns_to_duration(testcase_doc.get_i64("timeNs").expect(expected_field("timeNs").as_str())),
-            memory_bytes: testcase_doc.get_i64("memoryB").expect(expected_field("memoryB").as_str()) as u64,
-        },
-        score:
-            score_option_bson_to_struct(testcase_doc.get("score"), true, expected_field("score")) // expected
-    }
-}
-
-fn single_subtask_db_to_struct(subtask_doc: &Document) -> SubtaskResult {
-    let subtask_score_bson = subtask_doc.get("subtaskScore")
-        .expect(expected_field("subtaskScore").as_str());
-    
-    SubtaskResult {
-        testcase_results: subtask_doc.get_array("testcases")
-            .expect(expected_field("testcases").as_str())
-            .into_iter()
-            .map(|bson_testcase| {
-                let testcase = bson_testcase.as_document()
-                    .unwrap(); 
-                single_testcase_db_to_struct(testcase)
-            })
-            .collect::<Vec<TestcaseResult>>(),
-        score: 
-            score_option_bson_to_struct(Some(subtask_score_bson), false, DUMMY_MESSAGE)
-    }
-}
-
-fn subtasks_db_to_struct(evaluation_doc: &Document) -> Vec<SubtaskResult> {
-    evaluation_doc.get_array("subtasks")
-        .expect(expected_field("subtasks").as_str())
-        .into_iter()
-        .map(|bson_subtask| {
-            let subtask = bson_subtask.as_document()
-                .unwrap(); 
-            single_subtask_db_to_struct(subtask)
-        })
-        .collect::<Vec<SubtaskResult>>()
-}
-
-fn document_to_evaluation_result_struct(submission_doc: Document) -> EvaluationResult {
-    let compilation_result_struct = compilation_doc_to_struct(
-        submission_doc.get("compilation")
-            .expect(expected_field("compilation").as_str())
-            .as_document()
-            .unwrap()
-        );
-    let compilation_succeeded = compilation_result_struct.outcome == 1i32;
-    EvaluationResult {
-        compilation_result: compilation_result_struct,
-        subtask_results: 
-            if compilation_succeeded {
-                subtasks_db_to_struct(
-                    submission_doc.get("evaluation")
-                        .expect(expected_field("evaluation").as_str())
-                        .as_document()
-                        .unwrap()
-
-                )
-            } else {
-                vec![]
-            },
-        score: 
-            score_option_bson_to_struct(submission_doc.get("overallScore"), true, expected_field("overallScore")) // expected
-    }
-
-}
-
-fn generate_testcase_result() -> TestcaseResult {
-    let mut gen = rand::thread_rng();
-    let outcome = gen.gen::<i32>().checked_abs().unwrap_or(0) % 6;
-    TestcaseResult {
-        outcome: outcome,
-        score: if outcome == testcase_result::Outcome::Ok as i32 {
-            OneOfScore { score: Some(one_of_score::Score::BoolScore(true)) }
-        } else {
-            OneOfScore { score: Some(one_of_score::Score::BoolScore(false)) }
-        },
-        used_resources: Resources { time: time_ns_to_duration(gen.gen()), memory_bytes: gen.gen() },
-    }
-}
-
-fn generate_subtask_result() -> SubtaskResult {
-    SubtaskResult {
-        testcase_results: vec![
-            generate_testcase_result(),
-            generate_testcase_result(),
-            generate_testcase_result(),
-            generate_testcase_result(),
-            generate_testcase_result()
-        ],
-        score: OneOfScore { score: Some(one_of_score::Score::DoubleScore(0f64)) } // TODO this must be calculated with the lib function
-    }
+    Ok(())
 }
 
 #[tonic::async_trait]
 impl Submission for SubmissionService {
     async fn evaluate_submission(
-        &self, 
-        request: Request<EvaluateSubmissionRequest>
-    ) -> Result<Response<protos::service::submission::EvaluateSubmissionResponse>, Status> { 
-        // TODO is grpcurl gives default value to proto required fields, when not specified
+        &self,
+        request: Request<EvaluateSubmissionRequest>,
+    ) -> Result<Response<protos::service::submission::EvaluateSubmissionResponse>, Status> {
         let evaluate_submission_request = request.into_inner();
         let submission = evaluate_submission_request.sub;
         // 1) write into dabatase with Pending state
-        
-        let doc_filter = create_pending_submission_document(submission.clone());
+
+        let doc_filter = conversions::create_pending_submission_document(submission.clone());
         let id = doc_filter.get_i64("_id").unwrap();
 
-        self
-            .get_collection()
+        self.get_collection()
             .insert_one(doc_filter.clone(), None)
             .await
             .map_err(internal_error)?;
 
-	    // 2) redirect request to the dispatcher and await response
-        let mut mock_dispatcher = MockDispatcher::default();
-        
-        mock_dispatcher.evaluate_submission_set(
-            EvaluateSubmissionResponse {
-                res: EvaluationResult {
-                    compilation_result: CompilationResult { 
-                        outcome: compilation_result::Outcome::Success as i32,
-                        used_resources: Resources { 
-                            time: time_ns_to_duration(1), 
-                            memory_bytes: 1u64 
-                        },
-                        error_message: None
-                    },
-                    subtask_results: vec![
-                        generate_subtask_result(),
-                        generate_subtask_result(),
-                        generate_subtask_result(),
-                        generate_subtask_result(),
-                        generate_subtask_result(),
-                        generate_subtask_result()
-                    ],
-                    score: OneOfScore { score: Some(one_of_score::Score::DoubleScore(0f64)) }, // TODO this must be calculated with the lib function
+        // 2) redirect request to the dispatcher and await response
+        let mock_dispatcher = mock_services::get_mock_dispatcher();
+
+        let evaluation_result = match mock_dispatcher
+            .evaluate_submission(Request::new(
+                protos::service::dispatcher::EvaluateSubmissionRequest {
+                    sub: submission.clone(),
                 },
+            ))
+            .await
+        {
+            Ok(evaluated) => evaluated.into_inner().res,
+            Err(err) => {
+                // update state of the submission in the database to ABORTED
+                let mut doc_updated = doc_filter.clone();
+                doc_updated.insert("state", SubmissionState::Aborted as i32);
+
+                doc_updated.insert("overallScore", 0f64);
+
+                self.get_collection()
+                    .update_one(doc_filter, doc! { "$set": doc_updated }, None)
+                    .await
+                    .map_err(internal_error)?;
+
+                return Err(err);
             }
-        );
+        };
 
-        let evaluation_result = 
-            match mock_dispatcher.evaluate_submission(
-                Request::new(
-                    protos::service::dispatcher::EvaluateSubmissionRequest {
-                        sub: submission,
-                    }
-                )
-            )
-            .await {
-                Ok(evaluated) => evaluated.into_inner().res,
-                Err(err) => {
-                    // update state of the submission in the database to ABORTED 
-                    let mut doc_updated = doc_filter.clone();
-                    doc_updated.insert("state", SubmissionState::Aborted as i32);
-                    
-                    // set overall_score to 0?
+        // evaluate subtasks' and submission's scores starting from testcases' scores
+        // and problem metadata
+        let mut mut_evaluation_result = evaluation_result.clone();
+        evaluate_scores(&mut mut_evaluation_result, submission.problem_id).await?;
 
-                    self
-                        .get_collection()
-                        .update_one(
-                            doc_filter,
-                            doc! { "$set": doc_updated },
-                            None
-                        )
-                        .await
-                        .map_err(internal_error)?;
-
-                    return Err(err);
-                }
-            };
-
-        // TODO invoke RPC of evaluation service for scoring details
-        // from the Dispatcher I get the scores of the testcases
-
-        // lib function for calculating subtask scores starting from the testcases' scores
-        // lib function for calculating submission score starting from subtasks' scores 
-
-	    // 3) write values returned by the dispatcher into database
-	    //    changing the state to EVALUATED
+        // 3) write values returned by the dispatcher into database
+        //    changing the state to EVALUATED
         let mut doc_updated = doc_filter.clone();
         doc_updated.insert("state", SubmissionState::Evaluated as i32);
-        insert_evaluation_data_into_document(&mut doc_updated, &evaluation_result);
+        conversions::insert_evaluation_data_into_document(&mut doc_updated, &mut_evaluation_result);
 
-        let modified_count = self
-            .get_collection()
-            .update_one(
-                doc_filter, // not necessary, _id is already enough
-                doc! { "$set": doc_updated },
-                None
-            )
+        self.get_collection()
+            .update_one(doc! { "_id": id }, doc! { "$set": doc_updated }, None)
             .await
-            .map_err(internal_error)?
-            .modified_count;
-        // modified_count MUST be 1
-        assert_eq!(modified_count, 1u64);
+            .map_err(internal_error)?;
 
         Ok(Response::new(
             protos::service::submission::EvaluateSubmissionResponse {
-                res: evaluation_result,
+                res: mut_evaluation_result,
                 submission_id: id as u64,
-            }
+            },
         ))
     }
 
-    /*
-    get_submission_list --> based on the author, we keep an index on user
-    */
     async fn get_submission_list(
         &self,
-        request: Request<GetSubmissionListRequest>
-    ) -> Result<Response<GetSubmissionListResponse>, Status> { 
+        request: Request<GetSubmissionListRequest>,
+    ) -> Result<Response<GetSubmissionListResponse>, Status> {
         let list_request = request.into_inner();
-        let opt_limit = list_request.limit.clone();
+        let opt_limit = list_request.limit;
         let opt_user = list_request.user.clone();
-        let opt_problem_id = list_request.problem_id.clone();
+        let opt_problem_id = list_request.problem_id;
 
         let mut doc_filter = Document::new();
         if let Some(user) = opt_user {
@@ -695,94 +440,85 @@ impl Submission for SubmissionService {
             .get_collection()
             .find(
                 doc_filter,
-                FindOptions::builder().limit( 
-                    opt_limit.map(|limit| limit as i64)
-                ).build()
+                FindOptions::builder()
+                    .limit(opt_limit.map(|limit| limit as i64))
+                    .build(),
             )
             .await
             .map_err(internal_error)?
             .filter(|opt_submission| futures::future::ready(opt_submission.is_ok()))
-            .map(|some_submission| { 
-                match some_submission {
-                    Ok(submission) => Some(get_item_from_doc(submission)),
-                    Err(_) => None
-                }
+            .map(|some_submission| match some_submission {
+                Ok(submission) => Some(conversions::get_item_from_doc(submission)),
+                Err(_) => None,
             })
             .filter(|opt_item| futures::future::ready(opt_item.is_some()))
             .map(|some_item| some_item.unwrap())
             .collect::<Vec<_>>()
             .await;
 
-        Ok(Response::new(
-            GetSubmissionListResponse {
-                list: submissions
-            }
-        ))
+        Ok(Response::new(GetSubmissionListResponse {
+            list: submissions,
+        }))
     }
 
     async fn get_submission_details(
         &self,
-        request: Request<GetSubmissionDetailsRequest>
+        request: Request<GetSubmissionDetailsRequest>,
     ) -> Result<Response<GetSubmissionDetailsResponse>, Status> {
         let submission_details_request = request.into_inner();
         let submission_id = submission_details_request.submission_id;
         let opt_document = self
             .get_collection()
-            .find_one(
-                doc! {
-                    "_id": convert_to_i64(submission_id)
-                }, 
-                None
-            )
+            .find_one(doc! { "_id": convert_to_i64(submission_id) }, None)
             .await
             .map_err(internal_error)?;
-        
+
         match opt_document {
             Some(document) => {
-                let state = document.get_i32("state")
-                    .expect("This should not happen. \'state\' is a required field in db");
-                
-                Ok(Response::new(
-                    GetSubmissionDetailsResponse {
-                        sub: evaluation::Submission {
-                            user: document.get_str("user")
-                                .expect(expected_field("user").as_str())
-                                .to_string(),
-                            problem_id: document.get_i64("problemId")
-                                .expect(expected_field("problemId").as_str()) as u64,
-                            source: common::Source {
-                                lang:
-                                    document.get_i32("programmingLanguage")
-                                        .expect(expected_field("programmingLanguage").as_str()),
-                                code: {
-                                    let bson_source = document.get("source")
-                                        .expect(expected_field("source").as_str());
-                                    match bson_source {
+                let state = document
+                    .get_i32("state")
+                    .unwrap_or_else(|_| panic!("{}", expected_field("problemId")));
+
+                Ok(Response::new(GetSubmissionDetailsResponse {
+                    sub: evaluation::Submission {
+                        user: document
+                            .get_str("user")
+                            .unwrap_or_else(|_| panic!("{}", expected_field("user")))
+                            .to_string(),
+                        problem_id: document
+                            .get_i64("problemId")
+                            .unwrap_or_else(|_| panic!("{}", expected_field("problemId")))
+                            as u64,
+                        source: common::Source {
+                            lang: document.get_i32("programmingLanguage").unwrap_or_else(|_| {
+                                panic!("{}", expected_field("programmingLanguage"))
+                            }),
+                            code: {
+                                let bson_source = document
+                                    .get("source")
+                                    .unwrap_or_else(|| panic!("{}", expected_field("source")));
+                                match bson_source {
                                         Bson::Binary(bin_data) => bin_data.bytes.clone(),
                                         _ => panic!("This should not happen. \'source\' must be stored as Bson::Binary"),
-                                    } 
-                                }
-                            }
+                                    }
+                            },
                         },
-                        state: state,
-                        res: if state == SubmissionState::Evaluated as i32 {
-                                Some(document_to_evaluation_result_struct(document))
-                            } else {
-                                None
-                            }
-                    }
-                ))
-            },
-            None => {
-                Err(Status::new(
-                    tonic::Code::NotFound,
-                    "Submission id provided is not present in database"
-                ))
+                    },
+                    state,
+                    res: if state == SubmissionState::Evaluated as i32 {
+                        Some(conversions::document_to_evaluation_result_struct(document))
+                    } else {
+                        None
+                    },
+                }))
             }
+            None => Err(Status::new(
+                tonic::Code::NotFound,
+                "Submission id provided is not present in database",
+            )),
         }
     }
 }
-
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

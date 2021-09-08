@@ -2,150 +2,139 @@ syntax = "proto2";
 
 package service.evaluation;
 
-import "common.proto";
 import "scoring.proto";
+import "common.proto";
 
 // Schema-defining messages
 
-// Problems, subtasks, testcases IO files and evaluation related files are stored
-// in the filesystem using a gerarchy of nested folders.
-
-enum ProblemType {
-    BATCH = 0;
-    OUTPUT_ONLY = 1;
-    INTERACTIVE = 2;
-    OTHER = 3;
-}
-message ProblemLimits {
-    required uint64 runtime_time_limit_nanos = 1;    //TODO Fix with common.Resources when serialization works
-    required uint64 runtime_memory_limit_bytes = 2;
-    optional uint64 compilation_time_limit_nanos = 3;
-    optional uint64 source_size_limit_bytes = 4;
-}
-message ProblemEvaluationInfo {
-    required ProblemType type = 1;
-    required ProblemLimits limits = 2;
-}
-message ProblemScoringInfo {
-    repeated scoring.Subtask subtask_scorings = 3;
-    required scoring.Problem problem_scoring = 4;
-    required double problem_score = 5;   // This is a redundant information obtained by adding all subtask max scores
-}
-
-// Communication messages for large files and utils
+// Problems, subtasks, testcases IO files and evaluation related files are
+// stored in the filesystem using a gerarchy of nested folders.
 
 message Subtask {
-    message Testcase {
-        required uint64 id = 1;
-        optional bytes input = 2;
-        optional bytes output = 3;
-    }
     required uint64 id = 1;
     required scoring.Subtask scoring = 2;
-    repeated Testcase testcases = 3;
+    repeated uint64 testcases_id = 3;
+}
+
+message Problem {  // all problem metadata, no files
+    enum Type {    // maybe change into flags (eg: has interactor, has grader,
+                   // normal or oo) (?)
+        BATCH = 0;
+        OUTPUT_ONLY = 1;
+        INTERACTIVE = 2;
+        OTHER = 3;
+    }
+    required uint64 id = 1;
+    required scoring.Problem scoring = 2;
+    required Type type = 3;
+    required common.Resources execution_limits = 4;
+    required common.Resources compilation_limits = 5;
+    repeated Subtask subtasks = 6;
+}
+
+// Only for updates/creation of metedata (not actually stored)
+message Contest {
+    repeated Problem problems = 1;
+    required scoring.User user_scoring_method = 2;
+}
+
+// Communication messages for large files (keep as few as possible)
+
+message Testcase {
+    required uint64 id = 1;
+    optional bytes input = 2;
+    optional bytes output = 3;
 }
 
 message EvaluationFile {
     enum Type {
-        GENERIC = 0;
-        CHECKER = 1;
-        INTERACTOR = 2;
+        CHECKER = 0;
+        INTERACTOR = 1;
     }
     required Type type = 1;
-    required common.Source file = 2;
-}
-
-message Failure {
-    required string error = 1;
+    required common.Source source = 2;
 }
 
 // RPC messages
 
-message GetProblemScoringInfoRequest {
+message GetUserScoringRequest {}
+message GetUserScoringResponse {
+    required scoring.User method = 1;
+}
+message SetUserScoringRequest {
+    required scoring.User method = 1;
+}
+message SetUserScoringResponse {}
+
+message GetProblemRequest {
     required uint64 problem_id = 1;
 }
-message GetProblemScoringInfoResponse {
-    message Success {
-        required ProblemScoringInfo info = 1;
-    }
-    oneof response {
-        Success success = 1;
-        Failure failure = 2;
-    }
+message GetProblemResponse {
+    required Problem info = 1;
 }
 
-message GetProblemEvaluationInfoRequest {
+message SetContestRequest {
+    required Contest info = 1;
+}
+message SetContestResponse {}
+
+message GetContestRequest {}
+message GetContestResponse {
+    required Contest info = 1;
+}
+
+// vv admin only vv we are gonna need to do streaming stuff for these
+message GetTestcaseRequest {
     required uint64 problem_id = 1;
+    required uint64 testcase_id = 2;
 }
-message GetProblemEvaluationInfoResponse {
-    message Success {
-        required ProblemEvaluationInfo info = 1;
-    }
-    oneof response {
-        Success success = 1;
-        Failure failure = 2;
-    }
+message GetTestcaseResponse {
+    required Testcase testcase = 1;
 }
-
 message GetProblemTestcasesRequest {
     required uint64 problem_id = 1;
 }
 message GetProblemTestcasesResponse {
-    message Success {
-        repeated Subtask subtasks = 1;
-    }
-    oneof response {
-        Success success = 1;
-        Failure failure = 2;
+    repeated Testcase testcases = 1;
+}
+message SetTestcaseRequest {
+    required uint64 problem_id = 1;
+    oneof command {
+        Testcase add_testcase = 2;
+        Testcase update_testcase = 3;
+        uint64 delete_testcase_id = 4;
     }
 }
+message SetTestcaseResponse {}
 
 message GetProblemEvaluationFileRequest {
     required uint64 problem_id = 1;
-    required EvaluationFile.Type file_type = 2;
+    required EvaluationFile.Type type = 2;
 }
 message GetProblemEvaluationFileResponse {
-    message Success {
-        required EvaluationFile file = 1;
-    }
-    oneof response {
-        Success success = 1;
-        Failure failure = 2;
-    }
+    required EvaluationFile file = 1;
 }
-
-message GetUserScoringMethodRequest {}
-message GetUserScoringMethodResponse {
-    required scoring.User method = 1;
-}
-
-message SetProblemInfoRequest {
+message SetProblemEvaluationFileRequest {
     required uint64 problem_id = 1;
-    required ProblemType type = 2;
-    required ProblemLimits limits = 3;
-    repeated Subtask subtasks = 4;
-    repeated EvaluationFile evaluation_files = 5;
-    required scoring.Problem problem_scoring = 6;
-}
-message SetProblemInfoResponse {
-    message Success {}
-    oneof response {
-        Success success = 1;
-        Failure failure = 2;
+    oneof command {
+        EvaluationFile add_evaluation_file = 2;
+        EvaluationFile update_evaluation_file = 3;
     }
 }
-
-message SetUserScoringMethodRequest {
-    required scoring.User method = 1;
-}
-message SetUserScoringMethodResponse {}
+message SetProblemEvaluationFileResponse {}
 
 service Evaluation {
-    rpc get_problem_scoring_info(GetProblemScoringInfoRequest) returns (GetProblemScoringInfoResponse);
-    rpc get_problem_evaluation_info(GetProblemEvaluationInfoRequest) returns (GetProblemEvaluationInfoResponse);
-    rpc get_problem_testcases(GetProblemTestcasesRequest) returns (GetProblemTestcasesResponse);
-    rpc get_problem_evaluation_file(GetProblemEvaluationFileRequest) returns (GetProblemEvaluationFileResponse);
-    rpc get_user_scoring_method(GetUserScoringMethodRequest) returns (GetUserScoringMethodResponse);
-    rpc set_problem_info(SetProblemInfoRequest) returns (SetProblemInfoResponse);
-    rpc set_user_scoring_method(SetUserScoringMethodRequest) returns (SetUserScoringMethodResponse);
+    rpc get_user_scoring(GetUserScoringRequest)
+        returns (GetUserScoringResponse);
+    rpc get_problem(GetProblemRequest) returns (GetProblemResponse);
+    rpc set_contest(SetContestRequest) returns (SetContestResponse);
+    rpc get_contest(GetContestRequest) returns (GetContestResponse);
+    rpc get_testcase(GetTestcaseRequest) returns (GetTestcaseResponse);
+    rpc get_problem_testcases(GetProblemTestcasesRequest)
+        returns (GetProblemTestcasesResponse);
+    rpc set_testcase(SetTestcaseRequest) returns (SetTestcaseResponse);
+    rpc get_problem_evaluation_file(GetProblemEvaluationFileRequest)
+        returns (GetProblemEvaluationFileResponse);
+    rpc set_problem_evaluation_file(SetProblemEvaluationFileRequest)
+        returns (SetProblemEvaluationFileResponse);
 }
