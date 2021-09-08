@@ -131,7 +131,6 @@ pub fn get_mock_dispatcher() -> MockDispatcher {
     mock
 }
 
-
 pub fn get_mock_evaluation(problem_id: u64) -> MockEvaluation {
     let mut mock = MockEvaluation::default();
     mock_evaluation_init(&mut mock, problem_id);

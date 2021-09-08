@@ -1,51 +1,24 @@
 #![recursion_limit = "256"]
 
 use core::panic;
-use rand::Rng;
-use std::time::SystemTime;
 
 use futures::stream::StreamExt;
 
-use ::utils::{
-    gen_uuid,
-    mongo::*,
-    scoring_lib::{evaluate_submission_score, evaluate_subtask_score},
-};
+use ::utils::scoring_lib::{evaluate_submission_score, evaluate_subtask_score};
 use mongodb::{
-    bson::{
-        bson, doc,
-        spec::{BinarySubtype, ElementType},
-        Binary, Bson, Document,
-    },
+    bson::{doc, Bson, Document},
     options::{
         ClientOptions, CreateCollectionOptions, FindOptions, ValidationAction, ValidationLevel,
     },
     Client, Database,
 };
 use protos::service::dispatcher::dispatcher_server::*;
+use protos::service::evaluation::{evaluation_server::Evaluation, GetProblemRequest};
 use protos::service::submission::submission_server::*;
 use protos::service::submission::*;
 use protos::utils::*;
-use protos::{
-    self,
-    common::Resources,
-    evaluation::{
-        compilation_result, testcase_result, CompilationResult, EvaluationResult, SubtaskResult,
-        TestcaseResult,
-    },
-    service::dispatcher::{EvaluateSubmissionResponse, MockDispatcher},
-    *,
-};
-use protos::{
-    scoring::{one_of_score, OneOfScore, Problem, Subtask},
-    service::evaluation::{
-        evaluation_server::Evaluation, problem, GetProblemRequest, GetProblemResponse,
-        MockEvaluation,
-    },
-};
+use protos::{self, *};
 use tonic::{transport::*, Request, Response, Status};
-
-use crate::mock_services::get_mock_dispatcher;
 
 mod conversions;
 
@@ -237,7 +210,7 @@ impl Submission for SubmissionService {
             .map_err(internal_error)?;
 
         // 2) redirect request to the dispatcher and await response
-        let mut mock_dispatcher = mock_services::get_mock_dispatcher();
+        let mock_dispatcher = mock_services::get_mock_dispatcher();
 
         let evaluation_result = match mock_dispatcher
             .evaluate_submission(Request::new(
