@@ -28,6 +28,13 @@ impl Evaluation for EvaluationService {
         todo!()
     }
 
+    async fn get_contest(
+        &self,
+        _request: Request<GetContestRequest>,
+    ) -> Result<Response<GetContestResponse>, Status> {
+        todo!()
+    }
+
     async fn get_testcase(
         &self,
         _request: Request<GetTestcaseRequest>,

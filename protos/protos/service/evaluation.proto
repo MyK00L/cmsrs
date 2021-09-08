@@ -78,6 +78,11 @@ message SetContestRequest {
 }
 message SetContestResponse {}
 
+message GetContestRequest {}
+message GetContestResponse {
+    required Contest info = 1;
+}
+
 // vv admin only vv we are gonna need to do streaming stuff for these
 message GetTestcaseRequest {
     required uint64 problem_id = 1;
@@ -123,6 +128,7 @@ service Evaluation {
         returns (GetUserScoringResponse);
     rpc get_problem(GetProblemRequest) returns (GetProblemResponse);
     rpc set_contest(SetContestRequest) returns (SetContestResponse);
+    rpc get_contest(GetContestRequest) returns (GetContestResponse);
     rpc get_testcase(GetTestcaseRequest) returns (GetTestcaseResponse);
     rpc get_problem_testcases(GetProblemTestcasesRequest)
         returns (GetProblemTestcasesResponse);
