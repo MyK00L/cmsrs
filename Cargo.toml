@@ -4,7 +4,7 @@ members = [
     "protos",
     "contest_service",
     "evaluation_service",
-		"admin",
+    "admin",
     "rpctest-client",
     "rpctest-server"
 ]
