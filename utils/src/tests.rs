@@ -417,11 +417,11 @@ fn evaluate_submission_score_test() {
 
     let mut score = OneOfScore::default();
     evaluate_submission_score(
-        &vec![
+        &[
             subtask_result_correct.clone(),
             subtask_result_correct.clone(),
             subtask_result_wrong.clone(),
-            subtask_result_wrong.clone(),
+            subtask_result_wrong,
             subtask_result_correct,
         ],
         &mut score,

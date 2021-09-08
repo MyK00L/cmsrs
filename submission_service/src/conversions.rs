@@ -71,7 +71,7 @@ pub fn get_item_from_doc(doc: Document) -> get_submission_list_response::Item {
         timestamp: timestamp_to_systime(doc.get_timestamp("created").unwrap()).into(),
         state: doc
             .get_i32("state")
-            .expect(expected_field("state").as_str()),
+            .unwrap_or_else(|_| panic!("{}", expected_field("state"))),
         score: score_option_bson_to_struct(doc.get("overallScore"), false, DUMMY_MESSAGE),
     }
 }
@@ -176,16 +176,17 @@ fn compilation_doc_to_struct(compilation_doc: &Document) -> CompilationResult {
     CompilationResult {
         outcome: compilation_doc
             .get_i32("outcome")
-            .expect(expected_field("compilation").as_str()),
+            .unwrap_or_else(|_| panic!("{}", expected_field("outcome"))),
         used_resources: Resources {
             time: time_ns_to_duration(
                 compilation_doc
                     .get_i64("timeNs")
-                    .expect(expected_field("timeNs").as_str()),
+                    .unwrap_or_else(|_| panic!("{}", expected_field("timeNs"))),
             ),
             memory_bytes: compilation_doc
                 .get_i64("memoryB")
-                .expect(expected_field("memoryB").as_str()) as u64,
+                .unwrap_or_else(|_| panic!("{}", expected_field("memoryB")))
+                as u64,
         },
         error_message: compilation_doc.get("error").map(|bson_string| {
             bson_string
@@ -200,16 +201,17 @@ fn single_testcase_db_to_struct(testcase_doc: &Document) -> TestcaseResult {
     TestcaseResult {
         outcome: testcase_doc
             .get_i32("outcome")
-            .expect(expected_field("outcome").as_str()),
+            .unwrap_or_else(|_| panic!("{}", expected_field("outcome"))),
         used_resources: Resources {
             time: time_ns_to_duration(
                 testcase_doc
                     .get_i64("timeNs")
-                    .expect(expected_field("timeNs").as_str()),
+                    .unwrap_or_else(|_| panic!("{}", expected_field("timeNs"))),
             ),
             memory_bytes: testcase_doc
                 .get_i64("memoryB")
-                .expect(expected_field("memoryB").as_str()) as u64,
+                .unwrap_or_else(|_| panic!("{}", expected_field("memoryB")))
+                as u64,
         },
         score: score_option_bson_to_struct(
             testcase_doc.get("score"),
@@ -222,12 +224,12 @@ fn single_testcase_db_to_struct(testcase_doc: &Document) -> TestcaseResult {
 fn single_subtask_db_to_struct(subtask_doc: &Document) -> SubtaskResult {
     let subtask_score_bson = subtask_doc
         .get("subtaskScore")
-        .expect(expected_field("subtaskScore").as_str());
+        .unwrap_or_else(|| panic!("{}", expected_field("subtaskScore")));
 
     SubtaskResult {
         testcase_results: subtask_doc
             .get_array("testcases")
-            .expect(expected_field("testcases").as_str())
+            .unwrap_or_else(|_| panic!("{}", expected_field("testcases")))
             .iter()
             .map(|bson_testcase| {
                 let testcase = bson_testcase.as_document().unwrap();
@@ -241,7 +243,7 @@ fn single_subtask_db_to_struct(subtask_doc: &Document) -> SubtaskResult {
 fn subtasks_db_to_struct(evaluation_doc: &Document) -> Vec<SubtaskResult> {
     evaluation_doc
         .get_array("subtasks")
-        .expect(expected_field("subtasks").as_str())
+        .unwrap_or_else(|_| panic!("{}", expected_field("subtasks")))
         .iter()
         .map(|bson_subtask| {
             let subtask = bson_subtask.as_document().unwrap();
@@ -254,7 +256,7 @@ pub fn document_to_evaluation_result_struct(submission_doc: Document) -> Evaluat
     let compilation_result_struct = compilation_doc_to_struct(
         submission_doc
             .get("compilation")
-            .expect(expected_field("compilation").as_str())
+            .unwrap_or_else(|| panic!("{}", expected_field("compilation")))
             .as_document()
             .unwrap(),
     );
@@ -265,7 +267,7 @@ pub fn document_to_evaluation_result_struct(submission_doc: Document) -> Evaluat
             subtasks_db_to_struct(
                 submission_doc
                     .get("evaluation")
-                    .expect(expected_field("evaluation").as_str())
+                    .unwrap_or_else(|| panic!("{}", expected_field("evaluation")))
                     .as_document()
                     .unwrap(),
             )

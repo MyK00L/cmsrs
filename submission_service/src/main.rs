@@ -300,7 +300,7 @@ impl Submission for SubmissionService {
         let list_request = request.into_inner();
         let opt_limit = list_request.limit;
         let opt_user = list_request.user.clone();
-        let opt_problem_id = list_request.problem_id.clone();
+        let opt_problem_id = list_request.problem_id;
 
         let mut doc_filter = Document::new();
         if let Some(user) = opt_user {
@@ -351,26 +351,26 @@ impl Submission for SubmissionService {
             Some(document) => {
                 let state = document
                     .get_i32("state")
-                    .expect(expected_field("problemId").as_str());
+                    .unwrap_or_else(|_| panic!("{}", expected_field("problemId")));
 
                 Ok(Response::new(GetSubmissionDetailsResponse {
                     sub: evaluation::Submission {
                         user: document
                             .get_str("user")
-                            .expect(expected_field("user").as_str())
+                            .unwrap_or_else(|_| panic!("{}", expected_field("user")))
                             .to_string(),
                         problem_id: document
                             .get_i64("problemId")
-                            .expect(expected_field("problemId").as_str())
+                            .unwrap_or_else(|_| panic!("{}", expected_field("problemId")))
                             as u64,
                         source: common::Source {
-                            lang: document
-                                .get_i32("programmingLanguage")
-                                .expect(expected_field("programmingLanguage").as_str()),
+                            lang: document.get_i32("programmingLanguage").unwrap_or_else(|_| {
+                                panic!("{}", expected_field("programmingLanguage"))
+                            }),
                             code: {
                                 let bson_source = document
                                     .get("source")
-                                    .expect(expected_field("source").as_str());
+                                    .unwrap_or_else(|| panic!("{}", expected_field("source")));
                                 match bson_source {
                                         Bson::Binary(bin_data) => bin_data.bytes.clone(),
                                         _ => panic!("This should not happen. \'source\' must be stored as Bson::Binary"),
