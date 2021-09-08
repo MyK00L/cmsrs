@@ -12,12 +12,12 @@ use mongodb::{
     },
     Client, Database,
 };
-use protos::{evaluation::EvaluationResult, service::dispatcher::dispatcher_server::*};
 use protos::service::evaluation::{evaluation_server::Evaluation, GetProblemRequest};
 use protos::service::submission::submission_server::*;
 use protos::service::submission::*;
 use protos::utils::*;
 use protos::{self, *};
+use protos::{evaluation::EvaluationResult, service::dispatcher::dispatcher_server::*};
 use tonic::{transport::*, Request, Response, Status};
 
 mod conversions;
@@ -191,10 +191,11 @@ impl SubmissionService {
     }
 }
 
-async fn evaluate_scores(mut_evaluation_result: &mut EvaluationResult, problem_id: u64) -> Result<(), Status> {
-    let problem_metadata_request = GetProblemRequest {
-        problem_id: problem_id,
-    };
+async fn evaluate_scores(
+    mut_evaluation_result: &mut EvaluationResult,
+    problem_id: u64,
+) -> Result<(), Status> {
+    let problem_metadata_request = GetProblemRequest { problem_id };
     let mock_evaluation_server = mock_services::get_mock_evaluation(problem_id);
 
     let problem_metadata = mock_evaluation_server
@@ -279,13 +280,8 @@ impl Submission for SubmissionService {
         doc_updated.insert("state", SubmissionState::Evaluated as i32);
         conversions::insert_evaluation_data_into_document(&mut doc_updated, &mut_evaluation_result);
 
-        self
-            .get_collection()
-            .update_one(
-                doc! { "_id": id },
-                doc! { "$set": doc_updated },
-                None,
-            )
+        self.get_collection()
+            .update_one(doc! { "_id": id }, doc! { "$set": doc_updated }, None)
             .await
             .map_err(internal_error)?;
 
@@ -347,10 +343,7 @@ impl Submission for SubmissionService {
         let submission_id = submission_details_request.submission_id;
         let opt_document = self
             .get_collection()
-            .find_one(
-                doc! { "_id": convert_to_i64(submission_id) },
-                None,
-            )
+            .find_one(doc! { "_id": convert_to_i64(submission_id) }, None)
             .await
             .map_err(internal_error)?;
 
