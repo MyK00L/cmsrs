@@ -16,20 +16,30 @@ pub async fn login(cookies: &CookieJar<'_>, login: Form<Strict<Login>>) -> Redir
     }
 }
 
-#[derive(FromForm)]
+#[derive(FromForm, Debug)]
+pub struct UserScoringMethod {
+    aggregation: String,
+    score_weight: f64,
+    wrong_submission_count_weight: f64,
+    time_secs_weight: f64,
+}
+
+#[derive(FromForm, Debug)]
 pub struct UpdateContest {
     name: String,
     description: String,
     start_time: String,
     end_time: String,
+    user_scoring: Vec<UserScoringMethod>,
 }
 #[post("/form/update_contest", data = "<contest>")]
 pub async fn update_contest(
     _admin: Admin,
     contest: Form<Strict<UpdateContest>>,
-    contest_client: &State<ContestClient>,
+    _contest_client: &State<ContestClient>,
+    _evaluation_client: &State<EvaluationClient>,
 ) -> Result<Redirect, status::Custom<String>> {
-    let contest_client = contest_client.inner().clone();
+    /*let contest_client = contest_client.inner().clone();
     let req = contest::SetContestMetadataRequest {
         metadata: contest::ContestMetadata {
             name: contest.name.clone(),
@@ -53,7 +63,9 @@ pub async fn update_contest(
             Status::InternalServerError,
             format!("Error in rpc request:\n{:?}", err),
         )),
-    }
+    }*/
+    eprintln!("{:?}", contest);
+    Ok(Redirect::to("/contest"))
 }
 
 #[derive(FromForm)]
