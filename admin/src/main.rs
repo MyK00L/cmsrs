@@ -1,7 +1,7 @@
 use chrono::TimeZone;
 use protos::service::contest::contest_server::Contest;
 use protos::service::submission::submission_server::Submission;
-use protos::service::{contest, submission};
+use protos::service::{contest, evaluation, submission};
 use rocket::form::{Form, Strict};
 use rocket::fs::{relative, NamedFile};
 use rocket::http::{Cookie, CookieJar, Status};

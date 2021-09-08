@@ -262,58 +262,140 @@ pub async fn submissions_template(
         )),
     }
 }
-/*#[derive(Serialize)]
-#[serde(crate = "rocket::serde")]
-struct TemplateResources {
-    nanos: u64,
-    bytes: u64,
-}
 #[derive(Serialize)]
 #[serde(crate = "rocket::serde")]
-struct TemplateSubtaskScoring {
+struct SubtaskScoring {
     method: String, // MIN | SUM
     max_score: f64,
 }
+impl From<protos::scoring::Subtask> for SubtaskScoring {
+    fn from(s: protos::scoring::Subtask) -> Self {
+        Self {
+            method: format!(
+                "{:?}",
+                protos::scoring::subtask::Method::from_i32(s.method).unwrap()
+            ),
+            max_score: s.max_score,
+        }
+    }
+}
+
 #[derive(Serialize)]
 #[serde(crate = "rocket::serde")]
-struct TemplateSubtask {
+struct Subtask {
     id: u64,
-    scoring: TemplateSubtaskScoring,
+    scoring: SubtaskScoring,
     testcases: Vec<u64>,
 }
+impl From<evaluation::Subtask> for Subtask {
+    fn from(s: evaluation::Subtask) -> Self {
+        Self {
+            id: s.id,
+            scoring: s.scoring.into(),
+            testcases: s.testcases_id,
+        }
+    }
+}
+
 #[derive(Serialize)]
 #[serde(crate = "rocket::serde")]
-struct TemplateProblemScoring {
+struct ProblemScoring {
     method: String, // SUM_MAX | MAX_SUM
 }
-#[derive(Serialize)]
-#[serde(crate = "rocket::serde")]
-struct TemplateProblem {
-    id: u64,
-    scoring: TemplateProblemScoring,
-    problem_type: String,
-    execution_limits: TemplateResources,
-    compilation_limits: TemplateResources,
-    subtasks: Vec<TemplateSubtask>,
+impl From<protos::scoring::Problem> for ProblemScoring {
+    fn from(p: protos::scoring::Problem) -> Self {
+        Self {
+            method: format!(
+                "{:?}",
+                protos::scoring::problem::Method::from_i32(p.method).unwrap()
+            ),
+        }
+    }
 }
+
 #[derive(Serialize)]
 #[serde(crate = "rocket::serde")]
-struct TemplateUserScoringMethod {
+struct Problem {
+    id: u64,
+    scoring: ProblemScoring,
+    problem_type: String,
+    execution_limits: Resources,
+    compilation_limits: Resources,
+    subtasks: Vec<Subtask>,
+}
+impl From<evaluation::Problem> for Problem {
+    fn from(p: evaluation::Problem) -> Self {
+        Self {
+            id: p.id,
+            scoring: p.scoring.into(),
+            problem_type: String::from(""), //format!("{:?}", p.aa),
+            execution_limits: p.execution_limits.into(),
+            compilation_limits: p.compilation_limits.into(),
+            subtasks: p.subtasks.into_iter().map(Subtask::from).collect(),
+        }
+    }
+}
+
+#[derive(Serialize)]
+#[serde(crate = "rocket::serde")]
+struct UserScoringMethod {
     aggregation: String, // SUM | MAX
     score_weight: f64,
-    wrong_submision_count_weight: f64,
+    wrong_submission_count_weight: f64,
     time_secs_weight: f64,
 }
+impl From<protos::scoring::user::Method> for UserScoringMethod {
+    fn from(us: protos::scoring::user::Method) -> Self {
+        Self {
+            aggregation: us.aggregation_method.to_string(),
+            score_weight: us.score_weight,
+            wrong_submission_count_weight: us.wrong_submission_count_weight,
+            time_secs_weight: us.time_secs_weight,
+        }
+    }
+}
+
 #[derive(Serialize)]
 #[serde(crate = "rocket::serde")]
-struct TemplateContest {
+struct ContestUser {
     name: String,
     description: String,
     start_time: String,
     end_time: String,
-    user_scoring: Vec<TemplateUserScoringMethod>,
-    problems: Vec<TemplateProblem>,
-}*/
+}
+impl From<contest::GetContestMetadataResponse> for ContestUser {
+    fn from(res: contest::GetContestMetadataResponse) -> Self {
+        let res = res.metadata;
+        Self {
+            name: res.name,
+            description: res.description,
+            start_time: match res.start_time {
+                Some(t) => utils::render_protos_timestamp(t, "%FT%T"),
+                None => utils::render_protos_timestamp(
+                    (SystemTime::now() + std::time::Duration::from_secs(86400)).into(),
+                    "%FT%T",
+                ),
+            },
+            end_time: match res.end_time {
+                Some(t) => utils::render_protos_timestamp(t, "%FT%T"),
+                None => utils::render_protos_timestamp(
+                    (SystemTime::now() + std::time::Duration::from_secs(93600)).into(),
+                    "%FT%T",
+                ),
+            },
+        }
+    }
+}
+
+#[derive(Serialize)]
+#[serde(crate = "rocket::serde")]
+struct TemplateContest {
+    /*name: String,
+description: String,
+start_time: String,
+end_time: String,
+user_scoring: UserScoringMethod,
+problems: Vec<TemplateProblem>,*/}
 #[get("/contest")]
 pub async fn contest_template(
     _admin: Admin,
