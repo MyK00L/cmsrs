@@ -15,10 +15,10 @@
 	<hr>
 	</nav>
 		<form action="/form/update_contest" method="post" enctype="multipart/form-data">
-			<label>Name <input type="text" name="name" value="{{name}}" required></label><br>
-			<label>Description <input type="text" name="description" value="{{description}}" required></label><br>
-			<label>Start <input type="datetime-local" name="start_time" pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}" step="1" min="2000-01-01T00:00:00" value="{{start_time}}" required></label><br>
-			<label>End <input type="datetime-local" name="end_time" pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}" step="1" min="2000-01-01T00:00:00" value="{{end_time}}" required></label><br>
+			<label>Name <input type="text" name="name" value="{{user.name}}" required></label><br>
+			<label>Description <input type="text" name="description" value="{{user.description}}" required></label><br>
+			<label>Start <input type="datetime-local" name="start_time" pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}" step="1" min="2000-01-01T00:00:00" value="{{user.start_time}}" required></label><br>
+			<label>End <input type="datetime-local" name="end_time" pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}" step="1" min="2000-01-01T00:00:00" value="{{user.end_time}}" required></label><br>
 			<input type="submit" value="update">
 		</form>
 	</body>

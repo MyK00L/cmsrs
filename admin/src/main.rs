@@ -1,5 +1,6 @@
 use chrono::TimeZone;
 use protos::service::contest::contest_server::Contest;
+use protos::service::evaluation::evaluation_server::Evaluation;
 use protos::service::submission::submission_server::Submission;
 use protos::service::{contest, evaluation, submission};
 use rocket::form::{Form, Strict};
@@ -18,6 +19,7 @@ use utils::gen_uuid;
 const PASS: &str = "1234";
 type ContestClient = contest::MockContest;
 type SubmissionClient = submission::MockSubmission;
+type EvaluationClient = evaluation::MockEvaluation;
 
 // TODO: fix pub
 pub struct Admin {}
@@ -66,6 +68,8 @@ async fn statics_redirect(_path: PathBuf) -> Redirect {
 fn rocket() -> _ {
     let mut contest_client = contest::MockContest::default();
     let mut submission_client = submission::MockSubmission::default();
+    let mut evaluation_client = evaluation::MockEvaluation::default();
+    evaluation_client.get_contest_set(evaluation::GetContestResponse::default());
     submission_client.get_submission_list_set(submission::GetSubmissionListResponse {
         list: vec![submission::get_submission_list_response::Item {
             submission_id: 42,
@@ -149,6 +153,7 @@ fn rocket() -> _ {
     rocket::build()
         .manage(contest_client)
         .manage(submission_client)
+        .manage(evaluation_client)
         .mount(
             "/",
             routes![

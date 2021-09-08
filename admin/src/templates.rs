@@ -339,7 +339,7 @@ impl From<evaluation::Problem> for Problem {
 #[derive(Serialize)]
 #[serde(crate = "rocket::serde")]
 struct UserScoringMethod {
-    aggregation: String, // SUM | MAX
+    aggregation: String, // Sum | Max
     score_weight: f64,
     wrong_submission_count_weight: f64,
     time_secs_weight: f64,
@@ -351,6 +351,25 @@ impl From<protos::scoring::user::Method> for UserScoringMethod {
             score_weight: us.score_weight,
             wrong_submission_count_weight: us.wrong_submission_count_weight,
             time_secs_weight: us.time_secs_weight,
+        }
+    }
+}
+
+#[derive(Serialize)]
+#[serde(crate = "rocket::serde")]
+struct UserScoring {
+    main: UserScoringMethod,
+    tiebreakers: Vec<UserScoringMethod>,
+}
+impl From<protos::scoring::User> for UserScoring {
+    fn from(us: protos::scoring::User) -> Self {
+        Self {
+            main: us.main.into(),
+            tiebreakers: us
+                .tiebreakers
+                .into_iter()
+                .map(UserScoringMethod::from)
+                .collect(),
         }
     }
 }
@@ -389,52 +408,70 @@ impl From<contest::GetContestMetadataResponse> for ContestUser {
 
 #[derive(Serialize)]
 #[serde(crate = "rocket::serde")]
-struct TemplateContest {
-    /*name: String,
-description: String,
-start_time: String,
-end_time: String,
-user_scoring: UserScoringMethod,
-problems: Vec<TemplateProblem>,*/}
+struct ContestEvaluation {
+    problems: Vec<Problem>,
+    user_scoring: UserScoring,
+}
+impl From<evaluation::GetContestResponse> for ContestEvaluation {
+    fn from(res: evaluation::GetContestResponse) -> Self {
+        let res = res.info;
+        Self {
+            problems: res.problems.into_iter().map(Problem::from).collect(),
+            user_scoring: res.user_scoring_method.into(),
+        }
+    }
+}
+
+#[derive(Serialize)]
+#[serde(crate = "rocket::serde")]
+struct ContestTemplate {
+    user: ContestUser,
+    evaluation: ContestEvaluation,
+}
+
 #[get("/contest")]
 pub async fn contest_template(
     _admin: Admin,
     contest_client: &State<ContestClient>,
+    evaluation_client: &State<EvaluationClient>,
 ) -> Result<Template, status::Custom<String>> {
     let contest_client = contest_client.inner().clone();
-    match contest_client
+    let evaluation_client = evaluation_client.inner().clone();
+    let user_contest = match contest_client
         .get_contest_metadata(tonic::Request::new(
             contest::GetContestMetadataRequest::default(),
         ))
         .await
     {
         Ok(response) => {
-            // TODO: timezones
-            let res = response.into_inner().metadata;
-            /*let contest = TemplateContest {
-                name: res.name,
-                description: res.description,
-                start_time: match res.start_time {
-                    Some(t) => utils::render_protos_timestamp(t, "%FT%T"),
-                    None => utils::render_protos_timestamp(
-                        (SystemTime::now() + std::time::Duration::from_secs(86400)).into(),
-                        "%FT%T",
-                    ),
-                },
-                end_time: match res.end_time {
-                    Some(t) => utils::render_protos_timestamp(t, "%FT%T"),
-                    None => utils::render_protos_timestamp(
-                        (SystemTime::now() + std::time::Duration::from_secs(93600)).into(),
-                        "%FT%T",
-                    ),
-                },
-            };*/
-            let contest = res;
-            Ok(Template::render("contest", contest))
+            let res = response.into_inner();
+            ContestUser::from(res)
         }
-        Err(err) => Err(status::Custom(
-            Status::InternalServerError,
-            format!("Error in rpc request:\n{:?}", err),
-        )),
-    }
+        Err(err) => {
+            return Err(status::Custom(
+                Status::InternalServerError,
+                format!("Error in rpc request:\n{:?}", err),
+            ));
+        }
+    };
+    let evaluation_contest = match evaluation_client
+        .get_contest(tonic::Request::new(evaluation::GetContestRequest::default()))
+        .await
+    {
+        Ok(response) => {
+            let res = response.into_inner();
+            ContestEvaluation::from(res)
+        }
+        Err(err) => {
+            return Err(status::Custom(
+                Status::InternalServerError,
+                format!("Error in rpc request:\n{:?}", err),
+            ));
+        }
+    };
+    let ct = ContestTemplate {
+        user: user_contest,
+        evaluation: evaluation_contest,
+    };
+    Ok(Template::render("contest", ct))
 }
