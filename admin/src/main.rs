@@ -69,7 +69,15 @@ fn rocket() -> _ {
     let mut contest_client = contest::MockContest::default();
     let mut submission_client = submission::MockSubmission::default();
     let mut evaluation_client = evaluation::MockEvaluation::default();
-    evaluation_client.get_contest_set(evaluation::GetContestResponse::default());
+    evaluation_client.get_contest_set(evaluation::GetContestResponse {
+        info: evaluation::Contest {
+            problems: vec![],
+            user_scoring_method: protos::scoring::User {
+                main: protos::scoring::user::Method::default(),
+                tiebreakers: vec![protos::scoring::user::Method::default(); 4],
+            },
+        },
+    });
     submission_client.get_submission_list_set(submission::GetSubmissionListResponse {
         list: vec![submission::get_submission_list_response::Item {
             submission_id: 42,
