@@ -27,7 +27,7 @@ services:
       context: .
       dockerfile: ./evaluation_service/Dockerfile
     ports: 
-      - 50051:50051
+      - 50057:50051
 
   submission_service_db:
     image: mongo
