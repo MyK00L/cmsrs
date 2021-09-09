@@ -24,46 +24,13 @@ pub struct UserScoringMethod {
     time_secs_weight: f64,
 }
 
-#[derive(FromForm, Debug)]
-pub struct UpdateContest {
-    name: String,
-    description: String,
-    start_time: String,
-    end_time: String,
-    user_scoring: Vec<UserScoringMethod>,
-}
 #[post("/form/update_contest", data = "<contest>")]
 pub async fn update_contest(
     _admin: Admin,
-    contest: Form<Strict<UpdateContest>>,
+    contest: Form<Strict<templates::ContestTemplate>>,
     _contest_client: &State<ContestClient>,
     _evaluation_client: &State<EvaluationClient>,
 ) -> Result<Redirect, status::Custom<String>> {
-    /*let contest_client = contest_client.inner().clone();
-    let req = contest::SetContestMetadataRequest {
-        metadata: contest::ContestMetadata {
-            name: contest.name.clone(),
-            description: contest.description.clone(),
-            start_time: chrono::prelude::Utc
-                .datetime_from_str(&contest.start_time, "%FT%T")
-                .ok()
-                .map(|t| SystemTime::from(t).into()),
-            end_time: chrono::prelude::Utc
-                .datetime_from_str(&contest.end_time, "%FT%T")
-                .ok()
-                .map(|t| SystemTime::from(t).into()),
-        },
-    };
-    match contest_client
-        .set_contest_metadata(tonic::Request::new(req))
-        .await
-    {
-        Ok(_) => Ok(Redirect::to("/contest")),
-        Err(err) => Err(status::Custom(
-            Status::InternalServerError,
-            format!("Error in rpc request:\n{:?}", err),
-        )),
-    }*/
     eprintln!("{:?}", contest);
     Ok(Redirect::to("/contest"))
 }

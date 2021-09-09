@@ -8,13 +8,13 @@
 			user_scoring_n+=1;
 			user_scorings.innerHTML+=`
  <label>Tiebreaker ${user_scoring_n}:
- <select name="user_scoring[${user_scoring_n}].aggregation" required>
+ <select name="user_scoring.tiebreakers[${user_scoring_n}].aggregation" required>
  <option value="Sum">Sum</option>
  <option value="Max">Max</option>
  </select>
- <input type="number" step="0.01" name="user_scoring[${user_scoring_n}].score_weight" required></input>
- <input type="number" step="0.01" name="user_scoring[${user_scoring_n}].wrong_submission_count_weight" required></input>
- <input type="number" step="0.01" name="user_scoring[${user_scoring_n}].time_secs_weight" required></input>
+ <input type="number" step="0.01" name="user_scoring.tiebreakers[${user_scoring_n}].score_weight" required></input>
+ <input type="number" step="0.01" name="user_scoring.tiebreakers[${user_scoring_n}].wrong_submission_count_weight" required></input>
+ <input type="number" step="0.01" name="user_scoring.tiebreakers[${user_scoring_n}].time_secs_weight" required></input>
  <button onclick="this.parentElement.remove()">X</button>
  <br>
  </label>
@@ -31,34 +31,92 @@
 	<details>
 		<summary>User scoring</summary>
 		<label>Main:
-			<select name="user_scoring[0].aggregation" required>
+			<select name="user_scoring.main.aggregation" required>
 				<option value="Sum" {% if user_scoring.main.aggregation == "Sum" %} selected {% endif %} >Sum</option>
 				<option value="Max" {% if user_scoring.main.aggregation == "Max" %} selected {% endif %} >Max</option>
 			</select>
-			<input type="number" step="0.01" value="{{user_scoring.main.score_weight}}" name="user_scoring[0].score_weight" required></input>
-			<input type="number" step="0.01" value="{{user_scoring.main.wrong_submission_count_weight}}" name="user_scoring[0].wrong_submission_count_weight" required></input>
-			<input type="number" step="0.01" value="{{user_scoring.main.time_secs_weight}}" name="user_scoring[0].time_secs_weight" required></input>
+			<input type="number" step="0.01" value="{{user_scoring.main.score_weight}}" name="user_scoring.main.score_weight" required></input>
+			<input type="number" step="0.01" value="{{user_scoring.main.wrong_submission_count_weight}}" name="user_scoring.main.wrong_submission_count_weight" required></input>
+			<input type="number" step="0.01" value="{{user_scoring.main.time_secs_weight}}" name="user_scoring.main.time_secs_weight" required></input>
 		</label><br>
 		<button onclick="add_user_scoring(this.parentElement)">+</button></br>
 		{% for us in user_scoring.tiebreakers %}
 		<label>Tiebreaker {{loop.index}}:
-			<select name="user_scoring[{{loop.index}}].aggregation" required>
+			<select name="user_scoring.tiebreakers[{{loop.index}}].aggregation" required>
 				<option value="Sum" {% if us.aggregation == "Sum" %} selected {% endif %} >Sum</option>
 				<option value="Max" {% if us.aggregation == "Max" %} selected {% endif %} >Max</option>
 			</select>
-			<input type="number" step="0.01" value="{{us.score_weight}}" name="user_scoring[{{loop.index}}].score_weight" required></input>
-			<input type="number" step="0.01" value="{{us.wrong_submission_count_weight}}" name="user_scoring[{{loop.index}}].wrong_submission_count_weight" required></input>
-			<input type="number" step="0.01" value="{{us.time_secs_weight}}" name="user_scoring[{{loop.index}}].time_secs_weight" required></input>
+			<input type="number" step="0.01" value="{{us.score_weight}}" name="user_scoring.tiebreakers[{{loop.index}}].score_weight" required></input>
+			<input type="number" step="0.01" value="{{us.wrong_submission_count_weight}}" name="user_scoring.tiebreakers[{{loop.index}}].wrong_submission_count_weight" required></input>
+			<input type="number" step="0.01" value="{{us.time_secs_weight}}" name="user_scoring.tiebreakers[{{loop.index}}].time_secs_weight" required></input>
 			<button onclick="this.parentElement.remove()">X</button>
 			<br>
 		</label>
 		{% endfor %}
 	</details>
 	{% for problem in problems %}
+	<hr>
 	<details>
-		<summary>Problem {{loop.index}}: {{problem.name}}</summary>
+		{% set pi = loop.index0 %}
+		<summary>Problem {{pi}}</summary>
+		<label>id <input name="problems[{{pi}}].id" value="{{problem.id}}" type="number" readonly required><br></label>
+		<label>name <input name="problems[{{pi}}].name" value="{{problem.name}}" type="text" required><br></label>
+		<label>long name <input name="problems[{{pi}}].longname" value="{{problem.longname}}" type="text" required><br></label>
+		<label>Problem type
+			<select name="problems[{{pi}}].problem_type" required>
+				<option value="Batch" {% if problem.problem_type == "Batch" %} selected {% endif %} >Batch</option>
+				<option value="OutputOnly" {% if problem.problem_type == "OutputOnly" %} selected {% endif %} >OutputOnly</option>
+				<option value="Interactive" {% if problem.problem_type == "Interactive" %} selected {% endif %} >Interactive</option>
+				<option value="Other" {% if problem.problem_type == "Other" %} selected {% endif %} >Other</option>
+			</select>
+			<br>
+		</label>
+		<label>problem scoring method
+			<select name="problems[{{pi}}].scoring.method" required>
+				<option value="SumMax" {% if problem.scoring.method == "SumMax" %} selected {% endif %} >SumMax</option>
+				<option value="MaxSum" {% if problem.scoring.method == "MaxSum" %} selected {% endif %} >MaxSum</option>
+			</select>
+			<br>
+		</label>
+		
+		<details>
+			<summary>execution limits</summary>i
+			<label>nanos <input name="problems[{{pi}}].execution_limits.nanos" value="{{problem.execution_limits.nanos}}" type="number" step="1" required><br></label>
+			<label>bytes <input name="problems[{{pi}}].execution_limits.bytes" value="{{problem.execution_limits.bytes}}" type="number" step="1" required><br></label>
+		</details>
+		<details>
+			<summary>compilation limits</summary>
+			<label>nanos <input name="problems[{{pi}}].compilation_limits.nanos" value="{{problem.compilation_limits.nanos}}" type="number" step="1" required><br></label>
+			<label>bytes <input name="problems[{{pi}}].compilation_limits.bytes" value="{{problem.compilation_limits.bytes}}" type="number" step="1" required><br></label>
+		</details>
+		<details>
+			<summary>subtasks</summary>
+			{% for subtask in problem.subtasks %}
+			{% set si = loop.index0 %}
+			<details>
+				<summary>Subtask {{si}}</summary>
+				<label>id <input name="problems[{{pi}}].subtasks[{{si}}].id" value="{{subtask.id}}" type="number" readonly required><br></label>
+				<label>scoring method
+					<select name="problems[{{pi}}].subtasks[{{si}}].scoring.method" required>
+						<option value="Min" {% if subtask.scoring.method == "Min" %} selected {% endif %} >Min</option>
+						<option value="Sum" {% if subtask.scoring.method == "Sum" %} selected {% endif %} >Sum</option>
+					</select>
+					<br>
+				</label>
+				<label>max score <input name="problems[{{pi}}].subtasks[{{si}}].scoring.max_score" value="{{subtask.scoring.max_score}}" type="number" step="1" required><br></label>
+				<details>
+					<summary>testcases</summary>
+					{% for testcase in subtask.testcases %}
+					{% set ti = loop.index0 %}
+					<label>id <input name="problems[{{pi}}].subtasks[{{si}}].testcases[{{ti}}]" value="{{testcase}}" type="number" readonly required><br></label>
+					{% endfor %}
+				</details>
+			</details>
+			{% endfor %}
+		</details>
 	</details>
 	{% endfor %}
+	<hr>
 	<input type="submit" value="update">
 </form>
 </body>
