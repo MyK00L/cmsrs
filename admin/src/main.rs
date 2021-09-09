@@ -42,7 +42,7 @@ mod templates;
 
 #[get("/")]
 async fn root_logged(_admin: Admin) -> Redirect {
-    Redirect::to("/home")
+    Redirect::to(uri!(templates::submissions_template))
 }
 #[get("/", rank = 2)]
 async fn root() -> Option<NamedFile> {
@@ -161,6 +161,7 @@ fn rocket() -> _ {
                 root_logged,
                 statics,
                 statics_redirect,
+                templates::users_template,
                 templates::questions_template,
                 templates::submissions_template,
                 templates::submission_details_template,

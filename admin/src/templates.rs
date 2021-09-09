@@ -1,6 +1,12 @@
 use super::*;
 
-// templates
+#[get("/users")]
+pub async fn users_template(_admin: Admin) -> Result<Template, status::Custom<String>> {
+    Ok(Template::render(
+        "users",
+        std::collections::HashMap::<String, String>::new(),
+    ))
+}
 
 #[derive(Serialize)]
 #[serde(crate = "rocket::serde")]

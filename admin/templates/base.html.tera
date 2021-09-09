@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+		<title>{% block title %}{% endblock title %}</title>
+	</head>
+	<body>
+		<nav>
+			<a href="/questions">questions</a> |
+			<a href="/submissions">submissions</a> |
+			<a href="/contest">contest</a> |
+			<a href="/users">users</a>
+			{% block content %}{% endblock content %}
+		</nav>
+	</body>
+</html>

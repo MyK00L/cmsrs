@@ -10,7 +10,7 @@ pub struct Login {
 pub async fn login(cookies: &CookieJar<'_>, login: Form<Strict<Login>>) -> Redirect {
     if login.pass == PASS {
         cookies.add_private(Cookie::new("admin", "admin"));
-        Redirect::to("/home")
+        Redirect::to(uri!(templates::submissions_template))
     } else {
         Redirect::to(uri!(root))
     }
