@@ -49,6 +49,13 @@ services:
       - 50055:50051
     depends_on: 
       - submission_service_db
+  
+  dispatcher_service:
+    build:
+      context: .
+      dockerfile: ./dispatcher_service/Dockerfile
+    ports: 
+      - 50056:50051
 
 
 volumes:

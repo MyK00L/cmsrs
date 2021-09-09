@@ -1,0 +1,23 @@
+[package]
+name="dispatcher_service"
+version = "0.1.0"
+edition = "2018"
+
+[[bin]]
+name = "dispatcher_service"
+path = "src/main.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tonic = "0.5"
+protos = { path = "../protos" }
+tokio = { version = "1.9", features = ["macros", "rt-multi-thread"] }
+futures = "0.3"
+
+[dev-dependencies]
+tower = "0.4"
+tokio-test = "0.4"
+
+[features]
+loopback = ["protos/loopback"]
