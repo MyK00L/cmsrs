@@ -252,9 +252,9 @@ fn evaluate_partial_double_subtask_with_sum_test() {
         ],
         score: OneOfScore {
             score: Some(one_of_score::Score::DoubleScore(
-                SUM_SCORING_METHOD.max_score
-                    * ((DOUBLE_CORRECT_ANSWER + partial_score(2f64 + 3f64 + 1f64, 5f64))
-                        / num_of_testcases),
+                (SUM_SCORING_METHOD.max_score * DOUBLE_CORRECT_ANSWER
+                    + partial_score(SUM_SCORING_METHOD.max_score * (2f64 + 3f64 + 1f64), 5f64))
+                    / num_of_testcases,
             )),
         },
     };
@@ -265,11 +265,6 @@ fn evaluate_partial_double_subtask_with_sum_test() {
         &SUM_SCORING_METHOD,
         &mut score,
     );
-    println!(
-        "got: {0:?}, expected: {1:?}",
-        score, subtask_result_partial.score
-    );
-    // FLOATING POINT ERROR
     assert_eq!(score, subtask_result_partial.score);
 }
 
