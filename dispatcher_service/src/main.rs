@@ -59,10 +59,13 @@ fn dispatcher_to_worker_request(
     }
 }
 
-// Assuming that testcase_results are in the correct order. The only 
+// Assuming that testcase_results are in the correct order. The only
 // problem metadata we need are the number of testcases in each subtask
-async fn group_testcases(mut testcase_results: Vec<TestcaseResult>, problem_id: u64) -> Result<Vec<SubtaskResult>, Status> {
-    let mut mock_evaluation_service = MockEvaluation::default();
+async fn group_testcases(
+    mut testcase_results: Vec<TestcaseResult>,
+    problem_id: u64,
+) -> Result<Vec<SubtaskResult>, Status> {
+    let mock_evaluation_service = MockEvaluation::default();
     // mock_evaluation_service.get_problem_set(...stuff...)
     let problem_metadata = mock_evaluation_service
         .get_problem(Request::new(GetProblemRequest { problem_id }))
@@ -72,7 +75,9 @@ async fn group_testcases(mut testcase_results: Vec<TestcaseResult>, problem_id: 
     testcase_results.reverse(); // TODO change this hacky code
     let mut remaining_len = testcase_results.len();
 
-    Ok(problem_metadata.info.subtasks
+    Ok(problem_metadata
+        .info
+        .subtasks
         .iter()
         .map(|subtask| {
             let chunk_size = subtask.testcases_id.len();
@@ -107,8 +112,7 @@ async fn worker_to_dispatcher_response(
             subtask_results: if worker_response.compilation_result.outcome
                 == compilation_result::Outcome::Success as i32
             {
-                group_testcases(worker_response.testcase_results.clone(), problem_id)
-                    .await?
+                group_testcases(worker_response.testcase_results.clone(), problem_id).await?
             } else {
                 vec![]
             },
@@ -132,7 +136,9 @@ impl Dispatcher for DispatcherService {
             .await?
             .into_inner();
 
-        worker_to_dispatcher_response(&worker_response, problem_id).await.map(Response::new)
+        worker_to_dispatcher_response(&worker_response, problem_id)
+            .await
+            .map(Response::new)
     }
 }
 
