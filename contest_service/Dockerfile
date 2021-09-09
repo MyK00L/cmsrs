@@ -1,7 +1,7 @@
 FROM rustlang/rust:nightly as base
 WORKDIR /src
 COPY protos protos
-COPY convert convert
+COPY utils utils
 WORKDIR /src/server
 COPY contest_service/dummy.rs .
 COPY contest_service/Cargo.toml .
