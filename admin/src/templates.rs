@@ -418,7 +418,13 @@ impl ContestTemplate {
                     "%FT%T",
                 ),
             },
-            problems: evaluation_contest.info.problems.into_iter().zip(contest_problems.into_iter()).map(|x| Problem::new(x.0,x.1)).collect(),
+            problems: evaluation_contest
+                .info
+                .problems
+                .into_iter()
+                .zip(contest_problems.into_iter())
+                .map(|x| Problem::new(x.0, x.1))
+                .collect(),
             user_scoring: evaluation_contest.info.user_scoring_method.into(),
         }
     }
@@ -458,6 +464,7 @@ pub async fn contest_template(
             ));
         }
     };
+    #[allow(clippy::type_complexity)]
     let user_problem_requests: Vec<
         core::pin::Pin<
             Box<

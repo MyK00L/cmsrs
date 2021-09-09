@@ -72,17 +72,19 @@ fn rocket() -> _ {
     evaluation_client.get_contest_set(evaluation::GetContestResponse {
         info: evaluation::Contest {
             problems: vec![
-                evaluation::Problem{
+                evaluation::Problem {
                     id: 42,
                     subtasks: vec![
-                        evaluation::Subtask{
+                        evaluation::Subtask {
                             id: 69,
-                            testcases_id: vec![1,2,3,4,5,6,7,9,123],
+                            testcases_id: vec![1, 2, 3, 4, 5, 6, 7, 9, 123],
                             ..Default::default()
-                        }; 5
+                        };
+                        5
                     ],
-                    .. Default::default()
-                };3
+                    ..Default::default()
+                };
+                3
             ],
             user_scoring_method: protos::scoring::User {
                 main: protos::scoring::user::Method::default(),
@@ -90,7 +92,7 @@ fn rocket() -> _ {
             },
         },
     });
-    contest_client.get_problem_set(contest::GetProblemResponse{
+    contest_client.get_problem_set(contest::GetProblemResponse {
         info: contest::Problem {
             id: 42,
             name: String::from("problemname"),
