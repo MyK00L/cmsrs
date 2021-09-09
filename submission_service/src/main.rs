@@ -396,7 +396,7 @@ impl Submission for SubmissionService {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let addr = get_local_address(Service::CONTEST).parse()?;
+    let addr = get_local_address(Service::SUBMISSION).parse()?;
     let submission_service = SubmissionService::new().await?;
 
     println!("Starting submission server");

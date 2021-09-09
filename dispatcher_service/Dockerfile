@@ -1,6 +1,7 @@
 FROM rustlang/rust:nightly as base
 WORKDIR /src
 COPY protos protos
+COPY utils utils
 WORKDIR /src/server
 COPY dispatcher_service/dummy.rs .
 COPY dispatcher_service/Cargo.toml .

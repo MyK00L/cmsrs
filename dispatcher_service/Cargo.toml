@@ -14,6 +14,7 @@ tonic = "0.5"
 protos = { path = "../protos" }
 tokio = { version = "1.9", features = ["macros", "rt-multi-thread"] }
 futures = "0.3"
+utils = { path = "../utils" }
 
 [dev-dependencies]
 tower = "0.4"
