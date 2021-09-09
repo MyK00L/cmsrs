@@ -10,5 +10,6 @@ tonic = "0.5"
 protos = { path = "../protos" }
 utils = { path = "../utils" }
 chrono = "0.4"
+futures = "0.3"
 rocket = { version = "0.5.0-rc.1", features=["secrets", "tls"] }
 rocket_dyn_templates = {version="0.1.0-rc.1", features=["tera"] }

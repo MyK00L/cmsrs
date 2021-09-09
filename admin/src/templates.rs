@@ -1,4 +1,5 @@
 use super::*;
+use futures::future;
 
 #[get("/users")]
 pub async fn users_template(_admin: Admin) -> Result<Template, status::Custom<String>> {
@@ -328,16 +329,20 @@ struct Problem {
     execution_limits: Resources,
     compilation_limits: Resources,
     subtasks: Vec<Subtask>,
+    name: String,
+    longname: String,
 }
-impl From<evaluation::Problem> for Problem {
-    fn from(p: evaluation::Problem) -> Self {
+impl Problem {
+    fn new(e: evaluation::Problem, u: contest::Problem) -> Self {
         Self {
-            id: p.id,
-            scoring: p.scoring.into(),
+            id: e.id,
+            scoring: e.scoring.into(),
             problem_type: String::from(""), //format!("{:?}", p.aa),
-            execution_limits: p.execution_limits.into(),
-            compilation_limits: p.compilation_limits.into(),
-            subtasks: p.subtasks.into_iter().map(Subtask::from).collect(),
+            execution_limits: e.execution_limits.into(),
+            compilation_limits: e.compilation_limits.into(),
+            subtasks: e.subtasks.into_iter().map(Subtask::from).collect(),
+            name: u.name.clone(),
+            longname: u.long_name.clone(),
         }
     }
 }
@@ -382,57 +387,41 @@ impl From<protos::scoring::User> for UserScoring {
 
 #[derive(Serialize)]
 #[serde(crate = "rocket::serde")]
-struct ContestUser {
+struct ContestTemplate {
     name: String,
     description: String,
     start_time: String,
     end_time: String,
+    problems: Vec<Problem>,
+    user_scoring: UserScoring,
 }
-impl From<contest::GetContestMetadataResponse> for ContestUser {
-    fn from(res: contest::GetContestMetadataResponse) -> Self {
-        let res = res.metadata;
+impl ContestTemplate {
+    fn new(
+        evaluation_contest: evaluation::GetContestResponse,
+        user_contest: contest::GetContestMetadataResponse,
+        contest_problems: Vec<contest::Problem>,
+    ) -> Self {
         Self {
-            name: res.name,
-            description: res.description,
-            start_time: match res.start_time {
+            name: user_contest.metadata.name,
+            description: user_contest.metadata.description,
+            start_time: match user_contest.metadata.start_time {
                 Some(t) => utils::render_protos_timestamp(t, "%FT%T"),
                 None => utils::render_protos_timestamp(
                     (SystemTime::now() + std::time::Duration::from_secs(86400)).into(),
                     "%FT%T",
                 ),
             },
-            end_time: match res.end_time {
+            end_time: match user_contest.metadata.end_time {
                 Some(t) => utils::render_protos_timestamp(t, "%FT%T"),
                 None => utils::render_protos_timestamp(
                     (SystemTime::now() + std::time::Duration::from_secs(93600)).into(),
                     "%FT%T",
                 ),
             },
+            problems: evaluation_contest.info.problems.into_iter().zip(contest_problems.into_iter()).map(|x| Problem::new(x.0,x.1)).collect(),
+            user_scoring: evaluation_contest.info.user_scoring_method.into(),
         }
     }
-}
-
-#[derive(Serialize)]
-#[serde(crate = "rocket::serde")]
-struct ContestEvaluation {
-    problems: Vec<Problem>,
-    user_scoring: UserScoring,
-}
-impl From<evaluation::GetContestResponse> for ContestEvaluation {
-    fn from(res: evaluation::GetContestResponse) -> Self {
-        let res = res.info;
-        Self {
-            problems: res.problems.into_iter().map(Problem::from).collect(),
-            user_scoring: res.user_scoring_method.into(),
-        }
-    }
-}
-
-#[derive(Serialize)]
-#[serde(crate = "rocket::serde")]
-struct ContestTemplate {
-    user: ContestUser,
-    evaluation: ContestEvaluation,
 }
 
 #[get("/contest")]
@@ -443,16 +432,16 @@ pub async fn contest_template(
 ) -> Result<Template, status::Custom<String>> {
     let contest_client = contest_client.inner().clone();
     let evaluation_client = evaluation_client.inner().clone();
-    let user_contest = match contest_client
-        .get_contest_metadata(tonic::Request::new(
+    let (user_contest_response, evaluation_contest_response) = future::join(
+        contest_client.get_contest_metadata(tonic::Request::new(
             contest::GetContestMetadataRequest::default(),
-        ))
-        .await
-    {
-        Ok(response) => {
-            let res = response.into_inner();
-            ContestUser::from(res)
-        }
+        )),
+        evaluation_client
+            .get_contest(tonic::Request::new(evaluation::GetContestRequest::default())),
+    )
+    .await;
+    let user_contest = match user_contest_response {
+        Ok(response) => response.into_inner(),
         Err(err) => {
             return Err(status::Custom(
                 Status::InternalServerError,
@@ -460,14 +449,8 @@ pub async fn contest_template(
             ));
         }
     };
-    let evaluation_contest = match evaluation_client
-        .get_contest(tonic::Request::new(evaluation::GetContestRequest::default()))
-        .await
-    {
-        Ok(response) => {
-            let res = response.into_inner();
-            ContestEvaluation::from(res)
-        }
+    let evaluation_contest = match evaluation_contest_response {
+        Ok(response) => response.into_inner(),
         Err(err) => {
             return Err(status::Custom(
                 Status::InternalServerError,
@@ -475,9 +458,38 @@ pub async fn contest_template(
             ));
         }
     };
-    let ct = ContestTemplate {
-        user: user_contest,
-        evaluation: evaluation_contest,
-    };
+    let user_problem_requests: Vec<
+        core::pin::Pin<
+            Box<
+                dyn futures::Future<
+                        Output = Result<
+                            tonic::Response<contest::GetProblemResponse>,
+                            tonic::Status,
+                        >,
+                    > + std::marker::Send,
+            >,
+        >,
+    > = evaluation_contest
+        .info
+        .problems
+        .clone()
+        .into_iter()
+        .map(|x| {
+            contest_client.get_problem(tonic::Request::new(contest::GetProblemRequest {
+                problem_id: x.id,
+            }))
+        })
+        .collect();
+    let user_problem_responses: Vec<contest::Problem> = future::join_all(user_problem_requests)
+        .await
+        .into_iter()
+        .map(
+            |x: Result<tonic::Response<contest::GetProblemResponse>, tonic::Status>| {
+                x.unwrap().into_inner().info // TODO: remove unwrap
+            },
+        )
+        .collect();
+
+    let ct = ContestTemplate::new(evaluation_contest, user_contest, user_problem_responses);
     Ok(Template::render("contest", ct))
 }
