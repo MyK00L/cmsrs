@@ -342,7 +342,7 @@ impl Problem {
             compilation_limits: e.compilation_limits.into(),
             subtasks: e.subtasks.into_iter().map(Subtask::from).collect(),
             name: u.name.clone(),
-            longname: u.long_name.clone(),
+            longname: u.long_name,
         }
     }
 }
