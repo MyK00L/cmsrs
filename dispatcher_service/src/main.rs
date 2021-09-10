@@ -11,6 +11,7 @@ use protos::{
     },
     utils::{get_local_address, Service},
 };
+use std::collections::HashMap;
 use tonic::{transport::Server, Request, Response, Status};
 
 mod mock_services;
@@ -64,10 +65,8 @@ fn dispatcher_to_worker_request(
     }
 }
 
-// Assuming that testcase_results are in the correct order. The only
-// problem metadata we need are the number of testcases in each subtask
 async fn group_testcases(
-    mut testcase_results: Vec<TestcaseResult>,
+    testcase_results: Vec<TestcaseResult>,
     problem_id: u64,
 ) -> Result<Vec<SubtaskResult>, Status> {
     let mock_evaluation_service = mock_services::get_mock_evaluation();
@@ -76,23 +75,23 @@ async fn group_testcases(
         .await?
         .into_inner();
 
-    testcase_results.reverse(); // TODO change this hacky code
-    let mut remaining_len = testcase_results.len();
+    let map_id_to_testcase_result: HashMap<_, _> = testcase_results
+        .iter()
+        .map(|testcase_result| (testcase_result.id, testcase_result.to_owned()))
+        .collect();
 
     Ok(problem_metadata
         .info
         .subtasks
         .iter()
-        .map(|subtask| {
-            let chunk_size = subtask.testcases_id.len();
-            SubtaskResult {
-                testcase_results: {
-                    let chunk = testcase_results.split_off(remaining_len - chunk_size); // TODO change this hacky code
-                    remaining_len -= chunk_size;
-                    chunk.to_vec()
-                },
-                score: OneOfScore::default(),
-            }
+        .map(|subtask| SubtaskResult {
+            testcase_results: subtask
+                .testcases_id
+                .iter()
+                .map(|testcase_id| map_id_to_testcase_result[testcase_id].to_owned())
+                .collect(),
+            score: OneOfScore::default(),
+            id: subtask.id,
         })
         .collect())
 }

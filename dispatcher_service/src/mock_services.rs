@@ -7,6 +7,8 @@ use protos::{
         worker::{self, MockWorker},
     },
 };
+use rand::seq::SliceRandom;
+use rand::thread_rng;
 use utils::scoring_lib::score_with_bool;
 
 const NUM_OF_SUBTASKS: u64 = 5;
@@ -78,7 +80,7 @@ fn mock_worker_init(mock_worker_server: &mut MockWorker) {
         testcase_results: {
             let mut testcase_results =
                 Vec::with_capacity((NUM_OF_TESTCASES_PER_SUBTASK * NUM_OF_SUBTASKS) as usize);
-            for _ in 0..NUM_OF_TESTCASES_PER_SUBTASK * NUM_OF_SUBTASKS {
+            for i in 0..NUM_OF_TESTCASES_PER_SUBTASK * NUM_OF_SUBTASKS {
                 testcase_results.push(TestcaseResult {
                     outcome: Outcome::Ok as i32,
                     score: score_with_bool(true),
@@ -89,8 +91,10 @@ fn mock_worker_init(mock_worker_server: &mut MockWorker) {
                         },
                         memory_bytes: 1u64,
                     },
+                    id: i,
                 });
             }
+            testcase_results.shuffle(&mut thread_rng());
             testcase_results
         },
     })
