@@ -22,6 +22,7 @@ message TestcaseResult {
 	required Outcome outcome = 1;
 	required scoring.OneOfScore score = 2;
 	required common.Resources used_resources = 3;
+	required uint64 id = 4;
 }
 message CompilationResult {
 	enum Outcome {
@@ -40,6 +41,7 @@ message CompilationResult {
 message SubtaskResult {
 	repeated TestcaseResult testcase_results = 1;
 	required scoring.OneOfScore score = 2;
+	required uint64 id = 3;
 }
 
 message EvaluationResult {

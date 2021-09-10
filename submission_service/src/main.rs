@@ -112,8 +112,9 @@ async fn init_contest_service_db(db: Database) -> Result<(), Box<dyn std::error:
                                 "bsonType": "array",
                                 "items": {
                                     "bsonType": "object",
-                                    "required": ["testcases", "subtaskScore"],
+                                    "required": ["subtaskId", "testcases", "subtaskScore"],
                                     "properties": {
+                                    "subtaskId": { "bsonType": "long" },
                                     "subtaskScore": { 
                                         "oneOf": [ 
                                             { "bsonType": "bool"},
@@ -124,8 +125,9 @@ async fn init_contest_service_db(db: Database) -> Result<(), Box<dyn std::error:
                                         "bsonType": "array",
                                         "items": {
                                             "bsonType": "object",
-                                            "required": ["outcome", "score", "timeNs", "memoryB"], 
+                                            "required": ["testcaseId", "outcome", "score", "timeNs", "memoryB"], 
                                             "properties": {
+                                                "testcaseId": { "bsonType": "long" },
                                                 "outcome": {
                                                     "bsonType": "int",
                                                     "enum": [0, 1, 2, 3, 4, 5]
