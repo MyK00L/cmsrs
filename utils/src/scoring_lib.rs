@@ -3,21 +3,27 @@ use core::panic;
 use protos::evaluation::{SubtaskResult, TestcaseResult};
 use protos::scoring::{self, one_of_score, OneOfScore, Subtask};
 
-fn as_double(score: &OneOfScore) -> f64 {
+pub fn as_double(score: &OneOfScore) -> f64 {
     match score.score {
         Some(one_of_score::Score::DoubleScore(double_score)) => double_score,
         _ => panic!("Cannot cast OneOfScore to double"),
     }
 }
 
-fn as_bool(score: &OneOfScore) -> bool {
+pub fn as_bool(score: &OneOfScore) -> bool {
     match score.score {
         Some(one_of_score::Score::BoolScore(bool_score)) => bool_score,
         _ => panic!("Cannot cast OneOfScore to bool"),
     }
 }
 
-fn score_with_double(double_score: f64) -> OneOfScore {
+pub fn score_with_bool(bool_score: bool) -> OneOfScore {
+    OneOfScore {
+        score: Some(one_of_score::Score::BoolScore(bool_score)),
+    }
+}
+
+pub fn score_with_double(double_score: f64) -> OneOfScore {
     OneOfScore {
         score: Some(one_of_score::Score::DoubleScore(double_score)),
     }

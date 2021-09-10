@@ -6,12 +6,14 @@ use protos::{
             self,
             dispatcher_server::{Dispatcher, DispatcherServer},
         },
-        evaluation::{evaluation_server::Evaluation, GetProblemRequest, MockEvaluation},
+        evaluation::{evaluation_server::Evaluation, GetProblemRequest},
         worker::{self, worker_server::Worker, MockWorker},
     },
     utils::{get_local_address, Service},
 };
 use tonic::{transport::Server, Request, Response, Status};
+
+mod mock_services;
 
 struct RoundRobin {
     actual: usize,
@@ -41,7 +43,10 @@ impl DispatcherService {
     async fn new() -> Result<Self, Box<dyn std::error::Error>> {
         // somehow get the worker list
         // or get the reference for a worker provider
-        let workers = vec![MockWorker::default(), MockWorker::default()];
+        let workers = vec![
+            mock_services::get_mock_worker(),
+            mock_services::get_mock_worker(),
+        ];
         let len = workers.len();
         unsafe {
             SELECTOR.total_number = len;
@@ -65,8 +70,7 @@ async fn group_testcases(
     mut testcase_results: Vec<TestcaseResult>,
     problem_id: u64,
 ) -> Result<Vec<SubtaskResult>, Status> {
-    let mock_evaluation_service = MockEvaluation::default();
-    // mock_evaluation_service.get_problem_set(...stuff...)
+    let mock_evaluation_service = mock_services::get_mock_evaluation();
     let problem_metadata = mock_evaluation_service
         .get_problem(Request::new(GetProblemRequest { problem_id }))
         .await?
