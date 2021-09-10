@@ -7,12 +7,12 @@ import "evaluation.proto";
 
 // Submission service
 message EvaluateSubmissionRequest {
-	evaluation.Submission sub = 1;
+	required evaluation.Submission sub = 1;
 }
 message EvaluateSubmissionResponse {
-	evaluation.EvaluationResult res = 1;
-	common.Id submission_id = 2;
-	google.protobuf.Timestamp timestamp = 3;
+	required evaluation.EvaluationResult res = 1;
+	required common.Id submission_id = 2;
+	required google.protobuf.Timestamp timestamp = 3;
 }
 message GetSubmissionListRequest {
 	optional uint32 limit = 1;
@@ -21,20 +21,20 @@ message GetSubmissionListRequest {
 }
 message GetSubmissionListResponse {
 	message Item {
-		common.Id sub_id = 1;
-		string user = 2;
-		uint32 problem_id = 3;
-		google.protobuf.Timestamp timestamp = 5;
-		optional double score = 6;
+		required common.Id sub_id = 1;
+		required string user = 2;
+		required uint32 problem_id = 3;
+		required google.protobuf.Timestamp timestamp = 5;
+		required optional double score = 6;
 	}
 	repeated Item list = 1;
 }
 message GetSubmissionDetailsRequest {
-	common.Id submission_id = 1;
+	required common.Id submission_id = 1;
 }
 message GetSubmissionDetailsResponse {
-	evaluation.Submission sub = 1;
-	google.protobuf.Timestamp timestamp = 2;
+	required evaluation.Submission sub = 1;
+	required google.protobuf.Timestamp timestamp = 2;
 }
 service Submission {
 	rpc evaluate_submission(EvaluateSubmissionRequest) returns (EvaluateSubmissionResponse);
