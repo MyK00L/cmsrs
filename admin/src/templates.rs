@@ -381,7 +381,7 @@ impl Problem {
         Self {
             id: e.id,
             scoring: e.scoring.into(),
-            problem_type: String::from(""), //format!("{:?}", p.aa), // TODO
+            problem_type: format!("{:?}", evaluation::problem::Type::from_i32(e.r#type)),
             execution_limits: e.execution_limits.into(),
             compilation_limits: e.compilation_limits.into(),
             subtasks: e.subtasks.into_iter().map(Subtask::from).collect(),
@@ -395,7 +395,13 @@ impl From<Problem> for evaluation::Problem {
         Self {
             id: p.id,
             scoring: p.scoring.into(),
-            //TODO type??
+            r#type: match p.problem_type.as_str() {
+                "Batch" => evaluation::problem::Type::Batch as i32,
+                "OutputOnly" => evaluation::problem::Type::OutputOnly as i32,
+                "Interactive" => evaluation::problem::Type::Interactive as i32,
+                "Other" => evaluation::problem::Type::Other as i32,
+                _ => panic!("Invalid problem type string"),
+            },
             execution_limits: p.execution_limits.into(),
             compilation_limits: p.compilation_limits.into(),
             subtasks: p
