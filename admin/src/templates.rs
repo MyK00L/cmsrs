@@ -23,6 +23,18 @@ impl From<protos::common::Resources> for Resources {
         }
     }
 }
+impl From<Resources> for protos::common::Resources {
+    fn from(r: Resources) -> Self {
+        Self {
+            time: protos::common::Duration {
+                nanos: (r.nanos % 1000000000) as u32,
+                secs: r.nanos / 1000000000,
+            },
+            memory_bytes: r.bytes,
+        }
+    }
+}
+
 #[derive(Serialize)]
 #[serde(crate = "rocket::serde")]
 struct TestcaseResult {
@@ -286,6 +298,18 @@ impl From<protos::scoring::Subtask> for SubtaskScoring {
         }
     }
 }
+impl From<SubtaskScoring> for protos::scoring::Subtask {
+    fn from(s: SubtaskScoring) -> Self {
+        Self {
+            method: match s.method.as_str() {
+                "Min" => protos::scoring::subtask::Method::Min as i32,
+                "Sum" => protos::scoring::subtask::Method::Sum as i32,
+                _ => panic!("Bad subtask scoring string"),
+            },
+            max_score: s.max_score,
+        }
+    }
+}
 
 #[derive(Serialize, FromForm, Debug)]
 #[serde(crate = "rocket::serde")]
@@ -303,6 +327,15 @@ impl From<evaluation::Subtask> for Subtask {
         }
     }
 }
+impl From<Subtask> for evaluation::Subtask {
+    fn from(s: Subtask) -> Self {
+        Self {
+            id: s.id,
+            scoring: s.scoring.into(),
+            testcases_id: s.testcases,
+        }
+    }
+}
 
 #[derive(Serialize, FromForm, Debug)]
 #[serde(crate = "rocket::serde")]
@@ -316,6 +349,17 @@ impl From<protos::scoring::Problem> for ProblemScoring {
                 "{:?}",
                 protos::scoring::problem::Method::from_i32(p.method).unwrap()
             ),
+        }
+    }
+}
+impl From<ProblemScoring> for protos::scoring::Problem {
+    fn from(p: ProblemScoring) -> Self {
+        Self {
+            method: match p.method.as_str() {
+                "SumMax" => protos::scoring::problem::Method::SumMax as i32,
+                "MaxSum" => protos::scoring::problem::Method::MaxSum as i32,
+                _ => panic!("Invalid problem scoring method string"),
+            },
         }
     }
 }
@@ -346,6 +390,32 @@ impl Problem {
         }
     }
 }
+impl From<Problem> for evaluation::Problem {
+    fn from(p: Problem) -> Self {
+        Self {
+            id: p.id,
+            scoring: p.scoring.into(),
+            //TODO type??
+            execution_limits: p.execution_limits.into(),
+            compilation_limits: p.compilation_limits.into(),
+            subtasks: p
+                .subtasks
+                .into_iter()
+                .map(evaluation::Subtask::from)
+                .collect(),
+            ..Default::default()
+        }
+    }
+}
+impl From<Problem> for contest::Problem {
+    fn from(p: Problem) -> Self {
+        Self {
+            id: p.id,
+            name: p.name,
+            long_name: p.longname,
+        }
+    }
+}
 
 #[derive(Serialize, FromForm, Debug)]
 #[serde(crate = "rocket::serde")]
@@ -358,7 +428,24 @@ pub struct UserScoringMethod {
 impl From<protos::scoring::user::Method> for UserScoringMethod {
     fn from(us: protos::scoring::user::Method) -> Self {
         Self {
-            aggregation: us.aggregation_method.to_string(), // TODO: to enum
+            aggregation: format!(
+                "{:?}",
+                protos::scoring::user::method::Aggregation::from_i32(us.aggregation_method)
+            ),
+            score_weight: us.score_weight,
+            wrong_submission_count_weight: us.wrong_submission_count_weight,
+            time_secs_weight: us.time_secs_weight,
+        }
+    }
+}
+impl From<UserScoringMethod> for protos::scoring::user::Method {
+    fn from(us: UserScoringMethod) -> Self {
+        Self {
+            aggregation_method: match us.aggregation.as_str() {
+                "Sum" => protos::scoring::user::method::Aggregation::Sum as i32,
+                "Max" => protos::scoring::user::method::Aggregation::Max as i32,
+                _ => panic!("Invalid user scoring method aggregation string"),
+            },
             score_weight: us.score_weight,
             wrong_submission_count_weight: us.wrong_submission_count_weight,
             time_secs_weight: us.time_secs_weight,
@@ -380,6 +467,18 @@ impl From<protos::scoring::User> for UserScoring {
                 .tiebreakers
                 .into_iter()
                 .map(UserScoringMethod::from)
+                .collect(),
+        }
+    }
+}
+impl From<UserScoring> for protos::scoring::User {
+    fn from(us: UserScoring) -> Self {
+        Self {
+            main: us.main.into(),
+            tiebreakers: us
+                .tiebreakers
+                .into_iter()
+                .map(protos::scoring::user::Method::from)
                 .collect(),
         }
     }

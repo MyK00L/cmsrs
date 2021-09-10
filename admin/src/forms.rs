@@ -16,14 +16,6 @@ pub async fn login(cookies: &CookieJar<'_>, login: Form<Strict<Login>>) -> Redir
     }
 }
 
-#[derive(FromForm, Debug)]
-pub struct UserScoringMethod {
-    aggregation: String,
-    score_weight: f64,
-    wrong_submission_count_weight: f64,
-    time_secs_weight: f64,
-}
-
 #[post("/form/update_contest", data = "<contest>")]
 pub async fn update_contest(
     _admin: Admin,
