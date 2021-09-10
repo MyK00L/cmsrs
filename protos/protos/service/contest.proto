@@ -5,8 +5,8 @@ package service.contest;
 import "google/protobuf/timestamp.proto";
 
 message AuthUserRequest {
-	string username = 1;
-	string password = 2;
+	required string username = 1;
+	required string password = 2;
 }
 message AuthUserResponse {
 	message Success {
@@ -23,37 +23,37 @@ message AuthUserResponse {
 }
 
 message ContestMetadata {
-	string name = 1;
-	string description = 2;
+	required string name = 1;
+	required string description = 2;
 	optional google.protobuf.Timestamp start_time = 3;
 	optional google.protobuf.Timestamp end_time = 4;
 }
 message GetContestMetadataRequest {}
 message GetContestMetadataResponse {
-	ContestMetadata metadata = 1;
+	required ContestMetadata metadata = 1;
 }
 
 message Problem {
-	uint32 id = 1;
-	string name = 2;
-	string long_name = 3;
+	required uint32 id = 1;
+	required string name = 2;
+	required string long_name = 3;
 }
 message GetProblemRequest {
-	uint32 problem_id = 1;
+	required uint32 problem_id = 1;
 }
 message GetProblemResponse {
- 	Problem info = 1;
-	bytes statement = 2;
+ 	required Problem info = 1;
+	required bytes statement = 2;
 }
 
 message Message { // questions and announcements are the same
-	uint32 id = 1;
-	string subject = 2;
+	required uint32 id = 1;
+	required string subject = 2;
 	optional uint32 problem_id = 3;
-	string text = 4;
+	required string text = 4;
 	optional string from = 5;
 	optional string to = 6;
-	google.protobuf.Timestamp sent_at = 7;
+	required google.protobuf.Timestamp sent_at = 7;
 }
 message GetAnnouncementListRequest {
 	optional uint32 problem_id = 1;
@@ -72,9 +72,9 @@ message GetQuestionListResponse {
 
 
 message SetUserRequest {
-	string username = 1;
-	string fullname = 2;
-	string password = 3;
+	required string username = 1;
+	required string fullname = 2;
+	required string password = 3;
 }
 message SetUserResponse {
 	enum Code {
@@ -85,7 +85,7 @@ message SetUserResponse {
 }
 
 message SetContestMetadataRequest {
-	ContestMetadata metadata = 1;
+	required ContestMetadata metadata = 1;
 }
 message SetContestMetadataResponse {}
 
@@ -96,7 +96,7 @@ message SetProblemRequest {
 message SetProblemResponse {}
 
 message AddMessageRequest {
-	Message message = 1;
+	required Message message = 1;
 }
 message AddMessageResponse {}
 
