@@ -111,3 +111,37 @@ pub async fn reply(
         )),
     }
 }
+
+#[derive(FromForm)]
+pub struct SetChecker {
+    file: Vec<u8>,
+    language: String,
+}
+#[post("/form/set_checker/<problem_id>", data = "<checker>")]
+pub async fn set_checker(
+    _admin: Admin,
+    problem_id: u64,
+    checker: Form<Strict<SetChecker>>,
+    evaluation_client: &State<EvaluationClient>,
+) -> Result<Redirect, status::Custom<String>> {
+    let evaluation_client = evaluation_client.inner().clone();
+    let req = evaluation::SetProblemEvaluationFileRequest {
+        problem_id: problem_id,
+        command: Some(evaluation::set_problem_evaluation_file_request::Command::UpdateEvaluationFile(
+            evaluation::EvaluationFile {
+                r#type: 0, //TODO
+                source: protos::common::Source {
+                    lang: 0,
+                    code: checker.file.clone(),
+                }
+            }
+        )),
+    };
+    match evaluation_client.set_problem_evaluation_file(tonic::Request::new(req)).await {
+        Ok(_) => Ok(Redirect::to("/problem_files")),
+        Err(err) => Err(status::Custom(
+            Status::InternalServerError,
+            format!("Error in rpc request:\n{:?}", err),
+        )),
+    }
+}

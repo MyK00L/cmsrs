@@ -193,6 +193,7 @@ fn rocket() -> _ {
                 statics,
                 statics_redirect,
                 templates::users_template,
+                templates::problem_files_template,
                 templates::questions_template,
                 templates::submissions_template,
                 templates::submission_details_template,
