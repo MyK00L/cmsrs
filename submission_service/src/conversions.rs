@@ -120,6 +120,7 @@ fn compilation_data_to_db_obj(compilation_result: CompilationResult) -> Bson {
 
 fn testcase_data_to_db_obj(testcase_data: &TestcaseResult) -> Bson {
     bson! ({
+        "testcaseId": convert_to_i64(testcase_data.id),
         "outcome": testcase_data.outcome,
         "score": score_struct_to_bson(testcase_data.score.clone()).unwrap(),
         "timeNs": duration_to_time_ns(testcase_data.used_resources.time.clone()),
@@ -129,6 +130,7 @@ fn testcase_data_to_db_obj(testcase_data: &TestcaseResult) -> Bson {
 
 fn subtask_data_to_db_obj(subtask_data: &SubtaskResult) -> Bson {
     bson! ({
+        "subtaskId": convert_to_i64(subtask_data.id),
         "subtaskScore": score_struct_to_bson(subtask_data.score.clone()),
         "testcases":
             subtask_data.testcase_results
@@ -217,7 +219,10 @@ fn single_testcase_db_to_struct(testcase_doc: &Document) -> TestcaseResult {
             testcase_doc.get("score"),
             true,
             expected_field("score"),
-        ), // expected
+        ),
+        id: testcase_doc
+            .get_i64("testcaseId")
+            .unwrap_or_else(|_| panic!("{}", expected_field("testcaseId"))) as u64,
     }
 }
 
@@ -237,6 +242,9 @@ fn single_subtask_db_to_struct(subtask_doc: &Document) -> SubtaskResult {
             })
             .collect::<Vec<TestcaseResult>>(),
         score: score_option_bson_to_struct(Some(subtask_score_bson), false, DUMMY_MESSAGE),
+        id: subtask_doc
+            .get_i64("subtaskId")
+            .unwrap_or_else(|_| panic!("{}", expected_field("subtaskId"))) as u64,
     }
 }
 
@@ -278,6 +286,6 @@ pub fn document_to_evaluation_result_struct(submission_doc: Document) -> Evaluat
             submission_doc.get("overallScore"),
             true,
             expected_field("overallScore"),
-        ), // expected
+        ),
     }
 }
