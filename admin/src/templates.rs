@@ -366,7 +366,7 @@ impl From<ProblemScoring> for protos::scoring::Problem {
 #[derive(Serialize, FromForm, Debug, Clone)]
 #[serde(crate = "rocket::serde")]
 pub struct Problem {
-    id: u64,
+    id: Option<u64>,
     scoring: ProblemScoring,
     problem_type: String,
     execution_limits: Resources,
@@ -378,7 +378,7 @@ pub struct Problem {
 impl Problem {
     fn new(e: evaluation::Problem, u: contest::Problem) -> Self {
         Self {
-            id: e.id,
+            id: Some(e.id),
             scoring: e.scoring.into(),
             problem_type: format!("{:?}", evaluation::problem::Type::from_i32(e.r#type)),
             execution_limits: e.execution_limits.into(),
@@ -388,11 +388,16 @@ impl Problem {
             longname: u.long_name,
         }
     }
+    fn gen_id_if_none(&mut self) {
+        if self.id.is_none() {
+            self.id = Some(utils::gen_uuid());
+        }
+    }
 }
 impl From<Problem> for evaluation::Problem {
     fn from(p: Problem) -> Self {
         Self {
-            id: p.id,
+            id: p.id.unwrap(),
             scoring: p.scoring.into(),
             r#type: match p.problem_type.as_str() {
                 "Batch" => evaluation::problem::Type::Batch as i32,
@@ -414,7 +419,7 @@ impl From<Problem> for evaluation::Problem {
 impl From<Problem> for contest::Problem {
     fn from(p: Problem) -> Self {
         Self {
-            id: p.id,
+            id: p.id.unwrap(),
             name: p.name,
             long_name: p.longname,
         }
@@ -529,6 +534,11 @@ impl ContestTemplate {
                 .map(|x| Problem::new(x.0, x.1))
                 .collect(),
             user_scoring: evaluation_contest.info.user_scoring_method.into(),
+        }
+    }
+    pub fn gen_ids_if_none(&mut self) {
+        for p in self.problems.iter_mut() {
+            p.gen_id_if_none();
         }
     }
 }

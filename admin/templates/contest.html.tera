@@ -20,6 +20,48 @@
  </label>
  `;
 		}
+	let problem_n = {{problems | length}};
+	function add_problem(problems){
+			problem_n+=1;
+			problems.innerHTML+=`
+ <hr>
+ <details>
+ <summary>Problem ${problem_n}</summary>
+ <label>id <input name="problems[${problem_n}].id" type="number" readonly><br></label>
+ <label>name <input name="problems[${problem_n}].name" type="text" required><br></label>
+ <label>long name <input name="problems[${problem_n}].longname" type="text" required><br></label>
+ <label>Problem type
+ <select name="problems[${problem_n}].problem_type" required>
+ <option value="Batch">Batch</option>
+ <option value="OutputOnly">OutputOnly</option>
+ <option value="Interactive">Interactive</option>
+ <option value="Other">Other</option>
+ </select>
+ <br>
+ </label>
+ <label>problem scoring method
+ <select name="problems[${problem_n}].scoring.method" required>
+ <option value="SumMax">SumMax</option>
+ <option value="MaxSum">MaxSum</option>
+ </select>
+ <br>
+ </label>
+ <details>
+ <summary>execution limits</summary>
+ <label>nanos <input name="problems[${problem_n}].execution_limits.nanos" type="number" step="1" required><br></label>
+ <label>bytes <input name="problems[${problem_n}].execution_limits.bytes" type="number" step="1" required><br></label>
+ </details>
+ <details>
+ <summary>compilation limits</summary>
+ <label>nanos <input name="problems[${problem_n}].compilation_limits.nanos" type="number" step="1" required><br></label>
+ <label>bytes <input name="problems[${problem_n}].compilation_limits.bytes" type="number" step="1" required><br></label>
+ </details>
+ <details>
+ <summary>subtasks</summary>
+ </details>
+ </details>
+ `;
+		}
 </script>
 {% endblock scripts %}
 {% block content %}
@@ -54,68 +96,72 @@
 		</label>
 		{% endfor %}
 	</details>
-	{% for problem in problems %}
-	<hr>
 	<details>
-		{% set pi = loop.index0 %}
-		<summary>Problem {{pi}}</summary>
-		<label>id <input name="problems[{{pi}}].id" value="{{problem.id}}" type="number" readonly required><br></label>
-		<label>name <input name="problems[{{pi}}].name" value="{{problem.name}}" type="text" required><br></label>
-		<label>long name <input name="problems[{{pi}}].longname" value="{{problem.longname}}" type="text" required><br></label>
-		<label>Problem type
-			<select name="problems[{{pi}}].problem_type" required>
-				<option value="Batch" {% if problem.problem_type == "Batch" %} selected {% endif %} >Batch</option>
-				<option value="OutputOnly" {% if problem.problem_type == "OutputOnly" %} selected {% endif %} >OutputOnly</option>
-				<option value="Interactive" {% if problem.problem_type == "Interactive" %} selected {% endif %} >Interactive</option>
-				<option value="Other" {% if problem.problem_type == "Other" %} selected {% endif %} >Other</option>
-			</select>
-			<br>
-		</label>
-		<label>problem scoring method
-			<select name="problems[{{pi}}].scoring.method" required>
-				<option value="SumMax" {% if problem.scoring.method == "SumMax" %} selected {% endif %} >SumMax</option>
-				<option value="MaxSum" {% if problem.scoring.method == "MaxSum" %} selected {% endif %} >MaxSum</option>
-			</select>
-			<br>
-		</label>
-		
-		<details>
-			<summary>execution limits</summary>i
-			<label>nanos <input name="problems[{{pi}}].execution_limits.nanos" value="{{problem.execution_limits.nanos}}" type="number" step="1" required><br></label>
-			<label>bytes <input name="problems[{{pi}}].execution_limits.bytes" value="{{problem.execution_limits.bytes}}" type="number" step="1" required><br></label>
-		</details>
-		<details>
-			<summary>compilation limits</summary>
-			<label>nanos <input name="problems[{{pi}}].compilation_limits.nanos" value="{{problem.compilation_limits.nanos}}" type="number" step="1" required><br></label>
-			<label>bytes <input name="problems[{{pi}}].compilation_limits.bytes" value="{{problem.compilation_limits.bytes}}" type="number" step="1" required><br></label>
-		</details>
-		<details>
-			<summary>subtasks</summary>
-			{% for subtask in problem.subtasks %}
-			{% set si = loop.index0 %}
+		<summary>Problems</summary>
+		<button onclick="add_problem(this.parentElement)">+</button></br>
+			{% for problem in problems %}
+			<hr>
 			<details>
-				<summary>Subtask {{si}}</summary>
-				<label>id <input name="problems[{{pi}}].subtasks[{{si}}].id" value="{{subtask.id}}" type="number" readonly required><br></label>
-				<label>scoring method
-					<select name="problems[{{pi}}].subtasks[{{si}}].scoring.method" required>
-						<option value="Min" {% if subtask.scoring.method == "Min" %} selected {% endif %} >Min</option>
-						<option value="Sum" {% if subtask.scoring.method == "Sum" %} selected {% endif %} >Sum</option>
+				{% set pi = loop.index0 %}
+				<summary>Problem {{pi}}</summary>
+				<label>id <input name="problems[{{pi}}].id" value="{{problem.id}}" type="number" readonly required><br></label>
+				<label>name <input name="problems[{{pi}}].name" value="{{problem.name}}" type="text" required><br></label>
+				<label>long name <input name="problems[{{pi}}].longname" value="{{problem.longname}}" type="text" required><br></label>
+				<label>Problem type
+					<select name="problems[{{pi}}].problem_type" required>
+						<option value="Batch" {% if problem.problem_type == "Batch" %} selected {% endif %} >Batch</option>
+						<option value="OutputOnly" {% if problem.problem_type == "OutputOnly" %} selected {% endif %} >OutputOnly</option>
+						<option value="Interactive" {% if problem.problem_type == "Interactive" %} selected {% endif %} >Interactive</option>
+						<option value="Other" {% if problem.problem_type == "Other" %} selected {% endif %} >Other</option>
 					</select>
 					<br>
 				</label>
-				<label>max score <input name="problems[{{pi}}].subtasks[{{si}}].scoring.max_score" value="{{subtask.scoring.max_score}}" type="number" step="1" required><br></label>
+				<label>problem scoring method
+					<select name="problems[{{pi}}].scoring.method" required>
+						<option value="SumMax" {% if problem.scoring.method == "SumMax" %} selected {% endif %} >SumMax</option>
+						<option value="MaxSum" {% if problem.scoring.method == "MaxSum" %} selected {% endif %} >MaxSum</option>
+					</select>
+					<br>
+				</label>
+
 				<details>
-					<summary>testcases</summary>
-					{% for testcase in subtask.testcases %}
-					{% set ti = loop.index0 %}
-					<label>id <input name="problems[{{pi}}].subtasks[{{si}}].testcases[{{ti}}]" value="{{testcase}}" type="number" readonly required><br></label>
+					<summary>execution limits</summary>
+					<label>nanos <input name="problems[{{pi}}].execution_limits.nanos" value="{{problem.execution_limits.nanos}}" type="number" step="1" required><br></label>
+					<label>bytes <input name="problems[{{pi}}].execution_limits.bytes" value="{{problem.execution_limits.bytes}}" type="number" step="1" required><br></label>
+				</details>
+				<details>
+					<summary>compilation limits</summary>
+					<label>nanos <input name="problems[{{pi}}].compilation_limits.nanos" value="{{problem.compilation_limits.nanos}}" type="number" step="1" required><br></label>
+					<label>bytes <input name="problems[{{pi}}].compilation_limits.bytes" value="{{problem.compilation_limits.bytes}}" type="number" step="1" required><br></label>
+				</details>
+				<details>
+					<summary>subtasks</summary>
+					{% for subtask in problem.subtasks %}
+					{% set si = loop.index0 %}
+					<details>
+						<summary>Subtask {{si}}</summary>
+						<label>id <input name="problems[{{pi}}].subtasks[{{si}}].id" value="{{subtask.id}}" type="number" readonly required><br></label>
+						<label>scoring method
+							<select name="problems[{{pi}}].subtasks[{{si}}].scoring.method" required>
+								<option value="Min" {% if subtask.scoring.method == "Min" %} selected {% endif %} >Min</option>
+								<option value="Sum" {% if subtask.scoring.method == "Sum" %} selected {% endif %} >Sum</option>
+							</select>
+							<br>
+						</label>
+						<label>max score <input name="problems[{{pi}}].subtasks[{{si}}].scoring.max_score" value="{{subtask.scoring.max_score}}" type="number" step="1" required><br></label>
+						<details>
+							<summary>testcases</summary>
+							{% for testcase in subtask.testcases %}
+							{% set ti = loop.index0 %}
+							<label>id <input name="problems[{{pi}}].subtasks[{{si}}].testcases[{{ti}}]" value="{{testcase}}" type="number" readonly required><br></label>
+							{% endfor %}
+						</details>
+					</details>
 					{% endfor %}
 				</details>
 			</details>
 			{% endfor %}
-		</details>
 	</details>
-	{% endfor %}
 	<hr>
 	<input type="submit" value="update">
 </form>

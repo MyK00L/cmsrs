@@ -25,7 +25,8 @@ pub async fn update_contest(
 ) -> Result<Redirect, status::Custom<String>> {
     let contest_client = contest_client.inner().clone();
     let evaluation_client = evaluation_client.inner().clone();
-    let contest = contest.into_inner().into_inner();
+    let mut contest = contest.into_inner().into_inner();
+    contest.gen_ids_if_none();
 
     let user_req = contest::SetContestMetadataRequest::from(contest.clone());
 
