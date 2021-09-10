@@ -20,11 +20,29 @@ pub async fn login(cookies: &CookieJar<'_>, login: Form<Strict<Login>>) -> Redir
 pub async fn update_contest(
     _admin: Admin,
     contest: Form<Strict<templates::ContestTemplate>>,
-    _contest_client: &State<ContestClient>,
-    _evaluation_client: &State<EvaluationClient>,
+    contest_client: &State<ContestClient>,
+    evaluation_client: &State<EvaluationClient>,
 ) -> Result<Redirect, status::Custom<String>> {
-    eprintln!("{:?}", contest);
-    Ok(Redirect::to("/contest"))
+    let contest_client = contest_client.inner().clone();
+    let evaluation_client = evaluation_client.inner().clone();
+    let contest = contest.into_inner().into_inner();
+
+    let user_req = contest::SetContestMetadataRequest::from(contest.clone());
+
+    let evaluation_req = evaluation::SetContestRequest::from(contest);
+
+    let (contest_response, evaluation_response) = future::join(
+        contest_client.set_contest_metadata(tonic::Request::new(user_req)),
+        evaluation_client.set_contest(tonic::Request::new(evaluation_req)),
+    )
+    .await;
+    match contest_response.ok().zip(evaluation_response.ok()) {
+        Some(_) => Ok(Redirect::to("/contest")),
+        None => Err(status::Custom(
+            Status::InternalServerError,
+            String::from("Error in sending requests :("),
+        )),
+    }
 }
 
 #[derive(FromForm)]

@@ -1,5 +1,4 @@
 use super::*;
-use futures::future;
 
 #[get("/users")]
 pub async fn users_template(_admin: Admin) -> Result<Template, status::Custom<String>> {
@@ -9,7 +8,7 @@ pub async fn users_template(_admin: Admin) -> Result<Template, status::Custom<St
     ))
 }
 
-#[derive(Serialize, FromForm, Debug)]
+#[derive(Serialize, FromForm, Debug, Clone)]
 #[serde(crate = "rocket::serde")]
 pub struct Resources {
     nanos: u64,
@@ -35,7 +34,7 @@ impl From<Resources> for protos::common::Resources {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug, Clone)]
 #[serde(crate = "rocket::serde")]
 struct TestcaseResult {
     outcome: String,
@@ -55,7 +54,7 @@ impl From<protos::evaluation::TestcaseResult> for TestcaseResult {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug, Clone)]
 #[serde(crate = "rocket::serde")]
 struct SubtaskResult {
     score: String,
@@ -73,7 +72,7 @@ impl From<protos::evaluation::SubtaskResult> for SubtaskResult {
         }
     }
 }
-#[derive(Serialize)]
+#[derive(Serialize, Debug, Clone)]
 #[serde(crate = "rocket::serde")]
 struct CompilationResult {
     outcome: String,
@@ -93,7 +92,7 @@ impl From<protos::evaluation::CompilationResult> for CompilationResult {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug, Clone)]
 #[serde(crate = "rocket::serde")]
 struct EvaluationResult {
     compilation: CompilationResult,
@@ -114,7 +113,7 @@ impl From<protos::evaluation::EvaluationResult> for EvaluationResult {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug, Clone)]
 #[serde(crate = "rocket::serde")]
 struct SubmissionDetails {
     state: String,
@@ -169,7 +168,7 @@ pub async fn submission_details_template(
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug, Clone)]
 #[serde(crate = "rocket::serde")]
 struct Question {
     id: u64,
@@ -192,7 +191,7 @@ impl From<contest::Message> for Question {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug, Clone)]
 #[serde(crate = "rocket::serde")]
 struct QuestionList {
     questions: Vec<Question>,
@@ -229,7 +228,7 @@ pub async fn questions_template(
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug, Clone)]
 #[serde(crate = "rocket::serde")]
 struct TemplateSubmissionsItem {
     submission_id: u64,
@@ -238,7 +237,7 @@ struct TemplateSubmissionsItem {
     state: String,
     time: String,
 }
-#[derive(Serialize)]
+#[derive(Serialize, Debug, Clone)]
 #[serde(crate = "rocket::serde")]
 struct TemplateSubmissions {
     submission_list: Vec<TemplateSubmissionsItem>,
@@ -281,7 +280,7 @@ pub async fn submissions_template(
         )),
     }
 }
-#[derive(Serialize, FromForm, Debug)]
+#[derive(Serialize, FromForm, Debug, Clone)]
 #[serde(crate = "rocket::serde")]
 pub struct SubtaskScoring {
     method: String, // MIN | SUM
@@ -311,7 +310,7 @@ impl From<SubtaskScoring> for protos::scoring::Subtask {
     }
 }
 
-#[derive(Serialize, FromForm, Debug)]
+#[derive(Serialize, FromForm, Debug, Clone)]
 #[serde(crate = "rocket::serde")]
 pub struct Subtask {
     id: u64,
@@ -337,7 +336,7 @@ impl From<Subtask> for evaluation::Subtask {
     }
 }
 
-#[derive(Serialize, FromForm, Debug)]
+#[derive(Serialize, FromForm, Debug, Clone)]
 #[serde(crate = "rocket::serde")]
 pub struct ProblemScoring {
     method: String, // SUM_MAX | MAX_SUM
@@ -364,7 +363,7 @@ impl From<ProblemScoring> for protos::scoring::Problem {
     }
 }
 
-#[derive(Serialize, FromForm, Debug)]
+#[derive(Serialize, FromForm, Debug, Clone)]
 #[serde(crate = "rocket::serde")]
 pub struct Problem {
     id: u64,
@@ -409,7 +408,6 @@ impl From<Problem> for evaluation::Problem {
                 .into_iter()
                 .map(evaluation::Subtask::from)
                 .collect(),
-            ..Default::default()
         }
     }
 }
@@ -423,7 +421,7 @@ impl From<Problem> for contest::Problem {
     }
 }
 
-#[derive(Serialize, FromForm, Debug)]
+#[derive(Serialize, FromForm, Debug, Clone)]
 #[serde(crate = "rocket::serde")]
 pub struct UserScoringMethod {
     aggregation: String, // Sum | Max
@@ -459,7 +457,7 @@ impl From<UserScoringMethod> for protos::scoring::user::Method {
     }
 }
 
-#[derive(Serialize, FromForm, Debug)]
+#[derive(Serialize, FromForm, Debug, Clone)]
 #[serde(crate = "rocket::serde")]
 pub struct UserScoring {
     main: UserScoringMethod,
@@ -490,7 +488,7 @@ impl From<UserScoring> for protos::scoring::User {
     }
 }
 
-#[derive(Serialize, FromForm, Debug)]
+#[derive(Serialize, FromForm, Debug, Clone)]
 #[serde(crate = "rocket::serde")]
 pub struct ContestTemplate {
     name: String,
@@ -531,6 +529,38 @@ impl ContestTemplate {
                 .map(|x| Problem::new(x.0, x.1))
                 .collect(),
             user_scoring: evaluation_contest.info.user_scoring_method.into(),
+        }
+    }
+}
+impl From<ContestTemplate> for contest::SetContestMetadataRequest {
+    fn from(contest: ContestTemplate) -> Self {
+        Self {
+            metadata: contest::ContestMetadata {
+                name: contest.name.clone(),
+                description: contest.description.clone(),
+                start_time: chrono::prelude::Utc
+                    .datetime_from_str(&contest.start_time, "%FT%T")
+                    .ok()
+                    .map(|t| SystemTime::from(t).into()),
+                end_time: chrono::prelude::Utc
+                    .datetime_from_str(&contest.end_time, "%FT%T")
+                    .ok()
+                    .map(|t| SystemTime::from(t).into()),
+            },
+        }
+    }
+}
+impl From<ContestTemplate> for evaluation::SetContestRequest {
+    fn from(contest: ContestTemplate) -> Self {
+        Self {
+            info: evaluation::Contest {
+                problems: contest
+                    .problems
+                    .into_iter()
+                    .map(evaluation::Problem::from)
+                    .collect(),
+                user_scoring_method: contest.user_scoring.into(),
+            },
         }
     }
 }
