@@ -71,6 +71,7 @@ fn get_bool_testcase(result: bool) -> TestcaseResult {
             time: Duration { secs: 0, nanos: 0 },
             memory_bytes: 0u64,
         },
+        id: 1u64,
     }
 }
 
@@ -86,6 +87,7 @@ fn get_double_testcase(result: f64) -> TestcaseResult {
             time: Duration { secs: 0, nanos: 0 },
             memory_bytes: 0u64,
         },
+        id: 1u64,
     }
 }
 
@@ -102,6 +104,7 @@ fn evaluate_wrong_bool_subtask_with_min_test() {
         score: OneOfScore {
             score: Some(one_of_score::Score::DoubleScore(0f64)),
         },
+        id: 1u64,
     };
 
     let mut score = OneOfScore::default();
@@ -128,6 +131,7 @@ fn evaluate_correct_bool_subtask_with_min_test() {
                 MIN_SCORING_METHOD.max_score,
             )),
         },
+        id: 1u64,
     };
 
     let mut score = OneOfScore::default();
@@ -152,6 +156,7 @@ fn evaluate_wrong_bool_subtask_with_sum_test() {
         score: OneOfScore {
             score: Some(one_of_score::Score::DoubleScore(0f64)),
         },
+        id: 1u64,
     };
 
     let mut score = OneOfScore::default();
@@ -178,6 +183,7 @@ fn evaluate_partial_bool_subtask_with_sum_test() {
                 SUM_SCORING_METHOD.max_score * 3f64 / 5f64,
             )),
         },
+        id: 1u64,
     };
 
     let mut score = OneOfScore::default();
@@ -204,6 +210,7 @@ fn evaluate_correct_bool_subtask_with_sum_test() {
                 SUM_SCORING_METHOD.max_score,
             )),
         },
+        id: 1u64,
     };
 
     let mut score = OneOfScore::default();
@@ -228,6 +235,7 @@ fn evaluate_wrong_double_subtask_with_sum_test() {
         score: OneOfScore {
             score: Some(one_of_score::Score::DoubleScore(DOUBLE_WRONG_ANSWER)),
         },
+        id: 1u64,
     };
 
     let mut score = OneOfScore::default();
@@ -257,6 +265,7 @@ fn evaluate_partial_double_subtask_with_sum_test() {
                     / num_of_testcases,
             )),
         },
+        id: 1u64,
     };
 
     let mut score = OneOfScore::default();
@@ -284,6 +293,7 @@ fn evaluate_correct_double_subtask_with_sum_test() {
                 SUM_SCORING_METHOD.max_score,
             )),
         },
+        id: 1u64,
     };
 
     let mut score = OneOfScore::default();
@@ -308,6 +318,7 @@ fn evaluate_wrong_double_subtask_with_min_test() {
         score: OneOfScore {
             score: Some(one_of_score::Score::DoubleScore(DOUBLE_WRONG_ANSWER)),
         },
+        id: 1u64,
     };
 
     let mut score = OneOfScore::default();
@@ -334,6 +345,7 @@ fn evaluate_partial_double_subtask_with_min_test() {
                 MIN_SCORING_METHOD.max_score * partial_score(1f64, 5f64),
             )),
         },
+        id: 1u64,
     };
 
     let mut score = OneOfScore::default();
@@ -360,6 +372,7 @@ fn evaluate_correct_double_subtask_with_min_test() {
                 MIN_SCORING_METHOD.max_score,
             )),
         },
+        id: 1u64,
     };
 
     let mut score = OneOfScore::default();
@@ -386,6 +399,7 @@ fn evaluate_submission_score_test() {
         score: OneOfScore {
             score: Some(one_of_score::Score::DoubleScore(0f64)),
         },
+        id: 1u64,
     };
 
     let subtask_result_correct = SubtaskResult {
@@ -401,6 +415,7 @@ fn evaluate_submission_score_test() {
                 max_score / num_of_subtasks,
             )),
         },
+        id: 1u64,
     };
 
     let num_of_correct_subtasks = 3f64;
