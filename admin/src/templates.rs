@@ -313,14 +313,21 @@ impl From<SubtaskScoring> for protos::scoring::Subtask {
 #[derive(Serialize, FromForm, Debug, Clone)]
 #[serde(crate = "rocket::serde")]
 pub struct Subtask {
-    id: u64,
+    id: Option<u64>,
     scoring: SubtaskScoring,
     testcases: Vec<u64>,
+}
+impl Subtask {
+    fn gen_ids_if_none(&mut self) {
+        if self.id.is_none() {
+            self.id = Some(utils::gen_uuid());
+        }
+    }
 }
 impl From<evaluation::Subtask> for Subtask {
     fn from(s: evaluation::Subtask) -> Self {
         Self {
-            id: s.id,
+            id: Some(s.id),
             scoring: s.scoring.into(),
             testcases: s.testcases_id,
         }
@@ -329,7 +336,7 @@ impl From<evaluation::Subtask> for Subtask {
 impl From<Subtask> for evaluation::Subtask {
     fn from(s: Subtask) -> Self {
         Self {
-            id: s.id,
+            id: s.id.unwrap(),
             scoring: s.scoring.into(),
             testcases_id: s.testcases,
         }
@@ -388,9 +395,12 @@ impl Problem {
             longname: u.long_name,
         }
     }
-    fn gen_id_if_none(&mut self) {
+    fn gen_ids_if_none(&mut self) {
         if self.id.is_none() {
             self.id = Some(utils::gen_uuid());
+        }
+        for s in self.subtasks.iter_mut() {
+            s.gen_ids_if_none();
         }
     }
 }
@@ -538,7 +548,7 @@ impl ContestTemplate {
     }
     pub fn gen_ids_if_none(&mut self) {
         for p in self.problems.iter_mut() {
-            p.gen_id_if_none();
+            p.gen_ids_if_none();
         }
     }
 }

@@ -26,7 +26,7 @@
 			problems.innerHTML+=`
  <hr>
  <details>
- <summary>Problem ${problem_n}</summary>
+ <summary>New problem</summary>
  <label>id <input name="problems[${problem_n}].id" type="number" readonly><br></label>
  <label>name <input name="problems[${problem_n}].name" type="text" required><br></label>
  <label>long name <input name="problems[${problem_n}].longname" type="text" required><br></label>
@@ -58,6 +58,28 @@
  </details>
  <details>
  <summary>subtasks</summary>
+ <button onclick="add_subtask(this.parentElement, ${problem_n})">+</button></br>
+ </details>
+ </details>
+ `;
+		}
+	let subtask_n = 9999; // TODO something beter
+	function add_subtask(subtasks, pi) {
+			subtask_n+=1;
+			subtasks.innerHTML+=`
+ <details>
+ <summary>New subtask</summary>
+ <label>id <input name="problems[${pi}].subtasks[${subtask_n}].id" type="number" readonly><br></label>
+ <label>scoring method
+ <select name="problems[${pi}].subtasks[${subtask_n}].scoring.method" required>
+ <option value="Min">Min</option>
+ <option value="Sum">Sum</option>
+ </select>
+ <br>
+ </label>
+ <label>max score <input name="problems[${pi}].subtasks[${subtask_n}].scoring.max_score" type="number" step="1" required><br></label>
+ <details>
+ <summary>testcases</summary>
  </details>
  </details>
  `;
@@ -136,6 +158,7 @@
 				</details>
 				<details>
 					<summary>subtasks</summary>
+					<button onclick="add_subtask(this.parentElement, {{pi}})">+</button></br>
 					{% for subtask in problem.subtasks %}
 					{% set si = loop.index0 %}
 					<details>
