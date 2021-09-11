@@ -13,8 +13,6 @@ paste = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 fake = { version = "2.4", features = ["derive"] }
 rand = "0.8"
-strum = "0.21"
-strum_macros = "0.21"
 
 [build-dependencies]
 tonic-build = "0.5"
