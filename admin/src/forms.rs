@@ -112,31 +112,29 @@ pub async fn reply(
     }
 }
 
-#[derive(FromForm)]
-pub struct SetChecker {
-    file: Vec<u8>,
-    language: String,
-}
-#[post("/form/set_checker/<problem_id>", data = "<checker>")]
-pub async fn set_checker(
-    _admin: Admin,
+use rocket::data::ToByteUnit;
+pub async fn set_evaluation_file(
     problem_id: u64,
-    checker: Form<Strict<SetChecker>>,
-    evaluation_client: &State<EvaluationClient>,
+    file_language: String,
+    file_content: Data<'_>,
+    file_type: evaluation::evaluation_file::Type,
+    evaluation_client: EvaluationClient,
 ) -> Result<Redirect, status::Custom<String>> {
-    let evaluation_client = evaluation_client.inner().clone();
+    let stuff = evaluation::EvaluationFile {
+        r#type: file_type as i32,
+        source: protos::common::Source {
+            lang: match file_language.as_str() {
+                "Rust" => protos::common::ProgrammingLanguage::Rust as i32,
+                "Cpp" => protos::common::ProgrammingLanguage::Cpp as i32,
+                _ => protos::common::ProgrammingLanguage::None as i32,
+            },
+            code: file_content.open(512.mebibytes()).into_bytes().await.unwrap().value, // TODO: remove unwrap
+        },
+    };
     let req = evaluation::SetProblemEvaluationFileRequest {
         problem_id,
         command: Some(
-            evaluation::set_problem_evaluation_file_request::Command::UpdateEvaluationFile(
-                evaluation::EvaluationFile {
-                    r#type: 0, //TODO
-                    source: protos::common::Source {
-                        lang: 0,
-                        code: checker.file.clone(),
-                    },
-                },
-            ),
+            evaluation::set_problem_evaluation_file_request::Command::UpdateEvaluationFile(stuff), // TODO: unite update and add
         ),
     };
     match evaluation_client
@@ -149,4 +147,42 @@ pub async fn set_checker(
             format!("Error in rpc request:\n{:?}", err),
         )),
     }
+}
+
+#[post("/form/set_checker/<problem_id>/<lang>", data = "<checker>")]
+pub async fn set_checker(
+    _admin: Admin,
+    problem_id: u64,
+    lang: String,
+    checker: Data<'_>,
+    evaluation_client: &State<EvaluationClient>,
+) -> Result<Redirect, status::Custom<String>> {
+    let evaluation_client = evaluation_client.inner().clone();
+    set_evaluation_file(
+        problem_id,
+        lang,
+        checker,
+        evaluation::evaluation_file::Type::Checker,
+        evaluation_client,
+    )
+    .await
+}
+
+#[post("/form/set_interactor/<problem_id>/<lang>", data = "<interactor>")]
+pub async fn set_interactor(
+    _admin: Admin,
+    problem_id: u64,
+    lang: String,
+    interactor: Data<'_>,
+    evaluation_client: &State<EvaluationClient>,
+) -> Result<Redirect, status::Custom<String>> {
+    let evaluation_client = evaluation_client.inner().clone();
+    set_evaluation_file(
+        problem_id,
+        lang,
+        interactor,
+        evaluation::evaluation_file::Type::Interactor,
+        evaluation_client,
+    )
+    .await
 }

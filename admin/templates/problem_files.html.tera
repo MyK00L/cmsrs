@@ -7,15 +7,8 @@
 	<details>
 		<summary>Checker</summary>
 		<a href="/form/get_checker/{{problem.id}}">download</a>
-		<form action="/form/set_checker/{{problem.id}}" method="post" enctype="multipart/form-data">
+		<form action="/form/set_checker/{{problem.id}}/Cpp" method="post" enctype="text/plain">
 			<label>File <input type="file" name="file"><br></label>
-			<label>Language
-				<select name="language">
-					<option value="None">None</option>
-					<option value="Rust">Rust</option>
-					<option value="Cpp">Cpp</option>
-				</select>
-			</label>
 			<input type="submit" value="upload">
 		</form>
 	</details>
