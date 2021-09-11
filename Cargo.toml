@@ -6,6 +6,7 @@ members = [
     "evaluation_service",
     "admin",
     "rpctest-client",
-    "rpctest-server"
+    "rpctest-server",
+    "submission_service"
 ]
 
