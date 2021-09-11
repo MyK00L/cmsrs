@@ -8,7 +8,6 @@ pub async fn users_template(_admin: Admin) -> Result<Template, status::Custom<St
     ))
 }
 
-
 #[derive(Serialize, FromForm, Debug, Clone)]
 #[serde(crate = "rocket::serde")]
 pub struct Resources {
@@ -547,6 +546,74 @@ impl ContestTemplate {
             user_scoring: evaluation_contest.info.user_scoring_method.into(),
         }
     }
+    async fn from_clients(
+        contest_client: ContestClient,
+        evaluation_client: EvaluationClient,
+    ) -> Result<Self, status::Custom<String>> {
+        let (user_contest_response, evaluation_contest_response) = future::join(
+            contest_client.get_contest_metadata(tonic::Request::new(
+                contest::GetContestMetadataRequest::default(),
+            )),
+            evaluation_client
+                .get_contest(tonic::Request::new(evaluation::GetContestRequest::default())),
+        )
+        .await;
+        let user_contest = match user_contest_response {
+            Ok(response) => response.into_inner(),
+            Err(err) => {
+                return Err(status::Custom(
+                    Status::InternalServerError,
+                    format!("Error in rpc request:\n{:?}", err),
+                ));
+            }
+        };
+        let evaluation_contest = match evaluation_contest_response {
+            Ok(response) => response.into_inner(),
+            Err(err) => {
+                return Err(status::Custom(
+                    Status::InternalServerError,
+                    format!("Error in rpc request:\n{:?}", err),
+                ));
+            }
+        };
+        #[allow(clippy::type_complexity)]
+        let user_problem_requests: Vec<
+            core::pin::Pin<
+                Box<
+                    dyn futures::Future<
+                            Output = Result<
+                                tonic::Response<contest::GetProblemResponse>,
+                                tonic::Status,
+                            >,
+                        > + std::marker::Send,
+                >,
+            >,
+        > = evaluation_contest
+            .info
+            .problems
+            .clone()
+            .into_iter()
+            .map(|x| {
+                contest_client.get_problem(tonic::Request::new(contest::GetProblemRequest {
+                    problem_id: x.id,
+                }))
+            })
+            .collect();
+        let user_problem_responses: Vec<contest::Problem> = future::join_all(user_problem_requests)
+            .await
+            .into_iter()
+            .map(
+                |x: Result<tonic::Response<contest::GetProblemResponse>, tonic::Status>| {
+                    x.unwrap().into_inner().info // TODO: remove unwrap
+                },
+            )
+            .collect();
+        Ok(Self::new(
+            evaluation_contest,
+            user_contest,
+            user_problem_responses,
+        ))
+    }
     pub fn gen_ids_if_none(&mut self) {
         for p in self.problems.iter_mut() {
             p.gen_ids_if_none();
@@ -594,135 +661,18 @@ pub async fn contest_template(
 ) -> Result<Template, status::Custom<String>> {
     let contest_client = contest_client.inner().clone();
     let evaluation_client = evaluation_client.inner().clone();
-    let (user_contest_response, evaluation_contest_response) = future::join(
-        contest_client.get_contest_metadata(tonic::Request::new(
-            contest::GetContestMetadataRequest::default(),
-        )),
-        evaluation_client
-            .get_contest(tonic::Request::new(evaluation::GetContestRequest::default())),
-    )
-    .await;
-    let user_contest = match user_contest_response {
-        Ok(response) => response.into_inner(),
-        Err(err) => {
-            return Err(status::Custom(
-                Status::InternalServerError,
-                format!("Error in rpc request:\n{:?}", err),
-            ));
-        }
-    };
-    let evaluation_contest = match evaluation_contest_response {
-        Ok(response) => response.into_inner(),
-        Err(err) => {
-            return Err(status::Custom(
-                Status::InternalServerError,
-                format!("Error in rpc request:\n{:?}", err),
-            ));
-        }
-    };
-    #[allow(clippy::type_complexity)]
-    let user_problem_requests: Vec<
-        core::pin::Pin<
-            Box<
-                dyn futures::Future<
-                        Output = Result<
-                            tonic::Response<contest::GetProblemResponse>,
-                            tonic::Status,
-                        >,
-                    > + std::marker::Send,
-            >,
-        >,
-    > = evaluation_contest
-        .info
-        .problems
-        .clone()
-        .into_iter()
-        .map(|x| {
-            contest_client.get_problem(tonic::Request::new(contest::GetProblemRequest {
-                problem_id: x.id,
-            }))
-        })
-        .collect();
-    let user_problem_responses: Vec<contest::Problem> = future::join_all(user_problem_requests)
-        .await
-        .into_iter()
-        .map(
-            |x: Result<tonic::Response<contest::GetProblemResponse>, tonic::Status>| {
-                x.unwrap().into_inner().info // TODO: remove unwrap
-            },
-        )
-        .collect();
-
-    let ct = ContestTemplate::new(evaluation_contest, user_contest, user_problem_responses);
+    let ct = ContestTemplate::from_clients(contest_client, evaluation_client).await?;
     Ok(Template::render("contest", ct))
 }
 
 #[get("/problem_files")]
-pub async fn problem_files_template(_admin: Admin, contest_client: &State<ContestClient>, evaluation_client: &State<EvaluationClient>) -> Result<Template, status::Custom<String>> {
+pub async fn problem_files_template(
+    _admin: Admin,
+    contest_client: &State<ContestClient>,
+    evaluation_client: &State<EvaluationClient>,
+) -> Result<Template, status::Custom<String>> {
     let contest_client = contest_client.inner().clone();
     let evaluation_client = evaluation_client.inner().clone();
-    let (user_contest_response, evaluation_contest_response) = future::join(
-        contest_client.get_contest_metadata(tonic::Request::new(
-            contest::GetContestMetadataRequest::default(),
-        )),
-        evaluation_client
-            .get_contest(tonic::Request::new(evaluation::GetContestRequest::default())),
-    )
-    .await;
-    let user_contest = match user_contest_response {
-        Ok(response) => response.into_inner(),
-        Err(err) => {
-            return Err(status::Custom(
-                Status::InternalServerError,
-                format!("Error in rpc request:\n{:?}", err),
-            ));
-        }
-    };
-    let evaluation_contest = match evaluation_contest_response {
-        Ok(response) => response.into_inner(),
-        Err(err) => {
-            return Err(status::Custom(
-                Status::InternalServerError,
-                format!("Error in rpc request:\n{:?}", err),
-            ));
-        }
-    };
-    #[allow(clippy::type_complexity)]
-    let user_problem_requests: Vec<
-        core::pin::Pin<
-            Box<
-                dyn futures::Future<
-                        Output = Result<
-                            tonic::Response<contest::GetProblemResponse>,
-                            tonic::Status,
-                        >,
-                    > + std::marker::Send,
-            >,
-        >,
-    > = evaluation_contest
-        .info
-        .problems
-        .clone()
-        .into_iter()
-        .map(|x| {
-            contest_client.get_problem(tonic::Request::new(contest::GetProblemRequest {
-                problem_id: x.id,
-            }))
-        })
-        .collect();
-    let user_problem_responses: Vec<contest::Problem> = future::join_all(user_problem_requests)
-        .await
-        .into_iter()
-        .map(
-            |x: Result<tonic::Response<contest::GetProblemResponse>, tonic::Status>| {
-                x.unwrap().into_inner().info // TODO: remove unwrap
-            },
-        )
-        .collect();
-
-    let ct = ContestTemplate::new(evaluation_contest, user_contest, user_problem_responses);
-    Ok(Template::render(
-        "problem_files",
-        ct
-    ))
+    let ct = ContestTemplate::from_clients(contest_client, evaluation_client).await?;
+    Ok(Template::render("problem_files", ct))
 }

@@ -126,18 +126,23 @@ pub async fn set_checker(
 ) -> Result<Redirect, status::Custom<String>> {
     let evaluation_client = evaluation_client.inner().clone();
     let req = evaluation::SetProblemEvaluationFileRequest {
-        problem_id: problem_id,
-        command: Some(evaluation::set_problem_evaluation_file_request::Command::UpdateEvaluationFile(
-            evaluation::EvaluationFile {
-                r#type: 0, //TODO
-                source: protos::common::Source {
-                    lang: 0,
-                    code: checker.file.clone(),
-                }
-            }
-        )),
+        problem_id,
+        command: Some(
+            evaluation::set_problem_evaluation_file_request::Command::UpdateEvaluationFile(
+                evaluation::EvaluationFile {
+                    r#type: 0, //TODO
+                    source: protos::common::Source {
+                        lang: 0,
+                        code: checker.file.clone(),
+                    },
+                },
+            ),
+        ),
     };
-    match evaluation_client.set_problem_evaluation_file(tonic::Request::new(req)).await {
+    match evaluation_client
+        .set_problem_evaluation_file(tonic::Request::new(req))
+        .await
+    {
         Ok(_) => Ok(Redirect::to("/problem_files")),
         Err(err) => Err(status::Custom(
             Status::InternalServerError,
