@@ -82,7 +82,7 @@ impl Evaluation for EvaluationService {
                     .read_file_object(&path)
                     .map_err(|err| internal_error(err.as_ref()))
             })
-            .map(|user| Response::new(GetUserScoringResponse { info: user }))
+            .map(|user| Response::new(GetUserScoringResponse { method: user }))
     }
 
     async fn get_problem(
@@ -125,7 +125,7 @@ impl Evaluation for EvaluationService {
             .get_user_scoring(Request::new(GetUserScoringRequest {}))
             .await?
             .into_inner()
-            .info;
+            .method;
         let mut problems: Vec<Problem> = vec![];
         for entry in self.storage.iterate_folder(PROBLEMS_FOLDER_NAME, None)? {
             let problem_path = self
