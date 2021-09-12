@@ -88,6 +88,39 @@ impl Evaluation for EvaluationService {
             .map(|prob| Response::new(GetProblemResponse { info: prob }))
     }
 
+    async fn get_contest(
+        &self,
+        _request: Request<GetContestRequest>,
+    ) -> Result<Response<GetContestResponse>, Status> {
+        let user_scoring_method = self
+            .get_user_scoring(Request::new(GetUserScoringRequest {}))
+            .await?
+            .into_inner()
+            .info;
+        let mut problems: Vec<Problem> = vec![];
+        for entry in self.storage.iterate_folder(PROBLEMS_FOLDER_NAME, None)? {
+            let problem_path = self
+                .storage
+                .search_item(
+                    Some(&entry?.path()),
+                    PROBLEM_METADATA_FILE_NAME,
+                    Some(SERIALIZED_EXTENSION),
+                )?
+                .ok_or_else(|| Status::internal("Problem metadata not found"))?;
+            let p: Problem = self
+                .storage
+                .read_file_object(&problem_path)
+                .map_err(|err| internal_error(err.as_ref()))?;
+            problems.push(p);
+        }
+        Ok(Response::new(GetContestResponse {
+            info: Contest {
+                problems,
+                user_scoring_method,
+            },
+        }))
+    }
+
     async fn set_contest(
         &self,
         request: Request<SetContestRequest>,

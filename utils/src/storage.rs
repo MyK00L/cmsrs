@@ -1,4 +1,4 @@
-use std::fs::{DirBuilder, File};
+use std::fs::{DirBuilder, File, ReadDir};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
@@ -38,6 +38,16 @@ impl FsStorageHelper {
             .recursive(true)
             .create(folder_path.clone())
             .map(|_| folder_path)
+    }
+
+    pub fn iterate_folder(
+        &self,
+        folder_name: &str,
+        path: Option<&Path>,
+    ) -> Result<ReadDir, std::io::Error> {
+        let path = self.get_root_path(path);
+        let folder_path = path.join(folder_name);
+        folder_path.read_dir()
     }
 
     pub fn search_item(

@@ -73,6 +73,11 @@ message GetProblemResponse {
     required Problem info = 1;
 }
 
+message GetContestRequest {}
+message GetContestResponse {
+    required Contest info = 1;
+}
+
 message SetContestRequest {
     required Contest info = 1;
 }
@@ -123,6 +128,7 @@ service Evaluation {
     rpc get_user_scoring(GetUserScoringRequest)
         returns (GetUserScoringResponse);
     rpc get_problem(GetProblemRequest) returns (GetProblemResponse);
+    rpc get_contest(GetContestRequest) returns (GetContestResponse);
     rpc set_contest(SetContestRequest) returns (SetContestResponse);
     rpc get_testcase(GetTestcaseRequest) returns (GetTestcaseResponse);
     rpc get_problem_testcases(GetProblemTestcasesRequest)
