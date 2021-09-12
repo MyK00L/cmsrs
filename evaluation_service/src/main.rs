@@ -249,9 +249,74 @@ impl Evaluation for EvaluationService {
 
     async fn get_problem_testcases(
         &self,
-        _request: Request<GetProblemTestcasesRequest>,
+        request: Request<GetProblemTestcasesRequest>,
     ) -> Result<Response<GetProblemTestcasesResponse>, Status> {
-        todo!()
+        let request = request.into_inner();
+        let problem_id = request.problem_id;
+        let mut testcases: Vec<Testcase> = vec![];
+
+        for entry in self
+            .storage
+            .search_item(None, PROBLEMS_FOLDER_NAME, None)
+            .and_then(|op| {
+                op.ok_or_else(|| {
+                    std::io::Error::new(std::io::ErrorKind::NotFound, "Problems folder not found")
+                })
+            })
+            .and_then(|path| {
+                self.storage
+                    .search_item(Some(&path), &problem_id.to_string(), None)
+            })
+            .and_then(|op| {
+                op.ok_or_else(|| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        format!("Problem not found [id: {}]", problem_id),
+                    )
+                })
+            })
+            .and_then(|path| {
+                self.storage
+                    .iterate_folder(TESTCASES_FOLDER_NAME, Some(&path))
+            })?
+        {
+            let testcase_path = entry?.path();
+            let testcase_id = testcase_path
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .parse::<u64>()
+                .map_err(internal_error)?;
+
+            // Get input and output files (if present)
+            let input_path = self.storage.search_item(
+                Some(&testcase_path),
+                INPUT_FILE_NAME,
+                Some(IO_EXTENSION),
+            )?;
+            let input_bytes = match input_path {
+                Some(ip) => Some(self.storage.read_file(&ip)?),
+                None => None,
+            };
+            let output_path = self.storage.search_item(
+                Some(&testcase_path),
+                OUTPUT_FILE_NAME,
+                Some(IO_EXTENSION),
+            )?;
+            let output_bytes = match output_path {
+                Some(op) => Some(self.storage.read_file(&op)?),
+                None => None,
+            };
+
+            testcases.push(Testcase {
+                id: testcase_id,
+                input: input_bytes,
+                output: output_bytes,
+            });
+        }
+
+        Ok(Response::new(GetProblemTestcasesResponse { testcases }))
     }
 
     async fn set_testcase(
