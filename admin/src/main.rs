@@ -202,8 +202,8 @@ fn rocket() -> _ {
                 forms::reply,
                 forms::set_user,
                 forms::login,
-                forms::set_checker,
-                forms::set_interactor,
+                forms::set_evaluation_file,
+                forms::add_testcase,
             ],
         )
         .attach(Template::fairing())

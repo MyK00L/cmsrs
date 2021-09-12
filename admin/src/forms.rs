@@ -1,4 +1,8 @@
 use super::*;
+// use rocket::data::ToByteUnit;
+use rocket::fs::TempFile;
+use std::io::Read;
+use std::str::FromStr;
 
 // API (forms and stuff)
 
@@ -112,34 +116,37 @@ pub async fn reply(
     }
 }
 
-use rocket::data::ToByteUnit;
-pub async fn set_evaluation_file(
+//TODO: remove unwraps
+
+#[derive(FromForm)]
+pub struct SetEvaluationFile<'v> {
     problem_id: u64,
-    file_language: String,
-    file_content: Data<'_>,
-    file_type: evaluation::evaluation_file::Type,
-    evaluation_client: EvaluationClient,
+    file_type: String,
+    language: String,
+    file: TempFile<'v>,
+}
+#[post("/form/set_evaluation_file", data = "<data>")]
+pub async fn set_evaluation_file(
+    data: Form<Strict<SetEvaluationFile<'_>>>,
+    evaluation_client: &State<EvaluationClient>,
 ) -> Result<Redirect, status::Custom<String>> {
+    let evaluation_client = evaluation_client.inner().clone();
+    let mut file = std::fs::File::open(data.file.path().unwrap()).unwrap();
+    let mut raw = Vec::<u8>::new();
+    file.read_to_end(&mut raw).unwrap();
     let stuff = evaluation::EvaluationFile {
-        r#type: file_type as i32,
+        r#type: evaluation::evaluation_file::Type::from_str(data.file_type.as_str()).unwrap()
+            as i32,
         source: protos::common::Source {
-            lang: match file_language.as_str() {
-                "Rust" => protos::common::ProgrammingLanguage::Rust as i32,
-                "Cpp" => protos::common::ProgrammingLanguage::Cpp as i32,
-                _ => protos::common::ProgrammingLanguage::None as i32,
-            },
-            code: file_content
-                .open(512.mebibytes())
-                .into_bytes()
-                .await
-                .unwrap()
-                .value, // TODO: remove unwrap
+            lang: protos::common::ProgrammingLanguage::from_str(data.language.as_str()).unwrap()
+                as i32,
+            code: raw,
         },
     };
     let req = evaluation::SetProblemEvaluationFileRequest {
-        problem_id,
+        problem_id: data.problem_id,
         command: Some(
-            evaluation::set_problem_evaluation_file_request::Command::UpdateEvaluationFile(stuff), // TODO: unite update and add
+            evaluation::set_problem_evaluation_file_request::Command::UpdateEvaluationFile(stuff), // TODO: unify update and add
         ),
     };
     match evaluation_client
@@ -154,40 +161,42 @@ pub async fn set_evaluation_file(
     }
 }
 
-#[post("/form/set_checker/<problem_id>/<lang>", data = "<checker>")]
-pub async fn set_checker(
-    _admin: Admin,
+#[derive(FromForm)]
+pub struct AddTestcase<'v> {
     problem_id: u64,
-    lang: String,
-    checker: Data<'_>,
-    evaluation_client: &State<EvaluationClient>,
-) -> Result<Redirect, status::Custom<String>> {
-    let evaluation_client = evaluation_client.inner().clone();
-    set_evaluation_file(
-        problem_id,
-        lang,
-        checker,
-        evaluation::evaluation_file::Type::Checker,
-        evaluation_client,
-    )
-    .await
+    #[allow(dead_code)]
+    subtask_id: u64,
+    file: TempFile<'v>,
 }
-
-#[post("/form/set_interactor/<problem_id>/<lang>", data = "<interactor>")]
-pub async fn set_interactor(
-    _admin: Admin,
-    problem_id: u64,
-    lang: String,
-    interactor: Data<'_>,
+#[post("/form/add_testcase", data = "<data>")]
+pub async fn add_testcase(
+    data: Form<Strict<AddTestcase<'_>>>,
     evaluation_client: &State<EvaluationClient>,
 ) -> Result<Redirect, status::Custom<String>> {
     let evaluation_client = evaluation_client.inner().clone();
-    set_evaluation_file(
-        problem_id,
-        lang,
-        interactor,
-        evaluation::evaluation_file::Type::Interactor,
-        evaluation_client,
-    )
-    .await
+    let mut file = std::fs::File::open(data.file.path().unwrap()).unwrap();
+    let mut raw = Vec::<u8>::new();
+    file.read_to_end(&mut raw).unwrap();
+    let stuff = evaluation::Testcase {
+        id: utils::gen_uuid(),
+        input: Some(raw),
+        output: None,
+    };
+    let req = evaluation::SetTestcaseRequest {
+        problem_id: data.problem_id,
+        //subtask_id: data.subtask_id,
+        command: Some(evaluation::set_testcase_request::Command::AddTestcase(
+            stuff,
+        )),
+    };
+    match evaluation_client
+        .set_testcase(tonic::Request::new(req))
+        .await
+    {
+        Ok(_) => Ok(Redirect::to("/problem_files")),
+        Err(err) => Err(status::Custom(
+            Status::InternalServerError,
+            format!("Error in rpc request:\n{:?}", err),
+        )),
+    }
 }
