@@ -1,7 +1,5 @@
 #![feature(trait_alias)]
 
-pub use prost_types;
-
 #[macro_use]
 mod mock_macro;
 
