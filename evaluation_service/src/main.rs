@@ -7,7 +7,7 @@ use tonic::{transport::*, Request, Response, Status};
 use utils::storage::FsStorageHelper;
 
 const ROOT_PATH: &str = "/evaluation_files";
-const SERIALIZED_EXTENSION: &str = ".ser";
+const SERIALIZED_EXTENSION: &str = "ser";
 const USER_SCORING_FILE_NAME: &str = "user_scoring";
 const PROBLEMS_FOLDER_NAME: &str = "problems";
 const TESTCASES_FOLDER_NAME: &str = "testcases";
@@ -24,8 +24,18 @@ where
     Status::internal(format!("{:?}", e))
 }
 
-fn not_found_io_error(message: &str) -> io::Error {
-    io::Error::new(io::ErrorKind::NotFound, message)
+fn not_found_error<T>(e: T) -> Status
+where
+    T: core::fmt::Debug + core::fmt::Display,
+{
+    Status::not_found(format!("{:?}", e))
+}
+
+fn not_found_io_error<T>(e: T) -> io::Error
+where
+    T: core::fmt::Debug + core::fmt::Display,
+{
+    io::Error::new(io::ErrorKind::NotFound, format!("{:?}", e))
 }
 
 #[derive(Debug)]
@@ -65,8 +75,8 @@ impl Evaluation for EvaluationService {
     ) -> Result<Response<GetUserScoringResponse>, Status> {
         self.storage
             .search_item(None, USER_SCORING_FILE_NAME, Some(SERIALIZED_EXTENSION))
-            .map_err(internal_error)
-            .and_then(|op| op.ok_or_else(|| Status::not_found("User scoring method not found")))
+            .map_err(not_found_error)
+            .and_then(|op| op.ok_or_else(|| not_found_error("User scoring method not found")))
             .and_then(|path| {
                 self.storage
                     .read_file_object(&path)
@@ -89,11 +99,11 @@ impl Evaluation for EvaluationService {
                         PROBLEM_METADATA_FILE_NAME,
                         Some(SERIALIZED_EXTENSION),
                     )
-                    .map_err(internal_error)
+                    .map_err(not_found_error)
             })
             .and_then(|op| {
                 op.ok_or_else(|| {
-                    Status::not_found(format!(
+                    not_found_error(format!(
                         "Problem metadata not found [id: {}]",
                         request.problem_id
                     ))
@@ -125,7 +135,7 @@ impl Evaluation for EvaluationService {
                     PROBLEM_METADATA_FILE_NAME,
                     Some(SERIALIZED_EXTENSION),
                 )?
-                .ok_or_else(|| Status::internal("Problem metadata not found"))?;
+                .ok_or_else(|| not_found_error("Problem metadata not found"))?;
             let p: Problem = self
                 .storage
                 .read_file_object(&problem_path)
@@ -156,13 +166,10 @@ impl Evaluation for EvaluationService {
                 SERIALIZED_EXTENSION,
                 user_scoring_method,
             )
-            .map_err(internal_error)?;
+            .map_err(not_found_error)?;
 
         // Save problems
-        let problems_path = self
-            .storage
-            .search_item(None, PROBLEMS_FOLDER_NAME, None)?
-            .ok_or_else(|| Status::not_found("Problems folder not found"))?;
+        let problems_path = self.storage.add_folder(PROBLEMS_FOLDER_NAME, None)?;
         for p in problems.iter() {
             // Save problem metadata
             let p_path = self
@@ -210,7 +217,7 @@ impl Evaluation for EvaluationService {
             .storage
             .search_item(Some(&problem_path), TESTCASES_FOLDER_NAME, None)?
             .ok_or_else(|| {
-                Status::not_found(format!(
+                not_found_error(format!(
                     "Testcases folder not found [problem id: {}]",
                     problem_id
                 ))
@@ -221,7 +228,7 @@ impl Evaluation for EvaluationService {
             .storage
             .search_item(Some(&testcases_path), &testcase_id.to_string(), None)?
             .ok_or_else(|| {
-                Status::not_found(format!(
+                not_found_error(format!(
                     "Testcase folder not found [problem id: {}, id: {}]",
                     problem_id, testcase_id
                 ))
@@ -321,10 +328,10 @@ impl Evaluation for EvaluationService {
         let testcases_path = self
             .storage
             .search_item(Some(&problem_path), TESTCASES_FOLDER_NAME, None)
-            .map_err(internal_error)
+            .map_err(not_found_io_error)
             .and_then(|op| {
                 op.ok_or_else(|| {
-                    Status::not_found(format!(
+                    not_found_io_error(format!(
                         "Testcases folder not found [problem id: {}]",
                         problem_id
                     ))
@@ -342,7 +349,7 @@ impl Evaluation for EvaluationService {
                         Some(SERIALIZED_EXTENSION),
                     )?
                     .ok_or_else(|| {
-                        Status::not_found(format!(
+                        not_found_error(format!(
                             "Testcases folder not found [problem id: {}]",
                             problem_id
                         ))
@@ -368,9 +375,18 @@ impl Evaluation for EvaluationService {
                     .iter_mut()
                     .find(|subtask| subtask.id == subtask_id)
                     .ok_or_else(|| {
-                        Status::not_found(format!("Subtask not found [id: {}]", subtask_id))
+                        not_found_error(format!("Subtask not found [id: {}]", subtask_id))
                     })?;
                 subtask.testcases_id.push(tc.id);
+
+                self.storage
+                    .save_file_object(
+                        Some(&problem_path),
+                        PROBLEM_METADATA_FILE_NAME,
+                        SERIALIZED_EXTENSION,
+                        problem_metadata,
+                    )
+                    .map_err(internal_error)?;
 
                 // Save testcase files into storage (only if present)
                 let tc_path = self
@@ -412,7 +428,7 @@ impl Evaluation for EvaluationService {
                         tc.output(),
                     )?;
                 } else {
-                    return Err(Status::not_found(format!(
+                    return Err(not_found_error(format!(
                         "Testcase not found [id: {}]",
                         tc.id
                     )));
@@ -428,7 +444,7 @@ impl Evaluation for EvaluationService {
                         Some(SERIALIZED_EXTENSION),
                     )?
                     .ok_or_else(|| {
-                        Status::not_found(format!(
+                        not_found_error(format!(
                             "Testcases folder not found [problem id: {}]",
                             problem_id
                         ))
@@ -442,16 +458,25 @@ impl Evaluation for EvaluationService {
                     .iter_mut()
                     .find(|subtask| subtask.id == subtask_id)
                     .ok_or_else(|| {
-                        Status::not_found(format!("Subtask not found [id: {}]", subtask_id))
+                        not_found_error(format!("Subtask not found [id: {}]", subtask_id))
                     })?;
                 let index = subtask
                     .testcases_id
                     .iter()
                     .position(|&id| id == tc_id)
                     .ok_or_else(|| {
-                        Status::not_found(format!("Testcase not found [id: {}]", tc_id))
+                        not_found_error(format!("Testcase not found [id: {}]", tc_id))
                     })?;
                 subtask.testcases_id.remove(index);
+
+                self.storage
+                    .save_file_object(
+                        Some(&problem_path),
+                        PROBLEM_METADATA_FILE_NAME,
+                        SERIALIZED_EXTENSION,
+                        problem_metadata,
+                    )
+                    .map_err(internal_error)?;
 
                 // Delete from storage
                 let tc_path =
@@ -460,7 +485,7 @@ impl Evaluation for EvaluationService {
                 if let Some(tc_path) = tc_path {
                     self.storage.delete_item(&tc_path)?;
                 } else {
-                    return Err(Status::not_found(format!(
+                    return Err(not_found_error(format!(
                         "Testcase not found [id: {}]",
                         tc_id
                     )));
@@ -495,7 +520,7 @@ impl Evaluation for EvaluationService {
                 self.get_evaluation_file_resource_name(file_type),
                 Some(SERIALIZED_EXTENSION),
             )?
-            .ok_or_else(|| internal_error("Evaluation file not found"))
+            .ok_or_else(|| not_found_error("Evaluation file not found"))
             .and_then(|path| self.storage.read_file_object(&path).map_err(internal_error))
             .map(|file| Response::new(GetProblemEvaluationFileResponse { file }))
     }
@@ -550,7 +575,7 @@ impl Evaluation for EvaluationService {
                     .map_err(internal_error)?;
             }
         }
-        todo!()
+        Ok(Response::new(SetProblemEvaluationFileResponse {}))
     }
 }
 
