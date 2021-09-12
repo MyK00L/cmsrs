@@ -128,7 +128,12 @@ pub async fn set_evaluation_file(
                 "Cpp" => protos::common::ProgrammingLanguage::Cpp as i32,
                 _ => protos::common::ProgrammingLanguage::None as i32,
             },
-            code: file_content.open(512.mebibytes()).into_bytes().await.unwrap().value, // TODO: remove unwrap
+            code: file_content
+                .open(512.mebibytes())
+                .into_bytes()
+                .await
+                .unwrap()
+                .value, // TODO: remove unwrap
         },
     };
     let req = evaluation::SetProblemEvaluationFileRequest {
