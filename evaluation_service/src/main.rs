@@ -1,4 +1,7 @@
-use protos::service::evaluation::{evaluation_server::*, set_testcase_request::Command, *};
+use std::io;
+use std::path::PathBuf;
+
+use protos::service::evaluation::{evaluation_server::*, *};
 use protos::utils::*;
 use tonic::{transport::*, Request, Response, Status};
 use utils::storage::FsStorageHelper;
@@ -21,9 +24,37 @@ where
     Status::internal(format!("{:?}", e))
 }
 
+fn not_found_io_error(message: &str) -> io::Error {
+    io::Error::new(io::ErrorKind::NotFound, message)
+}
+
 #[derive(Debug)]
 pub struct EvaluationService {
     storage: FsStorageHelper,
+}
+
+impl EvaluationService {
+    fn get_problem_folder_from_id(&self, problem_id: u64) -> io::Result<PathBuf> {
+        self.storage
+            .search_item(None, PROBLEMS_FOLDER_NAME, None)
+            .and_then(|op| op.ok_or_else(|| not_found_io_error("Problems folder not found")))
+            .and_then(|path| {
+                self.storage
+                    .search_item(Some(&path), &problem_id.to_string(), None)
+            })
+            .and_then(|op| {
+                op.ok_or_else(|| {
+                    not_found_io_error(&format!("Problem not found [id: {}]", problem_id))
+                })
+            })
+    }
+
+    fn get_evaluation_file_resource_name(&self, eval_type: evaluation_file::Type) -> &str {
+        match eval_type {
+            evaluation_file::Type::Checker => "checker",
+            evaluation_file::Type::Interactor => "interactor",
+        }
+    }
 }
 
 #[tonic::async_trait]
@@ -49,20 +80,8 @@ impl Evaluation for EvaluationService {
         request: Request<GetProblemRequest>,
     ) -> Result<Response<GetProblemResponse>, Status> {
         let request = request.into_inner();
-        self.storage
-            .search_item(None, PROBLEMS_FOLDER_NAME, None)
+        self.get_problem_folder_from_id(request.problem_id)
             .map_err(internal_error)
-            .and_then(|op| op.ok_or_else(|| Status::not_found("Problems folder not found")))
-            .and_then(|path| {
-                self.storage
-                    .search_item(Some(&path), &request.problem_id.to_string(), None)
-                    .map_err(internal_error)
-            })
-            .and_then(|op| {
-                op.ok_or_else(|| {
-                    Status::not_found(format!("Problem not found [id: {}]", request.problem_id))
-                })
-            })
             .and_then(|path| {
                 self.storage
                     .search_item(
@@ -184,21 +203,7 @@ impl Evaluation for EvaluationService {
         let testcase_id = request.testcase_id;
 
         // Get testcase's problem path
-        let problem_path = self
-            .storage
-            .search_item(None, PROBLEMS_FOLDER_NAME, None)
-            .map_err(internal_error)
-            .and_then(|op| op.ok_or_else(|| Status::not_found("Problems folder not found")))
-            .and_then(|path| {
-                self.storage
-                    .search_item(Some(&path), &problem_id.to_string(), None)
-                    .map_err(internal_error)
-            })
-            .and_then(|op| {
-                op.ok_or_else(|| {
-                    Status::not_found(format!("Problem not found [id: {}]", problem_id))
-                })
-            })?;
+        let problem_path = self.get_problem_folder_from_id(problem_id)?;
 
         // Get testcases folder
         let testcases_path = self
@@ -256,25 +261,7 @@ impl Evaluation for EvaluationService {
         let mut testcases: Vec<Testcase> = vec![];
 
         for entry in self
-            .storage
-            .search_item(None, PROBLEMS_FOLDER_NAME, None)
-            .and_then(|op| {
-                op.ok_or_else(|| {
-                    std::io::Error::new(std::io::ErrorKind::NotFound, "Problems folder not found")
-                })
-            })
-            .and_then(|path| {
-                self.storage
-                    .search_item(Some(&path), &problem_id.to_string(), None)
-            })
-            .and_then(|op| {
-                op.ok_or_else(|| {
-                    std::io::Error::new(
-                        std::io::ErrorKind::NotFound,
-                        format!("Problem not found [id: {}]", problem_id),
-                    )
-                })
-            })
+            .get_problem_folder_from_id(problem_id)
             .and_then(|path| {
                 self.storage
                     .iterate_folder(TESTCASES_FOLDER_NAME, Some(&path))
@@ -328,21 +315,7 @@ impl Evaluation for EvaluationService {
         let subtask_id = request.subtask_id;
 
         // Get testcase's problem path
-        let problem_path = self
-            .storage
-            .search_item(None, PROBLEMS_FOLDER_NAME, None)
-            .map_err(internal_error)
-            .and_then(|op| op.ok_or_else(|| Status::not_found("Problems folder not found")))
-            .and_then(|path| {
-                self.storage
-                    .search_item(Some(&path), &problem_id.to_string(), None)
-                    .map_err(internal_error)
-            })
-            .and_then(|op| {
-                op.ok_or_else(|| {
-                    Status::not_found(format!("Problem not found [id: {}]", problem_id))
-                })
-            })?;
+        let problem_path = self.get_problem_folder_from_id(problem_id)?;
 
         // Get testcases folder
         let testcases_path = self
@@ -359,7 +332,7 @@ impl Evaluation for EvaluationService {
             })?;
 
         match request.command.unwrap() {
-            Command::AddTestcase(tc) => {
+            set_testcase_request::Command::AddTestcase(tc) => {
                 // Check and add testcase to problem metadata
                 let mut problem_metadata: Problem = self
                     .storage
@@ -421,7 +394,7 @@ impl Evaluation for EvaluationService {
                     )?;
                 }
             }
-            Command::UpdateTestcase(tc) => {
+            set_testcase_request::Command::UpdateTestcase(tc) => {
                 let tc_path =
                     self.storage
                         .search_item(Some(&testcases_path), &tc.id.to_string(), None)?;
@@ -445,7 +418,7 @@ impl Evaluation for EvaluationService {
                     )));
                 }
             }
-            Command::DeleteTestcaseId(tc_id) => {
+            set_testcase_request::Command::DeleteTestcaseId(tc_id) => {
                 // Delete from problem metadata
                 let mut problem_metadata: Problem = self
                     .storage
@@ -499,15 +472,84 @@ impl Evaluation for EvaluationService {
 
     async fn get_problem_evaluation_file(
         &self,
-        _request: Request<GetProblemEvaluationFileRequest>,
+        request: Request<GetProblemEvaluationFileRequest>,
     ) -> Result<Response<GetProblemEvaluationFileResponse>, Status> {
-        todo!()
+        let request = request.into_inner();
+        let problem_id = request.problem_id;
+
+        let problem_path = self.get_problem_folder_from_id(problem_id)?;
+        let file_type = evaluation_file::Type::from_i32(request.r#type).ok_or_else(|| {
+            internal_error(format!(
+                "Cannot convert {} to evaluation file type",
+                request.r#type
+            ))
+        })?;
+
+        let eval_path = self
+            .storage
+            .search_item(Some(&problem_path), EVALUATION_FILES_FOLDER_NAME, None)?
+            .ok_or_else(|| not_found_io_error("Evaluation files folder not found"))?;
+        self.storage
+            .search_item(
+                Some(&eval_path),
+                self.get_evaluation_file_resource_name(file_type),
+                Some(SERIALIZED_EXTENSION),
+            )?
+            .ok_or_else(|| internal_error("Evaluation file not found"))
+            .and_then(|path| self.storage.read_file_object(&path).map_err(internal_error))
+            .map(|file| Response::new(GetProblemEvaluationFileResponse { file }))
     }
 
     async fn set_problem_evaluation_file(
         &self,
-        _request: Request<SetProblemEvaluationFileRequest>,
+        request: Request<SetProblemEvaluationFileRequest>,
     ) -> Result<Response<SetProblemEvaluationFileResponse>, Status> {
+        let request = request.into_inner();
+        let problem_id = request.problem_id;
+
+        let problem_path = self.get_problem_folder_from_id(problem_id)?;
+
+        match request.command.unwrap() {
+            set_problem_evaluation_file_request::Command::AddEvaluationFile(ef) => {
+                let file_type = evaluation_file::Type::from_i32(ef.r#type).ok_or_else(|| {
+                    internal_error(format!(
+                        "Cannot convert {} to evaluation file type",
+                        ef.r#type
+                    ))
+                })?;
+                let eval_path = self
+                    .storage
+                    .add_folder(EVALUATION_FILES_FOLDER_NAME, Some(&problem_path))?;
+                self.storage
+                    .save_file_object(
+                        Some(&eval_path),
+                        self.get_evaluation_file_resource_name(file_type),
+                        SERIALIZED_EXTENSION,
+                        ef,
+                    )
+                    .map_err(internal_error)?;
+            }
+            set_problem_evaluation_file_request::Command::UpdateEvaluationFile(ef) => {
+                let file_type = evaluation_file::Type::from_i32(ef.r#type).ok_or_else(|| {
+                    internal_error(format!(
+                        "Cannot convert {} to evaluation file type",
+                        ef.r#type
+                    ))
+                })?;
+                let eval_path = self
+                    .storage
+                    .search_item(Some(&problem_path), EVALUATION_FILES_FOLDER_NAME, None)?
+                    .ok_or_else(|| not_found_io_error("Evaluation files folder not found"))?;
+                self.storage
+                    .save_file_object(
+                        Some(&eval_path),
+                        self.get_evaluation_file_resource_name(file_type),
+                        SERIALIZED_EXTENSION,
+                        ef,
+                    )
+                    .map_err(internal_error)?;
+            }
+        }
         todo!()
     }
 }
