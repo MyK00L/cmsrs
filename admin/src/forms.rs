@@ -146,7 +146,7 @@ pub async fn set_evaluation_file(
     let req = evaluation::SetProblemEvaluationFileRequest {
         problem_id: data.problem_id,
         command: Some(
-            evaluation::set_problem_evaluation_file_request::Command::UpdateEvaluationFile(stuff), // TODO: unify update and add
+            evaluation::set_problem_evaluation_file_request::Command::AddEvaluationFile(stuff), // TODO: unify update and add
         ),
     };
     match evaluation_client
@@ -199,4 +199,62 @@ pub async fn add_testcase(
             format!("Error in rpc request:\n{:?}", err),
         )),
     }
+}
+/*
+#[derive(FromForm)]
+pub struct SetStatement<'v> {
+    problem_id: u64,
+    file: TempFile<'v>,
+}
+#[post("/form/set_statement", data = "<data>")]
+pub async fn set_statement(
+    data: Form<Strict<SetStatement<'_>>>,
+    contest_client: &State<ContestClient>,
+) -> Result<Redirect, status::Custom<String>> {
+    let contest_client = contest_client.inner().clone();
+    let mut file = std::fs::File::open(data.file.path().unwrap()).unwrap();
+    let mut raw = Vec::<u8>::new();
+    file.read_to_end(&mut raw).unwrap();
+    todo!(); // wait for problem metadata and file separation on client service
+}
+*/
+#[get("/form/get_evaluation_file/<problem_id>/<file_type>")]
+pub async fn get_evaluation_file(
+    problem_id: u64,
+    file_type: String,
+    evaluation_client: &State<EvaluationClient>,
+) -> Option<String> {
+    let evaluation_client = evaluation_client.inner().clone();
+    let file_type = evaluation::evaluation_file::Type::from_str(file_type.as_str()).unwrap();
+    let req = evaluation::GetProblemEvaluationFileRequest {
+        problem_id,
+        r#type: file_type as i32,
+    };
+    evaluation_client
+        .get_problem_evaluation_file(tonic::Request::new(req))
+        .await
+        .ok()
+        .map(|x| String::from_utf8(x.into_inner().file.source.code).ok())
+        .flatten()
+}
+
+#[get("/form/get_testcase/<problem_id>/<subtask_id>/<testcase_id>")]
+pub async fn get_testcase(
+    problem_id: u64,
+    #[allow(unused_variables)] subtask_id: u64,
+    testcase_id: u64,
+    evaluation_client: &State<EvaluationClient>,
+) -> Option<String> {
+    let evaluation_client = evaluation_client.inner().clone();
+    let req = evaluation::GetTestcaseRequest {
+        problem_id,
+        //subtask_id
+        testcase_id,
+    };
+    evaluation_client
+        .get_testcase(tonic::Request::new(req))
+        .await
+        .ok()
+        .map(|x| String::from_utf8(x.into_inner().testcase.input.unwrap_or_default()).ok()) // TODO: remove unwrap_or_default, return something better than a string(?), testcase output
+        .flatten()
 }
