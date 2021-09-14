@@ -58,13 +58,6 @@ impl EvaluationService {
                 })
             })
     }
-
-    fn get_evaluation_file_resource_name(&self, eval_type: evaluation_file::Type) -> &str {
-        match eval_type {
-            evaluation_file::Type::Checker => "checker",
-            evaluation_file::Type::Interactor => "interactor",
-        }
-    }
 }
 
 #[tonic::async_trait]
@@ -517,7 +510,7 @@ impl Evaluation for EvaluationService {
         self.storage
             .search_item(
                 Some(&eval_path),
-                self.get_evaluation_file_resource_name(file_type),
+                &file_type.to_string().to_lowercase(),
                 Some(SERIALIZED_EXTENSION),
             )?
             .ok_or_else(|| not_found_error("Evaluation file not found"))
@@ -548,7 +541,7 @@ impl Evaluation for EvaluationService {
                 self.storage
                     .save_file_object(
                         Some(&eval_path),
-                        self.get_evaluation_file_resource_name(file_type),
+                        &file_type.to_string().to_lowercase(),
                         SERIALIZED_EXTENSION,
                         ef,
                     )
@@ -568,7 +561,7 @@ impl Evaluation for EvaluationService {
                 self.storage
                     .save_file_object(
                         Some(&eval_path),
-                        self.get_evaluation_file_resource_name(file_type),
+                        &file_type.to_string().to_lowercase(),
                         SERIALIZED_EXTENSION,
                         ef,
                     )
