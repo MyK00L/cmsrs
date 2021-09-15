@@ -7,52 +7,33 @@ use protos::{
             dispatcher_server::{Dispatcher, DispatcherServer},
         },
         evaluation::{evaluation_server::Evaluation, GetProblemRequest},
-        worker::{self, worker_server::Worker, MockWorker},
+        worker::{self, worker_client::WorkerClient},
     },
-    utils::{get_local_address, Service},
+    utils::{get_local_address, get_remote_address, Service},
 };
 use std::collections::HashMap;
+use tonic::transport::Channel;
 use tonic::{transport::Server, Request, Response, Status};
 
 mod mock_services;
 
-struct RoundRobin {
-    actual: usize,
-    total_number: usize,
-}
-
-static mut SELECTOR: RoundRobin = RoundRobin {
-    actual: 0,
-    total_number: 0,
-};
-
-impl RoundRobin {
-    fn next(&mut self) -> usize {
-        let next_worker_id = self.actual;
-        self.actual = (self.actual + 1) % self.total_number;
-        next_worker_id
-    }
-}
-
 pub struct DispatcherService {
-    // worker list
-    workers: Vec<MockWorker>,
-    // Balance::new(tower::discover::ServiceList::new(vec![svc1, svc2]))
+    load_balancer: WorkerClient<Channel>,
 }
 
 impl DispatcherService {
     async fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        // somehow get the worker list
-        // or get the reference for a worker provider
-        let workers = vec![
-            mock_services::get_mock_worker(),
-            mock_services::get_mock_worker(),
-        ];
-        let len = workers.len();
-        unsafe {
-            SELECTOR.total_number = len;
-        }
-        Ok(Self { workers })
+        // change the argument passed to Channel::from_static inside the closure
+        // with the ip addresses of the workers
+        let workers_ip = [get_remote_address(Service::WORKER)];
+
+        let endpoints = workers_ip.iter().map(|ip| Channel::from_static(ip));
+
+        let channel = Channel::balance_list(endpoints);
+
+        Ok(Self {
+            load_balancer: WorkerClient::new(channel),
+        })
     }
 }
 
@@ -77,7 +58,7 @@ async fn group_testcases(
 
     let map_id_to_testcase_result: HashMap<_, _> = testcase_results
         .iter()
-        .map(|testcase_result| (testcase_result.id, testcase_result.to_owned()))
+        .map(|testcase_result| (testcase_result.id, testcase_result))
         .collect();
 
     Ok(problem_metadata
@@ -134,7 +115,9 @@ impl Dispatcher for DispatcherService {
         let problem_id = submission_request.sub.problem_id;
         let worker_request = Request::new(dispatcher_to_worker_request(&submission_request));
 
-        let worker_response = self.workers[unsafe { SELECTOR.next() }] // gets the worker we want to use
+        let worker_response = self
+            .load_balancer
+            .clone()
             .evaluate_submission(worker_request)
             .await?
             .into_inner();
