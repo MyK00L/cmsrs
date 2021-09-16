@@ -7,31 +7,33 @@ use protos::{
             dispatcher_server::{Dispatcher, DispatcherServer},
         },
         evaluation::{evaluation_server::Evaluation, GetProblemRequest},
-        worker::{self, worker_server::Worker, MockWorker},
+        worker::{self, worker_client::WorkerClient},
     },
-    utils::{get_local_address, Service},
+    utils::{get_local_address, get_remote_address, Service},
 };
 use std::collections::HashMap;
+use tonic::transport::Channel;
 use tonic::{transport::Server, Request, Response, Status};
 
 mod mock_services;
 
 pub struct DispatcherService {
-    workers: Vec<MockWorker>,
+    load_balancer: WorkerClient<Channel>,
 }
 
 impl DispatcherService {
     async fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        Ok(Self {
-            workers: vec![
-                mock_services::get_mock_worker(),
-                mock_services::get_mock_worker(),
-            ],
-        })
-    }
+        // change the argument passed to Channel::from_static inside the closure
+        // with the ip addresses of the workers
+        let workers_ip = [get_remote_address(Service::WORKER)];
 
-    fn elect_worker(&self) -> &MockWorker {
-        &self.workers[rand::random::<usize>() % self.workers.len()]
+        let endpoints = workers_ip.iter().map(|ip| Channel::from_static(ip));
+
+        let channel = Channel::balance_list(endpoints);
+
+        Ok(Self {
+            load_balancer: WorkerClient::new(channel),
+        })
     }
 }
 
@@ -114,7 +116,8 @@ impl Dispatcher for DispatcherService {
         let worker_request = Request::new(dispatcher_to_worker_request(&submission_request));
 
         let worker_response = self
-            .elect_worker()
+            .load_balancer
+            .clone()
             .evaluate_submission(worker_request)
             .await?
             .into_inner();
