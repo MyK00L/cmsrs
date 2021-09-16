@@ -27,7 +27,7 @@ fn generate_min_subtask_scoring(subtask_num: u64) -> protos::service::evaluation
                 testcase_ids.push(subtask_num * NUM_OF_TESTCASES_PER_SUBTASK + i);
             }
             testcase_ids
-        }, // the only relevant field (actually only the length of this vec)
+        }, // the only relevant field
     }
 }
 
