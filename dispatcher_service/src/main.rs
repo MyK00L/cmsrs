@@ -1,25 +1,37 @@
-use protos::{evaluation::{compilation_result, EvaluationResult, SubtaskResult, TestcaseResult}, scoring::OneOfScore, service::{dispatcher::{
+use protos::{
+    evaluation::{compilation_result, EvaluationResult, SubtaskResult, TestcaseResult},
+    scoring::OneOfScore,
+    service::{
+        dispatcher::{
             self,
             dispatcher_server::{Dispatcher, DispatcherServer},
-        }, evaluation::{evaluation_server::Evaluation, GetProblemRequest}, worker::{self, MockWorker, worker_server::Worker}}, utils::{get_local_address, Service}};
+        },
+        evaluation::{evaluation_server::Evaluation, GetProblemRequest},
+        worker::{self, worker_server::Worker, MockWorker},
+    },
+    utils::{get_local_address, Service},
+};
 use std::collections::HashMap;
 use tonic::{transport::Server, Request, Response, Status};
 
 mod mock_services;
 
 pub struct DispatcherService {
-    workers: Vec<MockWorker>, 
+    workers: Vec<MockWorker>,
 }
 
 impl DispatcherService {
     async fn new() -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Self {
-            workers: vec![mock_services::get_mock_worker(), mock_services::get_mock_worker()]
+            workers: vec![
+                mock_services::get_mock_worker(),
+                mock_services::get_mock_worker(),
+            ],
         })
     }
 
-    fn elect_worker<'a>(&'a self) -> &'a MockWorker {
-        &self.workers[ rand::random::<usize>() % self.workers.len()]
+    fn elect_worker(&self) -> &MockWorker {
+        &self.workers[rand::random::<usize>() % self.workers.len()]
     }
 }
 
