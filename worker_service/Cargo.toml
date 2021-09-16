@@ -1,0 +1,15 @@
+[package]
+name = "worker_service"
+version = "0.1.0"
+edition = "2018"
+[[bin]]
+name = "worker_service"
+path = "src/main.rs"
+
+[dependencies]
+tonic = "0.5"
+protos = { path = "../protos" }
+tokio = { version = "1.9", features = ["macros", "rt-multi-thread"] }
+
+[features]
+loopback = ["protos/loopback"]
