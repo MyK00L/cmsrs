@@ -10,6 +10,8 @@ path = "src/main.rs"
 tonic = "0.5"
 protos = { path = "../protos" }
 tokio = { version = "1.9", features = ["macros", "rt-multi-thread"] }
+utils = { path = "../utils" }
+rand = "0.8"
 
 [features]
 loopback = ["protos/loopback"]
