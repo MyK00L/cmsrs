@@ -55,21 +55,24 @@ services:
       context: .
       dockerfile: ./dispatcher_service/Dockerfile
     ports: 
-      - 50056:50051
+      - "127.0.0.1:50056:50051"
+    depends_on: 
+      - worker_service_1
+      - worker_service_2
 
   worker_service_1:
     build:
       context: .
       dockerfile: ./worker_service/Dockerfile
     ports: 
-      - 50058:50051
+      - "127.0.0.1:50058:50051"
   
   worker_service_2:
     build:
       context: .
       dockerfile: ./worker_service/Dockerfile
     ports: 
-      - 50059:50051
+      - "127.0.0.1:50059:50051"
 
   
 # volumes:

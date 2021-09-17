@@ -1,11 +1,16 @@
-use protos::{common::{self, Resources}, evaluation::{CompilationResult, TestcaseResult, compilation_result, testcase_result::Outcome}, scoring::{OneOfScore, one_of_score}, service::worker::{
+use protos::{
+    common::{self, Resources},
+    evaluation::{compilation_result, testcase_result::Outcome, CompilationResult, TestcaseResult},
+    service::worker::{
         worker_server::{Worker, WorkerServer},
         EvaluateSubmissionRequest, EvaluateSubmissionResponse, UpdateSourceRequest,
         UpdateSourceResponse, UpdateTestcaseRequest, UpdateTestcaseResponse,
-    }, utils::{get_local_address, Service}};
-use tonic::{transport::Server, Request, Response, Status};
+    },
+    utils::{get_local_address, Service},
+};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
+use tonic::{transport::Server, Request, Response, Status};
 use utils::scoring_lib::score_with_bool;
 
 pub struct WorkerService {}
@@ -23,7 +28,7 @@ const NUM_OF_TESTCASES_PER_SUBTASK: u64 = 5;
 impl Worker for WorkerService {
     async fn evaluate_submission(
         &self,
-        request: Request<EvaluateSubmissionRequest>,
+        _request: Request<EvaluateSubmissionRequest>,
     ) -> Result<Response<EvaluateSubmissionResponse>, Status> {
         Ok(Response::new(EvaluateSubmissionResponse {
             compilation_result: CompilationResult {
@@ -62,14 +67,14 @@ impl Worker for WorkerService {
 
     async fn update_testcase(
         &self,
-        request: Request<UpdateTestcaseRequest>,
+        _request: Request<UpdateTestcaseRequest>,
     ) -> Result<Response<UpdateTestcaseResponse>, Status> {
         todo!()
     }
 
     async fn update_source(
         &self,
-        request: Request<UpdateSourceRequest>,
+        _request: Request<UpdateSourceRequest>,
     ) -> Result<Response<UpdateSourceResponse>, Status> {
         todo!()
     }

@@ -9,7 +9,7 @@ use protos::{
         evaluation::{evaluation_server::Evaluation, GetProblemRequest},
         worker::{self, worker_client::WorkerClient},
     },
-    utils::{get_local_address, get_remote_address, Service},
+    utils::{get_local_address, Service},
 };
 use std::collections::HashMap;
 use tonic::transport::Channel;
@@ -23,9 +23,18 @@ pub struct DispatcherService {
 
 impl DispatcherService {
     async fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        // change the argument passed to Channel::from_static inside the closure
-        // with the ip addresses of the workers
-        let workers_ip = [get_remote_address(Service::WORKER)];
+        // the format of the IP address in the docker network has form:
+        // IMAGE_NAME://SERVICE_NAME:EXPOSED_PORT
+        // NB: if you implemented the service (basically if you have written a Dockerfile for it),
+        //     then the IMAGE_NAME and EXPOSED_PORT are specified in the Dockerfile of that service.
+        //     If the service uses an image downloaded from the web (e.g. the database images like
+        //     postgres or mongodb), then you should refer to the "docker-compose.yaml" file:
+        //     IMAGE_NAME is the name of the image from the web
+        //     EXPOSED_PORT is the last number of the string in the "ports" field
+        let workers_ip = [
+            "runtime://worker_service_1:50051",
+            "runtime://worker_service_2:50051",
+        ];
 
         let endpoints = workers_ip.iter().map(|ip| Channel::from_static(ip));
 
