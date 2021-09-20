@@ -29,12 +29,12 @@ pub mod contest {
                 description: value.get("description").unwrap().to_string(),
                 start_time: value.get("startTime").map(|x| {
                     x.as_timestamp()
-                        .map(convert::mongo::timestamp_to_systime)
+                        .map(utils::mongo::timestamp_to_systime)
                         .unwrap()
                 }),
                 end_time: value.get("endTime").map(|x| {
                     x.as_timestamp()
-                        .map(convert::mongo::timestamp_to_systime)
+                        .map(utils::mongo::timestamp_to_systime)
                         .unwrap()
                 }),
             }
@@ -43,16 +43,12 @@ pub mod contest {
     impl From<ContestMetadata> for Response<GetContestMetadataResponse> {
         fn from(md: ContestMetadata) -> Self {
             Response::new(GetContestMetadataResponse {
-                metadata: Some(protos::service::contest::ContestMetadata {
+                metadata: protos::service::contest::ContestMetadata {
                     name: md.name,
                     description: md.description,
-                    start_time: md
-                        .start_time
-                        .map(|x| protos::prost_types::Timestamp::try_from(x).unwrap()), // This should not break,
-                    end_time: md
-                        .end_time
-                        .map(|x| protos::prost_types::Timestamp::try_from(x).unwrap()), // This should not break,
-                }),
+                    start_time: md.start_time.map(protos::common::Timestamp::from),
+                    end_time: md.end_time.map(protos::common::Timestamp::from),
+                },
             })
         }
     }
@@ -61,9 +57,7 @@ pub mod contest {
         fn try_from(
             pb_meta: protos::service::contest::SetContestMetadataRequest,
         ) -> Result<Self, Self::Error> {
-            let metadata = pb_meta
-                .metadata
-                .ok_or(MappingError::MissingField("metadata"))?;
+            let metadata = pb_meta.metadata;
             Ok(Self {
                 name: metadata.name,
                 description: metadata.description,
@@ -82,11 +76,11 @@ pub mod contest {
             result.insert("description", m.description);
             result.insert(
                 "startTime",
-                m.start_time.map(convert::mongo::systime_to_timestamp),
+                m.start_time.map(utils::mongo::systime_to_timestamp),
             );
             result.insert(
                 "endTime",
-                m.end_time.map(convert::mongo::systime_to_timestamp),
+                m.end_time.map(utils::mongo::systime_to_timestamp),
             );
             result
         }
@@ -97,9 +91,9 @@ pub mod chat {
     use super::*;
 
     pub struct Message {
-        id: u32,
+        id: u64,
         subject: String,
-        problem_id: Option<u32>,
+        problem_id: Option<u64>,
         body: String,
         to: Option<String>,
         from: Option<String>,
@@ -135,17 +129,14 @@ pub mod chat {
                 body: msg.text,
                 to: msg.to,
                 from: msg.from,
-                sent_at: msg
-                    .sent_at
-                    .map(|x| std::time::SystemTime::try_from(x).unwrap())
-                    .unwrap(),
+                sent_at: std::time::SystemTime::try_from(msg.sent_at).unwrap(),
                 _thread: None,
             }
         }
     }
     impl From<protos::service::contest::AddMessageRequest> for Message {
         fn from(req: protos::service::contest::AddMessageRequest) -> Self {
-            Self::from(req.message.unwrap())
+            Self::from(req.message)
         }
     }
     impl From<Message> for protos::service::contest::Message {
@@ -155,7 +146,7 @@ pub mod chat {
                 problem_id: msg.problem_id,
                 subject: msg.subject.clone(),
                 text: msg.body.clone(),
-                sent_at: Some(protos::prost_types::Timestamp::from(msg.sent_at)),
+                sent_at: protos::common::Timestamp::from(msg.sent_at),
                 from: msg.from,
                 to: msg.to,
             }
@@ -164,29 +155,29 @@ pub mod chat {
     impl From<Message> for mongodb::bson::Document {
         fn from(m: Message) -> Self {
             let mut resp = Document::new();
-            resp.insert("_id", m.id);
+            resp.insert("_id", m.id as i64);
             resp.insert("subject", m.subject.clone());
-            resp.insert("problemId", m.problem_id);
+            resp.insert("problemId", m.problem_id.map(|id| id as i64));
             resp.insert("text", m.body.clone());
             if m.is_announcement() {
                 resp.insert("to", m.get_recipient());
             } else if m.is_question() {
                 resp.insert("from", m.get_recipient());
             }
-            resp.insert("created", convert::mongo::systime_to_timestamp(m.sent_at));
+            resp.insert("created", utils::mongo::systime_to_timestamp(m.sent_at));
             resp
         }
     }
     impl From<Document> for Message {
         fn from(d: Document) -> Self {
             Self {
-                id: d.get_i32("_id").unwrap() as u32,
+                id: d.get_i64("_id").unwrap() as u64,
                 subject: d.get_str("subject").unwrap().to_owned(),
-                problem_id: d.get_i32("problemId").map(|x| x as u32).ok(),
+                problem_id: d.get_i64("problemId").map(|x| x as u64).ok(),
                 body: d.get_str("text").unwrap().to_owned(),
                 to: d.get_str("to").map(|x| x.to_owned()).ok(),
                 from: d.get_str("from").map(|x| x.to_owned()).ok(),
-                sent_at: convert::mongo::timestamp_to_systime(d.get_timestamp("created").unwrap()),
+                sent_at: utils::mongo::timestamp_to_systime(d.get_timestamp("created").unwrap()),
                 _thread: None,
             }
         }
@@ -207,7 +198,7 @@ pub mod problem {
 
     #[derive(Default, Clone)]
     pub struct Problem {
-        id: u32,
+        id: u64,
         name: String,
         long_name: String,
     }
@@ -235,7 +226,7 @@ pub mod problem {
         fn from(mongo_record: Document) -> Self {
             ProblemData(
                 Problem {
-                    id: mongo_record.get_i32("_id").unwrap_or_default() as u32,
+                    id: mongo_record.get_i64("_id").unwrap_or_default() as u64,
                     name: mongo_record.get_str("name").unwrap_or_default().to_owned(),
                     long_name: mongo_record
                         .get_str("longName")
@@ -254,7 +245,7 @@ pub mod problem {
             let p = problem_data.get_problem();
             let statement = problem_data.get_statement();
             let mut result = Document::new();
-            result.insert("_id", p.id);
+            result.insert("_id", p.id as i64);
             result.insert("name", p.name.clone());
             result.insert("longName", p.long_name);
             result.insert(

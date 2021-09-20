@@ -1,4 +1,4 @@
-syntax = "proto3";
+syntax = "proto2";
 
 package service.worker;
 
@@ -7,21 +7,21 @@ import "evaluation.proto";
 import "worker.proto";
 
 message EvaluateSubmissionRequest {
-	uint32 problem_id = 1;
-	common.Source source = 2;
+	required uint64 problem_id = 1;
+	required common.Source source = 2;
 }
 message EvaluateSubmissionResponse {
-	evaluation.CompilationResult compilation_result = 1;
+	required evaluation.CompilationResult compilation_result = 1;
 	repeated evaluation.TestcaseResult testcase_results = 2;
 }
 
 message UpdateTestcaseRequest {
-	.worker.Testcase tc = 1;
+	required .worker.Testcase tc = 1;
 }
 message UpdateTestcaseResponse {}
 
 message UpdateSourceRequest {
-	.worker.SourceFile file = 1;
+	required .worker.SourceFile file = 1;
 }
 message UpdateSourceResponse {}
 

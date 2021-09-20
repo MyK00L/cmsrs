@@ -1,4 +1,4 @@
-syntax = "proto3";
+syntax = "proto2";
 
 package scoring;
 
@@ -11,8 +11,8 @@ message Subtask {
 		MIN = 0; // min score among all testcases
 		SUM = 1; // sum of all testcases
 	}
-	Method method = 1;
-	double max_score = 2; // calculated score gets transformed linearly in [0,max_score]
+	required Method method = 1;
+	required double max_score = 2; // calculated score gets transformed linearly in [0,max_score]
 }
 
 // Submission scoring same as Problem, considering only the single submission
@@ -22,7 +22,7 @@ message Problem {
 		SUM_MAX = 0; // sum maximum of each subtask across submissions
 		MAX_SUM = 1; // max sum of all subtasks for each submission
 	}
-	Method method = 1;
+	required Method method = 1;
 }
 
 message User {
@@ -32,11 +32,18 @@ message User {
 			SUM = 0;
 			MAX = 1;
 		}
-		Aggregation aggregation_method = 1;
-		double score_weight = 2;
-		double wrong_submission_count_weight = 3;
-		double time_secs_weight = 4;
+		required Aggregation aggregation_method = 1;
+		required double score_weight = 2;
+		required double wrong_submission_count_weight = 3;
+		required double time_secs_weight = 4;
 	}
-	Method main = 1; // users will be ranked by decreasing (main,tiebreakers[0],tiebreakers[1],...)
+	required Method main = 1; // users will be ranked by decreasing (main,tiebreakers[0],tiebreakers[1],...)
 	repeated Method tiebreakers = 2;
+}
+
+message OneOfScore {
+	oneof score {
+		bool bool_score = 1;
+		double double_score = 2;
+	}
 }

@@ -1,8 +1,8 @@
-syntax = "proto3";
+syntax = "proto2";
+
+import "common.proto";
 
 package service.contest;
-
-import "google/protobuf/timestamp.proto";
 
 message AuthUserRequest {
 	required string username = 1;
@@ -10,11 +10,11 @@ message AuthUserRequest {
 }
 message AuthUserResponse {
 	message Success {
-		string username = 1;
-		string fullname = 2;
+		required string username = 1;
+		required string fullname = 2;
 	}
 	message Failure {
-		string error = 1;
+		required string error = 1;
 	}
 	oneof response {
 		Success success = 1;
@@ -25,8 +25,8 @@ message AuthUserResponse {
 message ContestMetadata {
 	required string name = 1;
 	required string description = 2;
-	optional google.protobuf.Timestamp start_time = 3;
-	optional google.protobuf.Timestamp end_time = 4;
+	optional common.Timestamp start_time = 3;
+	optional common.Timestamp end_time = 4;
 }
 message GetContestMetadataRequest {}
 message GetContestMetadataResponse {
@@ -34,12 +34,12 @@ message GetContestMetadataResponse {
 }
 
 message Problem {
-	required uint32 id = 1;
+	required uint64 id = 1;
 	required string name = 2;
 	required string long_name = 3;
 }
 message GetProblemRequest {
-	required uint32 problem_id = 1;
+	required uint64 problem_id = 1;
 }
 message GetProblemResponse {
  	required Problem info = 1;
@@ -47,24 +47,24 @@ message GetProblemResponse {
 }
 
 message Message { // questions and announcements are the same
-	required uint32 id = 1;
+	required uint64 id = 1;
 	required string subject = 2;
-	optional uint32 problem_id = 3;
+	optional uint64 problem_id = 3;
 	required string text = 4;
 	optional string from = 5;
 	optional string to = 6;
-	required google.protobuf.Timestamp sent_at = 7;
+	required common.Timestamp sent_at = 7;
 }
 message GetAnnouncementListRequest {
-	optional uint32 problem_id = 1;
+	optional uint64 problem_id = 1;
 }
 message GetAnnouncementListResponse {
 	repeated Message announcements = 1;
 }
 
 message GetQuestionListRequest {
-	optional uint32 problem_id = 1;
-	optional uint32 user_id = 2;
+	optional uint64 problem_id = 1;
+	optional uint64 user_id = 2;
 }
 message GetQuestionListResponse {
 	repeated Message questions = 1;
@@ -81,7 +81,7 @@ message SetUserResponse {
 		ADD = 0;
 		UPDATE = 1;
 	}
-	Code code = 1;
+	required Code code = 1;
 }
 
 message SetContestMetadataRequest {

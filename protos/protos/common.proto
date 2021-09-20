@@ -1,24 +1,19 @@
-syntax = "proto3";
+syntax = "proto2";
 
 package common;
 
-import public "google/protobuf/timestamp.proto";
-import public "google/protobuf/duration.proto";
-
-/*
-message Id {
-	bytes mongo_id = 1;
+message Timestamp {
+	required uint64 secs = 1;
+	required uint32 nanos = 2;
 }
-*/
-
-message Id { // maybe this so that the length is fixed (and we know that if id exists it must have 12 bytes)?
-	fixed32 timestamp = 1;
-	fixed64 randinc = 2;
+message Duration {
+	required uint64 secs = 1;
+	required uint32 nanos = 2;
 }
 
 message Resources {
-	google.protobuf.Duration time = 1;
-	uint64 memory_bytes = 2;
+	required Duration time = 1;
+	required uint64 memory_bytes = 2;
 }
 
 enum ProgrammingLanguage {
@@ -28,7 +23,7 @@ enum ProgrammingLanguage {
 	// ...
 }
 message Source {
-	ProgrammingLanguage lang = 1;
-	bytes code = 2;
+	required ProgrammingLanguage lang = 1;
+	required bytes code = 2;
 }
 

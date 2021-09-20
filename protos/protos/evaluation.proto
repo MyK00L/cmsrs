@@ -1,13 +1,14 @@
-syntax = "proto3";
+syntax = "proto2";
 
 package evaluation;
 
 import "common.proto";
+import "scoring.proto";
 
 message Submission {
-	string user = 1;
-	uint32 problem_id = 2;
-	common.Source source = 3;
+	required string user = 1;
+	required uint64 problem_id = 2;
+	required common.Source source = 3;
 }
 message TestcaseResult {
 	enum Outcome {
@@ -16,15 +17,12 @@ message TestcaseResult {
 		TLE = 2; // time limit exceeded
 		MLE = 3; // memory limit exceeded
 		RTE = 4; // runtime error
-		CE = 5; // compilation error
-		CHECKER_ERROR = 6; // separate different errors?
+		CHECKER_ERROR = 5; // separate different errors?
 	}
-	Outcome outcome = 1;
-	oneof verdict {
-		bool ac = 2;
-		double score = 3;
-	}
-	common.Resources used_resources = 4;
+	required Outcome outcome = 1;
+	required scoring.OneOfScore score = 2;
+	required common.Resources used_resources = 3;
+	required uint64 id = 4;
 }
 message CompilationResult {
 	enum Outcome {
@@ -35,15 +33,20 @@ message CompilationResult {
 		MLE = 4;
 		RTE = 5; // bad stuff but could happen
 	}
-	Outcome outcome = 1;
-	common.Resources used_resources = 2;
+	required Outcome outcome = 1;
+	required common.Resources used_resources = 2;
 	optional string error_message = 3;
 }
+
+message SubtaskResult {
+	repeated TestcaseResult testcase_results = 1;
+	required scoring.OneOfScore score = 2;
+	required uint64 id = 3;
+}
+
 message EvaluationResult {
-	CompilationResult compilation_result = 1;
-	repeated TestcaseResult testcase_results = 2;
-	oneof score {
-		bool bool_score = 3;
-		double double_score = 4;
-	}
+	required CompilationResult compilation_result = 1;
+	// if compilation doesn't succeed, then subtask_results is empty
+	repeated SubtaskResult subtask_results = 2; 
+	required scoring.OneOfScore score = 3;
 }

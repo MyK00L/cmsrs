@@ -3,12 +3,12 @@ WORKDIR /src
 COPY protos protos
 COPY utils utils
 WORKDIR /src/server
-COPY contest_service/dummy.rs .
-COPY contest_service/Cargo.toml .
+COPY evaluation_service/dummy.rs .
+COPY evaluation_service/Cargo.toml .
 RUN rustup component add rustfmt
 
 FROM base as test
-COPY contest_service .
+COPY evaluation_service .
 CMD [ "cargo", "test" ]
 
 FROM base as build
@@ -19,6 +19,6 @@ COPY contest_service .
 RUN cargo build --release
 
 FROM rustlang/rust:nightly as runtime
-COPY --from=build /src/server/target/release/contest_service /usr/local/bin
+COPY --from=build /src/server/target/release/evaluation_service /usr/local/bin
 EXPOSE 50051
-ENTRYPOINT ["/usr/local/bin/contest_service"]
+ENTRYPOINT ["/usr/local/bin/evaluation_service"]

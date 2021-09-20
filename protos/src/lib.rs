@@ -1,12 +1,43 @@
 #![feature(trait_alias)]
 
-pub use prost_types;
-
 #[macro_use]
 mod mock_macro;
 
 pub mod common {
     tonic::include_proto!("common");
+    impl From<std::time::Duration> for Duration {
+        fn from(d: std::time::Duration) -> Self {
+            Duration {
+                secs: d.as_secs(),
+                nanos: d.subsec_nanos(),
+            }
+        }
+    }
+    impl From<Duration> for std::time::Duration {
+        fn from(d: Duration) -> std::time::Duration {
+            std::time::Duration::new(d.secs, d.nanos)
+        }
+    }
+    impl From<std::time::SystemTime> for Timestamp {
+        fn from(t: std::time::SystemTime) -> Self {
+            let d = t
+                .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                .unwrap_or_else(|_| std::time::Duration::new(0, 0));
+            Timestamp {
+                secs: d.as_secs(),
+                nanos: d.subsec_nanos(),
+            }
+        }
+    }
+    impl From<Timestamp> for std::time::SystemTime {
+        fn from(t: Timestamp) -> std::time::SystemTime {
+            let d = std::time::Duration::from(Duration {
+                secs: t.secs,
+                nanos: t.nanos,
+            });
+            std::time::SystemTime::UNIX_EPOCH + d
+        }
+    }
 }
 pub mod evaluation {
     tonic::include_proto!("evaluation");
@@ -38,11 +69,18 @@ pub mod service {
         (evaluate_submission,EvaluateSubmissionRequest,EvaluateSubmissionResponse)
         );
     }
-    pub mod evaluation_files {
-        tonic::include_proto!("service.evaluation_files");
+    pub mod evaluation {
+        tonic::include_proto!("service.evaluation");
         rpc_mock_server!(evaluation_server::Evaluation; MockEvaluation;
-        (get_scorer_info,GetScorerInfoRequest,GetScorerInfoResponse),
-        (get_scoreboard_info,GetScoreboardInfoRequest,GetScoreboardInfoResponse)
+        (get_user_scoring,GetUserScoringRequest,GetUserScoringResponse),
+        (get_problem,GetProblemRequest,GetProblemResponse),
+        (set_contest,SetContestRequest,SetContestResponse),
+        (get_contest,GetContestRequest,GetContestResponse),
+        (get_testcase,GetTestcaseRequest,GetTestcaseResponse),
+        (get_problem_testcases,GetProblemTestcasesRequest,GetProblemTestcasesResponse),
+        (set_testcase,SetTestcaseRequest,SetTestcaseResponse),
+        (get_problem_evaluation_file,GetProblemEvaluationFileRequest,GetProblemEvaluationFileResponse),
+        (set_problem_evaluation_file,SetProblemEvaluationFileRequest,SetProblemEvaluationFileResponse)
         );
     }
     pub mod submission {
