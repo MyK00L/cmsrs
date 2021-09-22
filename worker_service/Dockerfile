@@ -1,6 +1,11 @@
 FROM rustlang/rust:nightly as base
 WORKDIR /src 
 COPY protos protos
+# install the compilers needed 
+# NB: rustc is already in the base image
+RUN apt-get update && \
+    apt-get install gcc
+# finished installation of compilers
 WORKDIR /src/server
 COPY worker_service/dummy.rs .
 COPY worker_service/Cargo.toml .

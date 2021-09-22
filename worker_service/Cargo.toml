@@ -10,6 +10,8 @@ path = "src/main.rs"
 tonic = "0.5"
 protos = { path = "../protos" }
 tokio = { version = "1.9", features = ["macros", "rt-multi-thread"] }
+tabox = "0.1.16"
+failure = "0.1" # avoid this
 
 [features]
 loopback = ["protos/loopback"]
