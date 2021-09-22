@@ -4,7 +4,7 @@ use core::panic;
 
 use futures::stream::StreamExt;
 
-use ::utils::scoring_lib::{evaluate_submission_score, evaluate_subtask_score};
+use ::utils::scoring_lib::{evaluate_submission_score, evaluate_subtask_score, score_with_double};
 use mongodb::{
     bson::{doc, Bson, Document},
     options::{
@@ -12,7 +12,7 @@ use mongodb::{
     },
     Client, Database,
 };
-use protos::{service::evaluation::{evaluation_server::Evaluation, GetProblemRequest}};
+use protos::{evaluation::compilation_result, service::evaluation::{evaluation_server::Evaluation, GetProblemRequest}};
 use protos::service::submission::submission_server::*;
 use protos::service::submission::*;
 use protos::utils::*;
@@ -192,10 +192,18 @@ impl SubmissionService {
     }
 }
 
+/// safe even if compilation didn't succeed
 async fn evaluate_scores(
     mut_evaluation_result: &mut EvaluationResult,
     problem_id: u64,
 ) -> Result<(), Status> {
+    // if compilation failed, update manually submission score and return
+    if let compilation_result::Outcome::Success = mut_evaluation_result.compilation_result.outcome() {
+        assert!(mut_evaluation_result.subtask_results.is_empty());
+        mut_evaluation_result.score = score_with_double(0f64);
+        return Ok(());
+    }
+
     let problem_metadata_request = GetProblemRequest { problem_id };
     let mock_evaluation_server = mock_services::get_mock_evaluation(problem_id);
 
