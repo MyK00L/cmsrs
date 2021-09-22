@@ -12,7 +12,7 @@ use mongodb::{
     },
     Client, Database,
 };
-use protos::service::evaluation::{evaluation_server::Evaluation, GetProblemRequest};
+use protos::{service::evaluation::{evaluation_server::Evaluation, GetProblemRequest}};
 use protos::service::submission::submission_server::*;
 use protos::service::submission::*;
 use protos::utils::*;
@@ -89,14 +89,13 @@ async fn init_contest_service_db(db: Database) -> Result<(), Box<dyn std::error:
                             "properties": {
                                 "outcome": { 
                                     "bsonType": "int",
-                                    "enum": [0, 1, 2, 3, 4, 5]
+                                    "enum": [0, 1, 2, 3, 4]
                                     /*
                                     0 => NONE
                                     1 => SUCCESS
-                                    2 => REJECTED
-                                    3 => TLE
-                                    4 => MLE
-                                    5 => RTE
+                                    2 => TLE
+                                    3 => MLE
+                                    4 => RTE
                                     */
                                 },
                                 "timeNs": { "bsonType": "long" },
@@ -349,6 +348,7 @@ impl Submission for SubmissionService {
             .await
             .map_err(internal_error)?;
 
+        // consider using opt_document.map_or_else(default, f) instead of the match expression
         match opt_document {
             Some(document) => {
                 let state = document
