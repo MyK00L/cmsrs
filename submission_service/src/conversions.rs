@@ -185,7 +185,7 @@ fn compilation_doc_to_struct(compilation_doc: &Document) -> CompilationResult {
                 .get_i64("memoryB")
                 .unwrap_or_else(|_| panic!("{}", expected_field("memoryB")))
                 as u64,
-        }
+        },
     }
 }
 

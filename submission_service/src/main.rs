@@ -12,11 +12,14 @@ use mongodb::{
     },
     Client, Database,
 };
-use protos::{evaluation::compilation_result, service::evaluation::{evaluation_server::Evaluation, GetProblemRequest}};
 use protos::service::submission::submission_server::*;
 use protos::service::submission::*;
 use protos::utils::*;
 use protos::{self, *};
+use protos::{
+    evaluation::compilation_result,
+    service::evaluation::{evaluation_server::Evaluation, GetProblemRequest},
+};
 use protos::{evaluation::EvaluationResult, service::dispatcher::dispatcher_server::*};
 use tonic::{transport::*, Request, Response, Status};
 
@@ -198,7 +201,8 @@ async fn evaluate_scores(
     problem_id: u64,
 ) -> Result<(), Status> {
     // if compilation failed, update manually submission score and return
-    if let compilation_result::Outcome::Success = mut_evaluation_result.compilation_result.outcome() {
+    if let compilation_result::Outcome::Success = mut_evaluation_result.compilation_result.outcome()
+    {
         assert!(mut_evaluation_result.subtask_results.is_empty());
         mut_evaluation_result.score = score_with_double(0f64);
         return Ok(());
