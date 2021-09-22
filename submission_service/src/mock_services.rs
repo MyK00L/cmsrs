@@ -76,7 +76,6 @@ fn mock_dispatcher_init(mock_dispatcher: &mut MockDispatcher) {
                     },
                     memory_bytes: 1u64,
                 },
-                error_message: None,
             },
             subtask_results: vec![
                 generate_subtask_result(),

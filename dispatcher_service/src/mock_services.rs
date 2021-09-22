@@ -75,7 +75,6 @@ fn mock_worker_init(mock_worker_server: &mut MockWorker) {
                 },
                 memory_bytes: 1u64,
             },
-            error_message: None,
         },
         testcase_results: {
             let mut testcase_results =
