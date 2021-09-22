@@ -17,7 +17,7 @@ fn as_bool(score: &OneOfScore) -> bool {
     }
 }
 
-fn score_with_double(double_score: f64) -> OneOfScore {
+pub fn score_with_double(double_score: f64) -> OneOfScore {
     OneOfScore {
         score: Some(one_of_score::Score::DoubleScore(double_score)),
     }

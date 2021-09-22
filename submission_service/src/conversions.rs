@@ -107,15 +107,11 @@ fn time_ns_to_duration(time_ns: i64) -> common::Duration {
 }
 
 fn compilation_data_to_db_obj(compilation_result: CompilationResult) -> Bson {
-    let mut db_obj_document = doc! {
+    bson! ({
         "outcome": compilation_result.outcome,
         "timeNs": duration_to_time_ns(compilation_result.used_resources.time),
-        "memoryB": convert_to_i64(compilation_result.used_resources.memory_bytes),
-    };
-    if let Some(err_msg) = compilation_result.error_message {
-        db_obj_document.insert("error", err_msg);
-    }
-    db_obj_document.into()
+        "memoryB": convert_to_i64(compilation_result.used_resources.memory_bytes)
+    })
 }
 
 fn testcase_data_to_db_obj(testcase_data: &TestcaseResult) -> Bson {
@@ -190,12 +186,6 @@ fn compilation_doc_to_struct(compilation_doc: &Document) -> CompilationResult {
                 .unwrap_or_else(|_| panic!("{}", expected_field("memoryB")))
                 as u64,
         },
-        error_message: compilation_doc.get("error").map(|bson_string| {
-            bson_string
-                .as_str()
-                .expect("This should not happen. \'error\' must be stored as Bson::String")
-                .to_string()
-        }),
     }
 }
 
