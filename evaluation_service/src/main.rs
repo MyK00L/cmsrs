@@ -19,23 +19,23 @@ const PROBLEM_METADATA_FILE_NAME: &str = "metadata";
 
 fn internal_error<T>(e: T) -> Status
 where
-    T: core::fmt::Display,
+    T: core::fmt::Debug,
 {
-    Status::internal(format!("{}", e))
+    Status::internal(format!("{:?}", e))
 }
 
 fn not_found_error<T>(e: T) -> Status
 where
-    T: core::fmt::Display,
+    T: core::fmt::Debug,
 {
-    Status::not_found(format!("{}", e))
+    Status::not_found(format!("{:?}", e))
 }
 
 fn not_found_io_error<T>(e: T) -> io::Error
 where
-    T: core::fmt::Display,
+    T: core::fmt::Debug,
 {
-    io::Error::new(io::ErrorKind::NotFound, format!("{}", e))
+    io::Error::new(io::ErrorKind::NotFound, format!("{:?}", e))
 }
 
 #[derive(Debug)]
