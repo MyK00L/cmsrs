@@ -35,6 +35,7 @@ fn generate_testcase_result() -> TestcaseResult {
             },
             memory_bytes: gen.gen(),
         },
+        id: 1u64,
     }
 }
 
@@ -48,6 +49,7 @@ fn generate_subtask_result() -> SubtaskResult {
             generate_testcase_result(),
         ],
         score: OneOfScore::default(),
+        id: 1u64,
     }
 }
 
@@ -74,7 +76,6 @@ fn mock_dispatcher_init(mock_dispatcher: &mut MockDispatcher) {
                     },
                     memory_bytes: 1u64,
                 },
-                error_message: None,
             },
             subtask_results: vec![
                 generate_subtask_result(),

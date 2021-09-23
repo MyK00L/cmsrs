@@ -22,24 +22,24 @@ message TestcaseResult {
 	required Outcome outcome = 1;
 	required scoring.OneOfScore score = 2;
 	required common.Resources used_resources = 3;
+	required uint64 id = 4;
 }
 message CompilationResult {
 	enum Outcome {
 		NONE = 0;
 		SUCCESS = 1;
-		REJECTED = 2; // could be useful for checks on source code (eg: no pragmas)
-		TLE = 3;
-		MLE = 4;
-		RTE = 5; // bad stuff but could happen
+		TLE = 2;
+		MLE = 3;
+		RTE = 4; // bad stuff but could happen
 	}
 	required Outcome outcome = 1;
 	required common.Resources used_resources = 2;
-	optional string error_message = 3;
 }
 
 message SubtaskResult {
 	repeated TestcaseResult testcase_results = 1;
 	required scoring.OneOfScore score = 2;
+	required uint64 id = 3;
 }
 
 message EvaluationResult {

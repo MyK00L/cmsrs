@@ -4,7 +4,7 @@ use core::panic;
 
 use futures::stream::StreamExt;
 
-use ::utils::scoring_lib::{evaluate_submission_score, evaluate_subtask_score};
+use ::utils::scoring_lib::{evaluate_submission_score, evaluate_subtask_score, score_with_double};
 use mongodb::{
     bson::{doc, Bson, Document},
     options::{
@@ -12,11 +12,14 @@ use mongodb::{
     },
     Client, Database,
 };
-use protos::service::evaluation::{evaluation_server::Evaluation, GetProblemRequest};
 use protos::service::submission::submission_server::*;
 use protos::service::submission::*;
 use protos::utils::*;
 use protos::{self, *};
+use protos::{
+    evaluation::compilation_result,
+    service::evaluation::{evaluation_server::Evaluation, GetProblemRequest},
+};
 use protos::{evaluation::EvaluationResult, service::dispatcher::dispatcher_server::*};
 use tonic::{transport::*, Request, Response, Status};
 
@@ -89,14 +92,13 @@ async fn init_contest_service_db(db: Database) -> Result<(), Box<dyn std::error:
                             "properties": {
                                 "outcome": { 
                                     "bsonType": "int",
-                                    "enum": [0, 1, 2, 3, 4, 5]
+                                    "enum": [0, 1, 2, 3, 4]
                                     /*
                                     0 => NONE
                                     1 => SUCCESS
-                                    2 => REJECTED
-                                    3 => TLE
-                                    4 => MLE
-                                    5 => RTE
+                                    2 => TLE
+                                    3 => MLE
+                                    4 => RTE
                                     */
                                 },
                                 "timeNs": { "bsonType": "long" },
@@ -112,8 +114,9 @@ async fn init_contest_service_db(db: Database) -> Result<(), Box<dyn std::error:
                                 "bsonType": "array",
                                 "items": {
                                     "bsonType": "object",
-                                    "required": ["testcases", "subtaskScore"],
+                                    "required": ["subtaskId", "testcases", "subtaskScore"],
                                     "properties": {
+                                    "subtaskId": { "bsonType": "long" },
                                     "subtaskScore": { 
                                         "oneOf": [ 
                                             { "bsonType": "bool"},
@@ -124,8 +127,9 @@ async fn init_contest_service_db(db: Database) -> Result<(), Box<dyn std::error:
                                         "bsonType": "array",
                                         "items": {
                                             "bsonType": "object",
-                                            "required": ["outcome", "score", "timeNs", "memoryB"], 
+                                            "required": ["testcaseId", "outcome", "score", "timeNs", "memoryB"], 
                                             "properties": {
+                                                "testcaseId": { "bsonType": "long" },
                                                 "outcome": {
                                                     "bsonType": "int",
                                                     "enum": [0, 1, 2, 3, 4, 5]
@@ -191,10 +195,19 @@ impl SubmissionService {
     }
 }
 
+/// safe even if compilation didn't succeed
 async fn evaluate_scores(
     mut_evaluation_result: &mut EvaluationResult,
     problem_id: u64,
 ) -> Result<(), Status> {
+    // if compilation failed, update manually submission score and return
+    if let compilation_result::Outcome::Success = mut_evaluation_result.compilation_result.outcome()
+    {
+        assert!(mut_evaluation_result.subtask_results.is_empty());
+        mut_evaluation_result.score = score_with_double(0f64);
+        return Ok(());
+    }
+
     let problem_metadata_request = GetProblemRequest { problem_id };
     let mock_evaluation_server = mock_services::get_mock_evaluation(problem_id);
 
@@ -347,6 +360,7 @@ impl Submission for SubmissionService {
             .await
             .map_err(internal_error)?;
 
+        // consider using opt_document.map_or_else(default, f) instead of the match expression
         match opt_document {
             Some(document) => {
                 let state = document
