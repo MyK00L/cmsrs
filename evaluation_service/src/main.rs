@@ -19,23 +19,23 @@ const PROBLEM_METADATA_FILE_NAME: &str = "metadata";
 
 fn internal_error<T>(e: T) -> Status
 where
-    T: core::fmt::Debug + core::fmt::Display,
+    T: core::fmt::Display,
 {
-    Status::internal(format!("{:?}", e))
+    Status::internal(format!("{}", e))
 }
 
 fn not_found_error<T>(e: T) -> Status
 where
-    T: core::fmt::Debug + core::fmt::Display,
+    T: core::fmt::Display,
 {
-    Status::not_found(format!("{:?}", e))
+    Status::not_found(format!("{}", e))
 }
 
 fn not_found_io_error<T>(e: T) -> io::Error
 where
-    T: core::fmt::Debug + core::fmt::Display,
+    T: core::fmt::Display,
 {
-    io::Error::new(io::ErrorKind::NotFound, format!("{:?}", e))
+    io::Error::new(io::ErrorKind::NotFound, format!("{}", e))
 }
 
 #[derive(Debug)]
@@ -68,7 +68,7 @@ impl Evaluation for EvaluationService {
     ) -> Result<Response<GetUserScoringResponse>, Status> {
         self.storage
             .search_item(None, USER_SCORING_FILE_NAME, Some(SERIALIZED_EXTENSION))
-            .map_err(not_found_error)
+            .map_err(internal_error)
             .and_then(|op| op.ok_or_else(|| not_found_error("User scoring method not found")))
             .and_then(|path| {
                 self.storage
@@ -92,7 +92,7 @@ impl Evaluation for EvaluationService {
                         PROBLEM_METADATA_FILE_NAME,
                         Some(SERIALIZED_EXTENSION),
                     )
-                    .map_err(not_found_error)
+                    .map_err(internal_error)
             })
             .and_then(|op| {
                 op.ok_or_else(|| {
@@ -321,10 +321,10 @@ impl Evaluation for EvaluationService {
         let testcases_path = self
             .storage
             .search_item(Some(&problem_path), TESTCASES_FOLDER_NAME, None)
-            .map_err(not_found_io_error)
+            .map_err(internal_error)
             .and_then(|op| {
                 op.ok_or_else(|| {
-                    not_found_io_error(format!(
+                    not_found_error(format!(
                         "Testcases folder not found [problem id: {}]",
                         problem_id
                     ))
