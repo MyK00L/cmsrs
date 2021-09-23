@@ -1,12 +1,30 @@
 use super::ProtoScore;
 use ordered_float::NotNan;
 use std::cmp::Ord;
+use std::iter::Sum;
 use std::ops::{Add, Div, Mul};
 
 #[derive(Copy, Clone, Debug)]
 pub struct MyScore {
     score: NotNan<f64>,
     is_bool: bool,
+}
+impl MyScore {
+    pub fn from_f64(s: f64) -> Self {
+        // temporary because protos have max_score saved as double and note OneOfScore
+        Self {
+            score: NotNan::new(s).unwrap(),
+            is_bool: false,
+        }
+    }
+}
+impl Default for MyScore {
+    fn default() -> Self {
+        Self {
+            score: NotNan::new(0.0).unwrap(),
+            is_bool: false,
+        }
+    }
 }
 impl Ord for MyScore {
     fn cmp(&self, o: &Self) -> std::cmp::Ordering {
@@ -27,6 +45,17 @@ impl PartialEq for MyScore {
 }
 impl Eq for MyScore {}
 
+impl Sum for MyScore {
+    fn sum<I>(it: I) -> Self
+    where
+        I: Iterator<Item = Self>,
+    {
+        Self {
+            score: it.map(|x| x.score).sum(),
+            is_bool: false,
+        }
+    }
+}
 impl Add for MyScore {
     type Output = Self;
     fn add(self, o: Self) -> Self {
