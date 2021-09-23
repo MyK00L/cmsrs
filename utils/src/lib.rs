@@ -9,6 +9,8 @@ pub mod mongo;
 
 pub mod scoring_lib;
 
+pub mod scoring;
+
 #[cfg(test)]
 mod tests;
 
