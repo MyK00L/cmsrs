@@ -8,8 +8,6 @@ use std::time::SystemTime;
 pub mod mongo;
 pub mod storage;
 
-pub mod scoring_lib;
-
 pub mod scoring;
 
 #[cfg(test)]

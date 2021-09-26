@@ -1,9 +1,8 @@
 mod my_score;
 mod score;
-use ordered_float::NotNan;
 use score::ScoreTrait;
 
-type ProtoScore = protos::scoring::OneOfScore;
+type ProtoScore = protos::common::Score;
 type Score = my_score::MyScore;
 
 fn transpose<T>(v: Vec<Vec<T>>) -> Vec<Vec<T>> {
@@ -22,23 +21,21 @@ fn transpose<T>(v: Vec<Vec<T>>) -> Vec<Vec<T>> {
 
 pub fn calc_subtask_score(
     testcases: &[protos::evaluation::TestcaseResult],
-    opts: protos::scoring::Subtask,
+    opts: &protos::scoring::Subtask,
 ) -> ProtoScore {
     let method = protos::scoring::subtask::Method::from_i32(opts.method).unwrap();
     let testcase_scores = testcases.iter().map(|x| Score::from(x.score.clone()));
     let mut ans = match method {
-        protos::scoring::subtask::Method::Min => testcase_scores.min().unwrap_or_default(),
+        protos::scoring::subtask::Method::Min => testcase_scores.min().unwrap_or_else(Score::zero),
         protos::scoring::subtask::Method::Sum => testcase_scores.sum(),
     };
-    if NotNan::new(opts.max_score).unwrap() != NotNan::new(1.0).unwrap() {
-        ans.rescale(Score::from_f64(1.0), Score::from_f64(opts.max_score));
-    }
+    ans.rescale(Score::one(), Score::from(opts.max_score.clone()));
     ans.into()
 }
 
 pub fn calc_submission_score(
     subtasks: &[protos::evaluation::SubtaskResult],
-    _opts: protos::scoring::Problem,
+    _opts: &protos::scoring::Problem,
 ) -> ProtoScore {
     //let method = protos::scoring::problem::Method::from_i32(opts.method).unwrap();
 
@@ -51,7 +48,7 @@ pub fn calc_submission_score(
 
 pub fn calc_problem_score(
     submissions: &[protos::evaluation::EvaluationResult],
-    opts: protos::scoring::Problem,
+    opts: &protos::scoring::Problem,
 ) -> ProtoScore {
     let method = protos::scoring::problem::Method::from_i32(opts.method).unwrap();
 
@@ -74,14 +71,14 @@ pub fn calc_problem_score(
                     .into_iter()
                     .map(Score::from)
                     .max()
-                    .unwrap_or_default()
+                    .unwrap_or_else(Score::zero)
             })
             .sum(),
         protos::scoring::problem::Method::MaxSum => submission_scores
             .into_iter()
             .map(|subtask_scores| subtask_scores.into_iter().map(Score::from).sum::<Score>())
             .max()
-            .unwrap_or_default(),
+            .unwrap_or_else(Score::zero),
     }
     .into()
 }

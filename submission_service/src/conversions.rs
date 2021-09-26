@@ -6,7 +6,7 @@ use mongodb::bson::{
     spec::{BinarySubtype, ElementType},
     Binary, Bson, Document,
 };
-use protos::scoring::{one_of_score, OneOfScore};
+use protos::common::Score;
 use protos::service::submission::*;
 use protos::utils::*;
 use protos::{

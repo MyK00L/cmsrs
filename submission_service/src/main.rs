@@ -4,7 +4,7 @@ use core::panic;
 
 use futures::stream::StreamExt;
 
-use ::utils::scoring_lib::{evaluate_submission_score, evaluate_subtask_score, score_with_double};
+use ::utils::scoring::{calc_submission_score, calc_subtask_score};
 use mongodb::{
     bson::{doc, Bson, Document},
     options::{
@@ -67,7 +67,7 @@ async fn init_contest_service_db(db: Database) -> Result<(), Box<dyn std::error:
                         "problemId": { "bsonType": "long" },
                         "created": { "bsonType": "timestamp" },
                         "source": { "bsonType": "binData" },
-                        "programmingLanguage": { 
+                        "programmingLanguage": {
                             "bsonType": "int",
                             "enum": [0, 1, 2]
                             /*
@@ -77,7 +77,7 @@ async fn init_contest_service_db(db: Database) -> Result<(), Box<dyn std::error:
                             ...
                             */
                         },
-                        "state": { 
+                        "state": {
                             "bsonType": "int",
                             "enum": [0, 1, 2]
                             /*
@@ -90,7 +90,7 @@ async fn init_contest_service_db(db: Database) -> Result<(), Box<dyn std::error:
                             "bsonType": "object",
                             "required": ["outcome", "timeNs", "memoryB"],
                             "properties": {
-                                "outcome": { 
+                                "outcome": {
                                     "bsonType": "int",
                                     "enum": [0, 1, 2, 3, 4]
                                     /*
@@ -117,17 +117,12 @@ async fn init_contest_service_db(db: Database) -> Result<(), Box<dyn std::error:
                                     "required": ["subtaskId", "testcases", "subtaskScore"],
                                     "properties": {
                                     "subtaskId": { "bsonType": "long" },
-                                    "subtaskScore": { 
-                                        "oneOf": [ 
-                                            { "bsonType": "bool"},
-                                            { "bsonType": "double"}
-                                        ]
-                                    }, // SubtaskResult.subtask_score
+                                    "subtaskScore": { "bsonType": "double" }, // SubtaskResult.subtask_score
                                     "testcases": {
                                         "bsonType": "array",
                                         "items": {
                                             "bsonType": "object",
-                                            "required": ["testcaseId", "outcome", "score", "timeNs", "memoryB"], 
+                                            "required": ["testcaseId", "outcome", "score", "timeNs", "memoryB"],
                                             "properties": {
                                                 "testcaseId": { "bsonType": "long" },
                                                 "outcome": {
@@ -142,12 +137,7 @@ async fn init_contest_service_db(db: Database) -> Result<(), Box<dyn std::error:
                                                     5 => CHECKER_ERROR
                                                     */
                                                 }, // TestcaseResult.outcome
-                                                "score": { 
-                                                    "oneOf": [ 
-                                                        { "bsonType": "bool"},
-                                                        { "bsonType": "double"}
-                                                    ]
-                                                }, //TestcaseResult.score
+                                                "score": { "bsonType": "double" }, //TestcaseResult.score
                                                 "timeNs": { "bsonType": "long" }, // TestcaseResult.used_resources
                                                 "memoryB": { "bsonType": "long" }, // TestcaseResult.used_resources
                                         }
@@ -158,12 +148,7 @@ async fn init_contest_service_db(db: Database) -> Result<(), Box<dyn std::error:
                                 }
                             } // EvaluationResult.subtask_results
                         },
-                        "overallScore": { 
-                            "oneOf": [ 
-                                { "bsonType": "bool"},
-                                { "bsonType": "double"}
-                            ]
-                        } // EvaluationResult.overall_score
+                        "overallScore": { "bsonType": "double" } // EvaluationResult.overall_score
                     }
                 }
             })
@@ -201,10 +186,10 @@ async fn evaluate_scores(
     problem_id: u64,
 ) -> Result<(), Status> {
     // if compilation failed, update manually submission score and return
-    if let compilation_result::Outcome::Success = mut_evaluation_result.compilation_result.outcome()
+    if let compilation_result::Outcome::Success = mut_evaluation_result.compilation_result.outcome() //TODO: uuh are you sure about this if?
     {
         assert!(mut_evaluation_result.subtask_results.is_empty());
-        mut_evaluation_result.score = score_with_double(0f64);
+        mut_evaluation_result.score = protos::common::Score{score:0f64};
         return Ok(());
     }
 
@@ -221,16 +206,15 @@ async fn evaluate_scores(
         .iter_mut()
         .enumerate()
         .for_each(|(i, subtask)| {
-            evaluate_subtask_score(
+            subtask.score = calc_subtask_score(
                 &subtask.testcase_results,
                 &problem_metadata.info.subtasks[i].scoring,
-                &mut subtask.score,
             );
         });
 
-    evaluate_submission_score(
+    mut_evaluation_result.score = calc_submission_score(
         &mut_evaluation_result.subtask_results,
-        &mut mut_evaluation_result.score,
+        &protos::scoring::Problem::default() // TODO: pass the actual options
     );
 
     Ok(())

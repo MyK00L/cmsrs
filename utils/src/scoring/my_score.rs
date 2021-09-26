@@ -1,3 +1,4 @@
+use super::score::ScoreTrait;
 use super::ProtoScore;
 use ordered_float::NotNan;
 use std::cmp::Ord;
@@ -7,28 +8,9 @@ use std::ops::{Add, Div, Mul};
 #[derive(Copy, Clone, Debug)]
 pub struct MyScore {
     score: NotNan<f64>,
-    is_bool: bool,
-}
-impl MyScore {
-    pub fn from_f64(s: f64) -> Self {
-        // temporary because protos have max_score saved as double and note OneOfScore
-        Self {
-            score: NotNan::new(s).unwrap(),
-            is_bool: false,
-        }
-    }
-}
-impl Default for MyScore {
-    fn default() -> Self {
-        Self {
-            score: NotNan::new(0.0).unwrap(),
-            is_bool: false,
-        }
-    }
 }
 impl Ord for MyScore {
     fn cmp(&self, o: &Self) -> std::cmp::Ordering {
-        assert_eq!(self.is_bool, o.is_bool);
         self.score.cmp(&o.score)
     }
 }
@@ -39,7 +21,6 @@ impl PartialOrd for MyScore {
 }
 impl PartialEq for MyScore {
     fn eq(&self, o: &Self) -> bool {
-        assert_eq!(self.is_bool, o.is_bool);
         self.score.eq(&o.score)
     }
 }
@@ -52,70 +33,65 @@ impl Sum for MyScore {
     {
         Self {
             score: it.map(|x| x.score).sum(),
-            is_bool: false,
         }
     }
 }
 impl Add for MyScore {
     type Output = Self;
     fn add(self, o: Self) -> Self {
-        assert_eq!(self.is_bool, o.is_bool);
         Self {
             score: self.score + o.score,
-            is_bool: false,
         }
     }
 }
 impl Mul for MyScore {
     type Output = Self;
     fn mul(self, o: Self) -> Self {
-        assert_eq!(self.is_bool, o.is_bool);
         Self {
             score: self.score * o.score,
-            is_bool: false,
         }
     }
 }
 impl Div for MyScore {
     type Output = Self;
     fn div(self, o: Self) -> Self {
-        assert_eq!(self.is_bool, o.is_bool);
         Self {
             score: self.score / o.score,
-            is_bool: false,
         }
     }
 }
 impl From<ProtoScore> for MyScore {
     fn from(score: ProtoScore) -> Self {
-        match score.score.unwrap() {
-            protos::scoring::one_of_score::Score::BoolScore(s) => Self {
-                score: NotNan::new(if s { 1.0 } else { 0.0 }).unwrap(),
-                is_bool: true,
-            },
-            protos::scoring::one_of_score::Score::DoubleScore(s) => Self {
-                score: NotNan::new(s).unwrap(),
-                is_bool: false,
-            },
+        Self {
+            score: NotNan::new(score.score).unwrap(),
         }
     }
 }
 impl From<MyScore> for ProtoScore {
     fn from(score: MyScore) -> ProtoScore {
         ProtoScore {
-            score: Some(if score.is_bool {
-                protos::scoring::one_of_score::Score::BoolScore(
-                    if score.score == NotNan::new(0.0).unwrap() {
-                        false
-                    } else if score.score == NotNan::new(1.0).unwrap() {
-                        true
-                    } else {
-                        panic!("Bool score not 0 or 1, should not happen")
-                    },
-                )
-            } else {
-                protos::scoring::one_of_score::Score::DoubleScore(score.score.into_inner())
-            }),
+            score: score.score.into_inner(),
         }
+    }
+}
+impl ScoreTrait for MyScore {
+    fn rescale(&mut self, old_max_score: Self, new_max_score: Self) {
+        *self = (*self) * new_max_score / old_max_score;
+    }
+    fn one() -> Self {
+        Self {
+            score: NotNan::new(1.0).unwrap(),
+        }
+    }
+    fn is_one(&self) -> bool {
+        *self == Self::one()
+    }
+    fn zero() -> Self {
+        Self {
+            score: NotNan::new(0.0).unwrap(),
+        }
+    }
+    fn is_zero(&self) -> bool {
+        *self == Self::zero()
     }
 }
