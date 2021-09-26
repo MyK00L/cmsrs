@@ -52,13 +52,15 @@ fn get_extension(lang: ProgrammingLanguage) -> String {
 fn save_source_code(source: Source, mut path: PathBuf) -> Result<(), Error> {
     let filename = format!("{}{}", SOURCE_CODE_NAME, get_extension(source.lang()));
     path.push(PathBuf::from(filename));
-    // save source.code to path
-    std::fs::write(path, source.code).map_err(|io_error| format_err!("{}", io_error.to_string()))
+    // Save source.code to path.
+    std::fs::create_dir_all(path.parent().unwrap()).map_err(|io_error| format_err!("While creating parent dir for sandbox-accessibile source code file: {}", io_error.to_string()))?;
+    std::fs::write(path, source.code).map_err(|io_error| format_err!("While creating sandbox-accessibile source code file: {}", io_error.to_string()))
 }
 
 fn get_compiler_executable(lang: ProgrammingLanguage) -> PathBuf {
     match lang {
         ProgrammingLanguage::None => panic!(),
+        // TODO: should this not just be rustc?
         ProgrammingLanguage::Rust => PathBuf::from("/tmp/tabox/compilation/compiler/rustc"),
         ProgrammingLanguage::Cpp => PathBuf::from("g++"),
     }
@@ -69,6 +71,10 @@ fn get_compilation_config(
     source: Source,
 ) -> Result<SandboxConfiguration, Error> {
     let mut compilation_config = SandboxConfiguration::default();
+
+    // Not very helpful. TODO: remove.
+    // std::env::set_var("RUST_BACKTRACE", "1");  // Print stacktrace if failure in sandbox.
+
     compilation_config
         .working_directory(PathBuf::from("/tmp/tabox/compilation"))
         .executable(get_compiler_executable(source.lang()))
@@ -85,22 +91,26 @@ fn get_compilation_config(
         .stderr(PathBuf::from(
             "/tmp/tabox/compilation/compilation_output.txt",
         ))
-        /*.syscall_filter(SyscallFilter {
+        .syscall_filter(
+            SyscallFilter {
             // default behaviour if a system call is invoked
-            default_action: SyscallFilterAction::Kill,
+            // TODO: allow everything for now, but this shoudl be reduced as much as possible.
+            default_action: SyscallFilterAction::Allow,
             // overwrites the default behaviour for the specified rules
-            // Example: allows echo
-            rules: vec![("echo".to_string(), SyscallFilterAction::Allow)],
-        }) // no syscall */
-        .uid(1000) // see https://github.com/edomora97/task-maker-rust/blob/master/task-maker-exec/src/sandbox.rs#L367
+            rules: vec![],
+        }) // no syscall
+        .uid(1000) // Configured in the Dockerfile.
         .gid(1000)
-        .mount(PathBuf::new(), PathBuf::from("/tmp/tabox/compilation/compiler/"), true);
+        .build();
+        //.mount(PathBuf::new(), PathBuf::from("/tmp/tabox/compilation/compiler/"), true);
 
+    // This line fails, need to find the right way to write into a sandbox owned repo?
     save_source_code(source, compilation_config.working_directory.clone())?;
 
     Ok(compilation_config)
 }
 
+// TODO: remove.
 fn test_easy_config() -> Result<SandboxConfiguration, Error> {
     let mut compilation_config = SandboxConfiguration::default();
     std::fs::create_dir_all(PathBuf::from("/tmp/tabox/other")).unwrap();
@@ -177,8 +187,8 @@ impl Worker for WorkerService {
 
         let compilation_config = get_compilation_config(problem_metadata, request_inner.source)
             .map_err(|e| Status::new(Code::Aborted, e.to_string()))?;
-        println!("{:?}\n\n\n", compilation_config);
-        println!("{:?}", run_sandbox(compilation_config));
+        println!("Compilation config: {:?}", compilation_config);
+        println!("Run results: {:?}", run_sandbox(compilation_config));
         return Err(Status::new(Code::Unimplemented, "Stopped here"));
 
         let mut evaluation_response: EvaluateSubmissionResponse;
@@ -278,27 +288,49 @@ fn init_evaluation_service(evaluation_service: &mut MockEvaluation, problem_id: 
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let addr: _ = "127.0.0.1:50051".parse()?;
-    let worker_service = WorkerService::new();
+    // let addr: _ = "127.0.0.1:50051".parse()?;
+    // let worker_service = WorkerService::new();
     
-    // std::fs::write(PathBuf::from("/tmp/pippo-puzza/test.txt"), "ciao".as_bytes())?;
-    println!("Starting a worker server");
-    println!(
-        "{:?}",
-        worker_service
-            .evaluate_submission(Request::new(EvaluateSubmissionRequest {
-                problem_id: 1,
-                source: Source {
-                    lang: ProgrammingLanguage::Rust as i32,
-                    code: "fn main() {}".as_bytes().to_vec()
-                },
-            }))
-            .await?
-            .into_inner()
-    );
-    Server::builder()
-        .add_service(WorkerServer::new(worker_service))
-        .serve(addr)
-        .await?;
+    // // std::fs::write(PathBuf::from("/tmp/pippo-puzza/test.txt"), "ciao".as_bytes())?;
+    // println!("Starting a worker server");
+    // println!(
+    //     "{:?}",
+    //     worker_service
+    //         .evaluate_submission(Request::new(EvaluateSubmissionRequest {
+    //             problem_id: 1,
+    //             source: Source {
+    //                 lang: ProgrammingLanguage::Rust as i32,
+    //                 code: "fn main() {}".as_bytes().to_vec()
+    //             },
+    //         }))
+    //         .await?
+    //         .into_inner()
+    // );
+    // Server::builder()
+    //     .add_service(WorkerServer::new(worker_service))
+    //     .serve(addr)
+    //     .await?;
+
+    // Start child in an unshared environment
+    let child_pid = unsafe {
+        libc::syscall(
+            libc::SYS_clone,
+            // TODO: Setting any of the CLONE_* files make it fail.
+            // We need to find a (Dockerfile) setup that allows them all.
+            // libc::CLONE_NEWIPC,
+            // libc::CLONE_NEWNET,
+            // libc::CLONE_NEWNS,
+            // libc::CLONE_NEWPID,
+            // libc::CLONE_NEWUSER,
+            // libc::CLONE_NEWUTS,
+            libc::SIGCHLD,
+            std::ptr::null::<libc::c_void>(),
+        )
+    } as libc::pid_t;
+
+    if child_pid < 0 {
+        println!("***************** ERROR ******************\nclone() error: errno is {}", nix::errno::Errno::last() as i32);
+    }
+
     Ok(())
 }

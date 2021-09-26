@@ -1,4 +1,13 @@
 FROM rustlang/rust:nightly as base
+
+# TODO: might not be needed.
+# Prepare user id and group id for user running the sandbox process(es).
+ARG UID=1000
+ARG GID=1000
+
+# Drop root privileges for user running the sandbox process(es).
+RUN groupadd -g $GID user && useradd -m -g $GID -u $UID user
+
 WORKDIR /src 
 COPY protos protos
 # install the compilers needed 
