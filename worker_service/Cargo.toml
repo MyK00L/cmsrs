@@ -12,6 +12,7 @@ protos = { path = "../protos" }
 tokio = { version = "1.9", features = ["macros", "rt-multi-thread"] }
 tabox = "0.1.16"
 failure = "0.1" # avoid this
+which = "2.0"
 
 [features]
 loopback = ["protos/loopback"]

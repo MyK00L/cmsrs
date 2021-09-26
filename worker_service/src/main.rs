@@ -1,11 +1,13 @@
 use failure::{format_err, Error};
 use protos::{
-    common::{Duration, ProgrammingLanguage, Resources, Source},
+    common::{self, Duration, ProgrammingLanguage, Resources, Source},
     evaluation::{compilation_result, CompilationResult, TestcaseResult},
+    scoring,
     service::{
         evaluation::{
-            evaluation_server::Evaluation, GetProblemRequest, GetProblemTestcasesRequest,
-            MockEvaluation, Problem,
+            evaluation_server::Evaluation, problem, GetProblemEvaluationFileRequest,
+            GetProblemRequest, GetProblemResponse, GetProblemTestcasesRequest, MockEvaluation,
+            Problem, Testcase,
         },
         worker::{
             worker_server::{Worker, WorkerServer},
@@ -14,7 +16,9 @@ use protos::{
         },
     },
     utils::{get_local_address, Service},
+    worker,
 };
+use which::which;
 use std::path::{Path, PathBuf};
 use tabox::{
     configuration::SandboxConfiguration,
@@ -32,7 +36,7 @@ const SOURCE_CODE_NAME: &str = "main";
 pub struct WorkerService {}
 
 impl WorkerService {
-    fn new() -> Self {
+    pub fn new() -> Self {
         WorkerService {}
     }
 }
@@ -55,7 +59,7 @@ fn save_source_code(source: Source, mut path: PathBuf) -> Result<(), Error> {
 fn get_compiler_executable(lang: ProgrammingLanguage) -> PathBuf {
     match lang {
         ProgrammingLanguage::None => panic!(),
-        ProgrammingLanguage::Rust => PathBuf::from("rustc"),
+        ProgrammingLanguage::Rust => PathBuf::from("/tmp/tabox/compilation/compiler/rustc"),
         ProgrammingLanguage::Cpp => PathBuf::from("g++"),
     }
 }
@@ -65,7 +69,6 @@ fn get_compilation_config(
     source: Source,
 ) -> Result<SandboxConfiguration, Error> {
     let mut compilation_config = SandboxConfiguration::default();
-
     compilation_config
         .working_directory(PathBuf::from("/tmp/tabox/compilation"))
         .executable(get_compiler_executable(source.lang()))
@@ -73,22 +76,51 @@ fn get_compilation_config(
         .memory_limit(problem_metadata.compilation_limits.memory_bytes)
         .arg("-o")
         .arg("executable")
-        .arg(format!("{}{}", SOURCE_CODE_NAME, get_extension(source.lang())))
+        .arg(format!(
+            "{}{}",
+            SOURCE_CODE_NAME,
+            get_extension(source.lang())
+        ))
         //.wall_time_limit(5 * problem_metadata.compilation_limits.time.secs)
-        .stderr(PathBuf::from("/tmp/tabox/compilation/compilation_output.txt"))
-        .syscall_filter(SyscallFilter {
+        .stderr(PathBuf::from(
+            "/tmp/tabox/compilation/compilation_output.txt",
+        ))
+        /*.syscall_filter(SyscallFilter {
             // default behaviour if a system call is invoked
             default_action: SyscallFilterAction::Kill,
-
             // overwrites the default behaviour for the specified rules
             // Example: allows echo
             rules: vec![("echo".to_string(), SyscallFilterAction::Allow)],
-        }) // no syscall
+        }) // no syscall */
         .uid(1000) // see https://github.com/edomora97/task-maker-rust/blob/master/task-maker-exec/src/sandbox.rs#L367
-        .gid(1000);
-    // .mount(compilation_output_file_path);
+        .gid(1000)
+        .mount(PathBuf::new(), PathBuf::from("/tmp/tabox/compilation/compiler/"), true);
 
     save_source_code(source, compilation_config.working_directory.clone())?;
+
+    Ok(compilation_config)
+}
+
+fn test_easy_config() -> Result<SandboxConfiguration, Error> {
+    let mut compilation_config = SandboxConfiguration::default();
+    std::fs::create_dir_all(PathBuf::from("/tmp/tabox/other")).unwrap();
+    compilation_config
+        .working_directory(PathBuf::from("/tmp/tabox/other"))
+        .executable(which("echo").unwrap())
+        .arg("\"test-echo-inside-sandbox\"")
+        .arg(">> /tmp/tabox/other/out.txt")
+        .syscall_filter(SyscallFilter {
+            // default behaviour if a system call is invoked
+            default_action: SyscallFilterAction::Kill,
+            // overwrites the default behaviour for the specified rules
+            // Example: allows echo
+            rules: vec![("echo".to_string(), SyscallFilterAction::Allow)],
+        })
+        .mount(which("echo").unwrap(), which("echo").unwrap(), false)
+        .mount(PathBuf::from("/tmp/tabox/other"), PathBuf::from("/tmp/tabox/other"), true)
+        //.stdout(PathBuf::from("/tmp/tabox/other/out.txt"))
+        .uid(1000) // see https://github.com/edomora97/task-maker-rust/blob/master/task-maker-exec/src/sandbox.rs#L367
+        .gid(1000);
 
     Ok(compilation_config)
 }
@@ -131,7 +163,9 @@ impl Worker for WorkerService {
             problem_id: request_inner.problem_id,
         };
 
-        let evaluation_service = MockEvaluation::default();
+        let mut evaluation_service = MockEvaluation::default();
+        init_evaluation_service(&mut evaluation_service, request_inner.problem_id);
+
         let problem_metadata = evaluation_service
             .get_problem(Request::new(get_problem_request))
             .await?
@@ -139,10 +173,13 @@ impl Worker for WorkerService {
             .info;
 
         // TODO NEED TO SET UP THE DIRECTORIES MANUALLY, check this file entirely:
-        // https://github.com/edomora97/task-maker-rust/blob/master/task-maker-exec/src/sandbox.rs 
+        // https://github.com/edomora97/task-maker-rust/blob/master/task-maker-exec/src/sandbox.rs
 
         let compilation_config = get_compilation_config(problem_metadata, request_inner.source)
             .map_err(|e| Status::new(Code::Aborted, e.to_string()))?;
+        println!("{:?}\n\n\n", compilation_config);
+        println!("{:?}", run_sandbox(compilation_config));
+        return Err(Status::new(Code::Unimplemented, "Stopped here"));
 
         let mut evaluation_response: EvaluateSubmissionResponse;
         match run_sandbox(compilation_config) {
@@ -151,7 +188,6 @@ impl Worker for WorkerService {
                     compilation_result: CompilationResult {
                         outcome: compilation_result::Outcome::Success as i32,
                         used_resources: map_used_resources(res.resource_usage),
-                        error_message: None,
                     },
                     testcase_results: vec![], // yet to be evaluated
                 }
@@ -161,7 +197,6 @@ impl Worker for WorkerService {
                     compilation_result: CompilationResult {
                         outcome: todo!(),        // deduce from e
                         used_resources: todo!(), // not applicable
-                        error_message: todo!(),  // deduce from e
                     },
                     testcase_results: vec![],
                 }));
@@ -214,12 +249,53 @@ impl Worker for WorkerService {
     }
 }
 
+fn init_evaluation_service(evaluation_service: &mut MockEvaluation, problem_id: u64) {
+    evaluation_service.get_problem_set(GetProblemResponse {
+        info: Problem {
+            id: problem_id,
+            scoring: scoring::Problem {
+                method: scoring::problem::Method::MaxSum as i32,
+            },
+            r#type: problem::Type::Other as i32,
+            execution_limits: Resources {
+                time: Duration {
+                    secs: 2u64,
+                    nanos: 0u32,
+                },
+                memory_bytes: 256u64 * 1024u64 * 1024u64,
+            },
+            compilation_limits: Resources {
+                time: Duration {
+                    secs: 2u64,
+                    nanos: 0u32,
+                },
+                memory_bytes: 256u64 * 1024u64 * 1024u64,
+            },
+            subtasks: vec![],
+        },
+    });
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let addr: _ = get_local_address(Service::WORKER).parse()?;
+    let addr: _ = "127.0.0.1:50051".parse()?;
     let worker_service = WorkerService::new();
-
+    
+    // std::fs::write(PathBuf::from("/tmp/pippo-puzza/test.txt"), "ciao".as_bytes())?;
     println!("Starting a worker server");
+    println!(
+        "{:?}",
+        worker_service
+            .evaluate_submission(Request::new(EvaluateSubmissionRequest {
+                problem_id: 1,
+                source: Source {
+                    lang: ProgrammingLanguage::Rust as i32,
+                    code: "fn main() {}".as_bytes().to_vec()
+                },
+            }))
+            .await?
+            .into_inner()
+    );
     Server::builder()
         .add_service(WorkerServer::new(worker_service))
         .serve(addr)

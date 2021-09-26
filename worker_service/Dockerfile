@@ -6,6 +6,8 @@ COPY protos protos
 RUN apt-get update && \
     apt-get install gcc
 # finished installation of compilers
+# package required by tabox 
+RUN apt-get install -y libseccomp-dev 
 WORKDIR /src/server
 COPY worker_service/dummy.rs .
 COPY worker_service/Cargo.toml .

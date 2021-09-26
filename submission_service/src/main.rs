@@ -102,8 +102,7 @@ async fn init_contest_service_db(db: Database) -> Result<(), Box<dyn std::error:
                                     */
                                 },
                                 "timeNs": { "bsonType": "long" },
-                                "memoryB": { "bsonType": "long" },
-                                "error": { "bsonType": "string" }
+                                "memoryB": { "bsonType": "long" }
                             }
                         }, // EvaluationResult.compilation_result
                         "evaluation": {
@@ -201,9 +200,9 @@ async fn evaluate_scores(
     problem_id: u64,
 ) -> Result<(), Status> {
     // if compilation failed, update manually submission score and return
-    if let compilation_result::Outcome::Success = mut_evaluation_result.compilation_result.outcome()
+    if mut_evaluation_result.compilation_result.outcome() != compilation_result::Outcome::Success
     {
-        assert!(mut_evaluation_result.subtask_results.is_empty());
+        mut_evaluation_result.subtask_results = vec![];
         mut_evaluation_result.score = score_with_double(0f64);
         return Ok(());
     }
