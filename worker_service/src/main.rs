@@ -18,7 +18,6 @@ use protos::{
     utils::{get_local_address, Service},
     worker,
 };
-use which::which;
 use std::path::{Path, PathBuf};
 use tabox::{
     configuration::SandboxConfiguration,
@@ -28,10 +27,12 @@ use tabox::{
 };
 use tabox::{result::ResourceUsage, Sandbox};
 use tonic::{transport::Server, Code, Request, Response, Status};
+use which::which;
 
 mod languages_info;
 
 const SOURCE_CODE_NAME: &str = "main";
+const EXECUTABLE_NAME: &str = "executable";
 
 pub struct WorkerService {}
 
@@ -39,6 +40,10 @@ impl WorkerService {
     pub fn new() -> Self {
         WorkerService {}
     }
+}
+
+fn join_path_str(path1: PathBuf, path2: String) -> String {
+    path1.join(path2).into_os_string().into_string().unwrap()
 }
 
 fn get_extension(lang: ProgrammingLanguage) -> String {
@@ -49,19 +54,26 @@ fn get_extension(lang: ProgrammingLanguage) -> String {
     }
 }
 
-fn save_source_code(source: Source, mut path: PathBuf) -> Result<(), Error> {
-    let filename = format!("{}{}", SOURCE_CODE_NAME, get_extension(source.lang()));
-    path.push(PathBuf::from(filename));
+fn save_source_code(source: Source, path: PathBuf) -> Result<(), Error> {
     // Save source.code to path.
-    std::fs::create_dir_all(path.parent().unwrap()).map_err(|io_error| format_err!("While creating parent dir for sandbox-accessibile source code file: {}", io_error.to_string()))?;
-    std::fs::write(path, source.code).map_err(|io_error| format_err!("While creating sandbox-accessibile source code file: {}", io_error.to_string()))
+    std::fs::create_dir_all(path.parent().unwrap()).map_err(|io_error| {
+        format_err!(
+            "While creating parent dir for sandbox-accessibile source code file: {}",
+            io_error.to_string()
+        )
+    })?;
+    std::fs::write(path, source.code).map_err(|io_error| {
+        format_err!(
+            "While creating sandbox-accessibile source code file: {}",
+            io_error.to_string()
+        )
+    })
 }
 
-fn get_compiler_executable(lang: ProgrammingLanguage) -> PathBuf {
+fn get_compiler(lang: ProgrammingLanguage) -> PathBuf {
     match lang {
         ProgrammingLanguage::None => panic!(),
-        // TODO: should this not just be rustc?
-        ProgrammingLanguage::Rust => PathBuf::from("/tmp/tabox/compilation/compiler/rustc"),
+        ProgrammingLanguage::Rust => PathBuf::from("rustc"),
         ProgrammingLanguage::Cpp => PathBuf::from("g++"),
     }
 }
@@ -73,64 +85,49 @@ fn get_compilation_config(
     let mut compilation_config = SandboxConfiguration::default();
 
     // Not very helpful. TODO: remove.
-    // std::env::set_var("RUST_BACKTRACE", "1");  // Print stacktrace if failure in sandbox.
+    std::env::set_var("RUST_BACKTRACE", "1"); // Print stacktrace if failure in sandbox.
+
+    let compilation_dir = PathBuf::from("/tmp/tabox/compilation");
+    let source_code_file = format!("{}{}", SOURCE_CODE_NAME, get_extension(source.lang()));
 
     compilation_config
-        .working_directory(PathBuf::from("/tmp/tabox/compilation"))
-        .executable(get_compiler_executable(source.lang()))
-        .time_limit(problem_metadata.compilation_limits.time.secs)
+        .mount(compilation_dir.clone(), compilation_dir.clone(), true)
+        .working_directory(compilation_dir.clone())
         .memory_limit(problem_metadata.compilation_limits.memory_bytes)
+        .time_limit(problem_metadata.compilation_limits.time.secs)
+        .wall_time_limit(5 * problem_metadata.compilation_limits.time.secs)
+        .executable("echo")
+        .arg("hello")
+        .executable(get_compiler(source.lang()))
         .arg("-o")
-        .arg("executable")
-        .arg(format!(
-            "{}{}",
-            SOURCE_CODE_NAME,
-            get_extension(source.lang())
+        .arg(EXECUTABLE_NAME)
+        .arg(join_path_str(
+            compilation_dir.clone(),
+            source_code_file.clone(),
         ))
-        //.wall_time_limit(5 * problem_metadata.compilation_limits.time.secs)
-        .stderr(PathBuf::from(
-            "/tmp/tabox/compilation/compilation_output.txt",
-        ))
-        .syscall_filter(
-            SyscallFilter {
-            // default behaviour if a system call is invoked
-            // TODO: allow everything for now, but this shoudl be reduced as much as possible.
+        .stderr(PathBuf::from(join_path_str(
+            compilation_dir.clone(),
+            String::from("stderr.txt"),
+        )))
+        .stdout(PathBuf::from(join_path_str(
+            compilation_dir.clone(),
+            String::from("stdout.txt"),
+        )))
+        .syscall_filter(SyscallFilter {
+            // TODO: allow everything for now, but this should be reduced as much as possible.
             default_action: SyscallFilterAction::Allow,
-            // overwrites the default behaviour for the specified rules
+            // Overwrites the default behaviour for the specified rules.
             rules: vec![],
-        }) // no syscall
+        })
         .uid(1000) // Configured in the Dockerfile.
         .gid(1000)
         .build();
-        //.mount(PathBuf::new(), PathBuf::from("/tmp/tabox/compilation/compiler/"), true);
 
-    // This line fails, need to find the right way to write into a sandbox owned repo?
-    save_source_code(source, compilation_config.working_directory.clone())?;
-
-    Ok(compilation_config)
-}
-
-// TODO: remove.
-fn test_easy_config() -> Result<SandboxConfiguration, Error> {
-    let mut compilation_config = SandboxConfiguration::default();
-    std::fs::create_dir_all(PathBuf::from("/tmp/tabox/other")).unwrap();
-    compilation_config
-        .working_directory(PathBuf::from("/tmp/tabox/other"))
-        .executable(which("echo").unwrap())
-        .arg("\"test-echo-inside-sandbox\"")
-        .arg(">> /tmp/tabox/other/out.txt")
-        .syscall_filter(SyscallFilter {
-            // default behaviour if a system call is invoked
-            default_action: SyscallFilterAction::Kill,
-            // overwrites the default behaviour for the specified rules
-            // Example: allows echo
-            rules: vec![("echo".to_string(), SyscallFilterAction::Allow)],
-        })
-        .mount(which("echo").unwrap(), which("echo").unwrap(), false)
-        .mount(PathBuf::from("/tmp/tabox/other"), PathBuf::from("/tmp/tabox/other"), true)
-        //.stdout(PathBuf::from("/tmp/tabox/other/out.txt"))
-        .uid(1000) // see https://github.com/edomora97/task-maker-rust/blob/master/task-maker-exec/src/sandbox.rs#L367
-        .gid(1000);
+    // I believe stuff is mounted properly but it fails because this file exists... Not sure how or why.
+    save_source_code(
+        source,
+        PathBuf::from(join_path_str(compilation_dir, source_code_file)),
+    )?;
 
     Ok(compilation_config)
 }
@@ -288,49 +285,28 @@ fn init_evaluation_service(evaluation_service: &mut MockEvaluation, problem_id: 
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // let addr: _ = "127.0.0.1:50051".parse()?;
-    // let worker_service = WorkerService::new();
-    
-    // // std::fs::write(PathBuf::from("/tmp/pippo-puzza/test.txt"), "ciao".as_bytes())?;
-    // println!("Starting a worker server");
-    // println!(
-    //     "{:?}",
-    //     worker_service
-    //         .evaluate_submission(Request::new(EvaluateSubmissionRequest {
-    //             problem_id: 1,
-    //             source: Source {
-    //                 lang: ProgrammingLanguage::Rust as i32,
-    //                 code: "fn main() {}".as_bytes().to_vec()
-    //             },
-    //         }))
-    //         .await?
-    //         .into_inner()
-    // );
-    // Server::builder()
-    //     .add_service(WorkerServer::new(worker_service))
-    //     .serve(addr)
-    //     .await?;
+    let addr: _ = "127.0.0.1:50051".parse()?;
+    let worker_service = WorkerService::new();
 
-    // Start child in an unshared environment
-    let child_pid = unsafe {
-        libc::syscall(
-            libc::SYS_clone,
-            // TODO: Setting any of the CLONE_* files make it fail.
-            // We need to find a (Dockerfile) setup that allows them all.
-            // libc::CLONE_NEWIPC,
-            // libc::CLONE_NEWNET,
-            // libc::CLONE_NEWNS,
-            // libc::CLONE_NEWPID,
-            // libc::CLONE_NEWUSER,
-            // libc::CLONE_NEWUTS,
-            libc::SIGCHLD,
-            std::ptr::null::<libc::c_void>(),
-        )
-    } as libc::pid_t;
-
-    if child_pid < 0 {
-        println!("***************** ERROR ******************\nclone() error: errno is {}", nix::errno::Errno::last() as i32);
-    }
+    // std::fs::write(PathBuf::from("/tmp/pippo-puzza/test.txt"), "ciao".as_bytes())?;
+    println!("Starting a worker server");
+    println!(
+        "{:?}",
+        worker_service
+            .evaluate_submission(Request::new(EvaluateSubmissionRequest {
+                problem_id: 1,
+                source: Source {
+                    lang: ProgrammingLanguage::Rust as i32,
+                    code: "fn main() {}".as_bytes().to_vec()
+                },
+            }))
+            .await?
+            .into_inner()
+    );
+    Server::builder()
+        .add_service(WorkerServer::new(worker_service))
+        .serve(addr)
+        .await?;
 
     Ok(())
 }
