@@ -29,7 +29,13 @@ pub fn calc_subtask_score(
         protos::scoring::subtask::Method::Min => testcase_scores.min().unwrap_or_else(Score::zero),
         protos::scoring::subtask::Method::Sum => testcase_scores.sum(),
     };
-    ans.rescale(Score::one(), Score::from(opts.max_score.clone()));
+    let max_score = match method {
+        protos::scoring::subtask::Method::Min => Score::one(),
+        protos::scoring::subtask::Method::Sum => Score::from(ProtoScore {
+            score: testcases.len() as f64,
+        }), // TODO: better (maybe mul for usize for Score)
+    };
+    ans.rescale(max_score, Score::from(opts.max_score.clone()));
     ans.into()
 }
 
