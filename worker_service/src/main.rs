@@ -121,7 +121,6 @@ fn get_compilation_config(
         .gid(1000)
         .build();
 
-    // I believe stuff is mounted properly but it fails because this file exists... Not sure how or why.
     save_source_code(
         source,
         PathBuf::from(join_path_str(compilation_dir, source_code_file)),
