@@ -186,10 +186,11 @@ async fn evaluate_scores(
     problem_id: u64,
 ) -> Result<(), Status> {
     // if compilation failed, update manually submission score and return
-    if let compilation_result::Outcome::Success = mut_evaluation_result.compilation_result.outcome() //TODO: uuh are you sure about this if?
+    if let compilation_result::Outcome::Success = mut_evaluation_result.compilation_result.outcome()
+    //TODO: uuh are you sure about this if?
     {
         assert!(mut_evaluation_result.subtask_results.is_empty());
-        mut_evaluation_result.score = protos::common::Score{score:0f64};
+        mut_evaluation_result.score = protos::common::Score { score: 0f64 };
         return Ok(());
     }
 
@@ -214,7 +215,7 @@ async fn evaluate_scores(
 
     mut_evaluation_result.score = calc_submission_score(
         &mut_evaluation_result.subtask_results,
-        &protos::scoring::Problem::default() // TODO: pass the actual options
+        &protos::scoring::Problem::default(), // TODO: pass the actual options
     );
 
     Ok(())

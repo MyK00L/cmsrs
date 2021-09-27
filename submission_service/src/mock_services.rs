@@ -20,13 +20,9 @@ fn generate_testcase_result() -> TestcaseResult {
     TestcaseResult {
         outcome,
         score: if outcome == testcase_result::Outcome::Ok as i32 {
-            Score {
-                score: 1.0,
-            }
+            Score { score: 1.0 }
         } else {
-            Score {
-                score: 0.0,
-            }
+            Score { score: 0.0 }
         },
         used_resources: Resources {
             time: common::Duration {
@@ -58,7 +54,7 @@ fn generate_min_subtask_scoring() -> protos::service::evaluation::Subtask {
         id: 0u64,
         scoring: scoring::Subtask {
             method: scoring::subtask::Method::Min as i32,
-            max_score: common::Score{score:20f64},
+            max_score: common::Score { score: 20f64 },
         },
         testcases_id: vec![], // now useless
     }
@@ -85,9 +81,7 @@ fn mock_dispatcher_init(mock_dispatcher: &mut MockDispatcher) {
                 generate_subtask_result(),
                 generate_subtask_result(),
             ],
-            score: Score {
-                score: 0f64,
-            },
+            score: Score { score: 0f64 },
         },
     });
 }
