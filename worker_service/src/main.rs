@@ -96,8 +96,6 @@ fn get_compilation_config(
         .memory_limit(problem_metadata.compilation_limits.memory_bytes)
         .time_limit(problem_metadata.compilation_limits.time.secs)
         .wall_time_limit(5 * problem_metadata.compilation_limits.time.secs)
-        .executable("echo")
-        .arg("hello")
         .executable(get_compiler(source.lang()))
         .arg("-o")
         .arg(EXECUTABLE_NAME)
