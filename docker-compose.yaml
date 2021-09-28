@@ -52,14 +52,12 @@ services:
   #    - worker_service
 
   worker_service:
+    privileged: true
     build:
       context: .
       dockerfile: ./worker_service/Dockerfile
     ports: 
       - "127.0.0.1:50051:50051"
-    cap_add: 
-      - SYS_ADMIN
-    
 
 
 #volumes:

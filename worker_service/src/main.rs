@@ -34,6 +34,21 @@ mod languages_info;
 const SOURCE_CODE_NAME: &str = "main";
 const EXECUTABLE_NAME: &str = "executable";
 
+// The list of all the system-wide readable directories inside the sandbox.
+// TODO: probably not all of these are needed, remove the unneeded.
+const READABLE_DIRS: &[&str] = &[
+    "/lib",
+    "/lib64",
+    "/usr",
+    "/bin",
+    "/opt",
+    // update-alternatives stuff, sometimes the executables are symlinked here
+    "/etc/alternatives/",
+    "/var/lib/dpkg/alternatives/",
+    // required by texlive on Ubuntu
+    "/var/lib/texmf/",
+];
+
 pub struct WorkerService {}
 
 impl WorkerService {
@@ -58,13 +73,13 @@ fn save_source_code(source: Source, path: PathBuf) -> Result<(), Error> {
     // Save source.code to path.
     std::fs::create_dir_all(path.parent().unwrap()).map_err(|io_error| {
         format_err!(
-            "While creating parent dir for sandbox-accessibile source code file: {}",
+            "While creating parent dir for sandbox-accessible source code file: {}",
             io_error.to_string()
         )
     })?;
     std::fs::write(path, source.code).map_err(|io_error| {
         format_err!(
-            "While creating sandbox-accessibile source code file: {}",
+            "While creating sandbox-accessible source code file: {}",
             io_error.to_string()
         )
     })
@@ -73,8 +88,8 @@ fn save_source_code(source: Source, path: PathBuf) -> Result<(), Error> {
 fn get_compiler(lang: ProgrammingLanguage) -> PathBuf {
     match lang {
         ProgrammingLanguage::None => panic!(),
-        ProgrammingLanguage::Rust => PathBuf::from("rustc"),
-        ProgrammingLanguage::Cpp => PathBuf::from("g++"),
+        ProgrammingLanguage::Rust => PathBuf::from("/usr/local/cargo/bin/rustc"),
+        ProgrammingLanguage::Cpp => PathBuf::from("/usr/bin/g++"),
     }
 }
 
@@ -118,15 +133,20 @@ fn get_compilation_config(
             rules: vec![],
         })
         .uid(1000) // Configured in the Dockerfile.
-        .gid(1000)
-        .build();
+        .gid(1000);
+
+    for dir in READABLE_DIRS {
+        if Path::new(dir).is_dir() {
+            compilation_config.mount(dir, dir, false);
+        }
+    }
 
     save_source_code(
         source,
         PathBuf::from(join_path_str(compilation_dir, source_code_file)),
     )?;
 
-    Ok(compilation_config)
+    Ok(compilation_config.build())
 }
 
 fn run_sandbox(config: SandboxConfiguration) -> Result<SandboxExecutionResult, Error> {
