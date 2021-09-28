@@ -99,9 +99,6 @@ fn get_compilation_config(
 ) -> Result<SandboxConfiguration, Error> {
     let mut compilation_config = SandboxConfiguration::default();
 
-    // Not very helpful. TODO: remove.
-    std::env::set_var("RUST_BACKTRACE", "1"); // Print stacktrace if failure in sandbox.
-
     let compilation_dir = PathBuf::from("/tmp/tabox/compilation");
     let source_code_file = format!("{}{}", SOURCE_CODE_NAME, get_extension(source.lang()));
 
@@ -127,8 +124,7 @@ fn get_compilation_config(
             String::from("stdout.txt"),
         )))
         .syscall_filter(SyscallFilter {
-            // TODO: allow everything for now, but this should be reduced as much as possible.
-            default_action: SyscallFilterAction::Allow,
+            default_action: SyscallFilterAction::Kill,
             // Overwrites the default behaviour for the specified rules.
             rules: vec![],
         })
@@ -302,10 +298,12 @@ fn init_evaluation_service(evaluation_service: &mut MockEvaluation, problem_id: 
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Print stacktraces useful to debug sandbox failures.
+    std::env::set_var("RUST_BACKTRACE", "1");
+
     let addr: _ = "127.0.0.1:50051".parse()?;
     let worker_service = WorkerService::new();
 
-    // std::fs::write(PathBuf::from("/tmp/pippo-puzza/test.txt"), "ciao".as_bytes())?;
     println!("Starting a worker server");
     println!(
         "{:?}",
