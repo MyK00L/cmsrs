@@ -186,9 +186,7 @@ async fn evaluate_scores(
     problem_id: u64,
 ) -> Result<(), Status> {
     // if compilation failed, update manually submission score and return
-    if let compilation_result::Outcome::Success = mut_evaluation_result.compilation_result.outcome()
-    //TODO: uuh are you sure about this if?
-    {
+    if mut_evaluation_result.compilation_result.outcome() != compilation_result::Outcome::Success {
         assert!(mut_evaluation_result.subtask_results.is_empty());
         mut_evaluation_result.score = protos::common::Score { score: 0f64 };
         return Ok(());
@@ -337,17 +335,15 @@ impl Submission for SubmissionService {
         &self,
         request: Request<GetSubmissionDetailsRequest>,
     ) -> Result<Response<GetSubmissionDetailsResponse>, Status> {
-        let submission_details_request = request.into_inner();
-        let submission_id = submission_details_request.submission_id;
-        let opt_document = self
+        self
             .get_collection()
-            .find_one(doc! { "_id": convert_to_i64(submission_id) }, None)
+            .find_one(doc! { "_id": convert_to_i64(request.into_inner().submission_id) }, None)
             .await
-            .map_err(internal_error)?;
-
-        // consider using opt_document.map_or_else(default, f) instead of the match expression
-        match opt_document {
-            Some(document) => {
+            .map_err(internal_error)?
+            .map_or_else(|| Err(Status::new(
+            tonic::Code::NotFound,
+            "Submission id provided is not present in database",
+        )), |document| {
                 let state = document
                     .get_i32("state")
                     .unwrap_or_else(|_| panic!("{}", expected_field("problemId")));
@@ -384,12 +380,7 @@ impl Submission for SubmissionService {
                         None
                     },
                 }))
-            }
-            None => Err(Status::new(
-                tonic::Code::NotFound,
-                "Submission id provided is not present in database",
-            )),
-        }
+            })
     }
 }
 
