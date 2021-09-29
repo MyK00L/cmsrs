@@ -27,3 +27,10 @@ message Source {
 	required bytes code = 2;
 }
 
+// All fields that represent a score of some kind, should use this type
+message Score {
+	required double score = 1;
+	// in order to be easy to use, score should have a single type and should support rational numbers
+	// alternatives: fixed point, fraction
+}
+
