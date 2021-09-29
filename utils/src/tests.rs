@@ -1,15 +1,11 @@
 use super::*;
 
-use crate::scoring::{calc_submission_score, calc_subtask_score};
+use crate::scoring::calc_subtask_score;
 use protos::common::{Duration, Resources, Score};
 use protos::evaluation::*;
 use protos::evaluation::{SubtaskResult, TestcaseResult};
 use protos::scoring::{subtask, Subtask};
 use temp_testdir::TempDir;
-
-fn partial_score(correct: f64, total: f64) -> f64 {
-    correct / total
-}
 
 fn get_test_time() -> std::time::SystemTime {
     std::time::UNIX_EPOCH

@@ -34,11 +34,9 @@ pub fn get_item_from_doc(doc: Document) -> get_submission_list_response::Item {
         state: doc
             .get_i32("state")
             .unwrap_or_else(|_| panic!("{}", expected_field("state"))),
-        score: Score {
-            score: doc
-                .get_f64("overallScore")
-                .unwrap_or_else(|_| panic!("{}", expected_field("overallScore"))),
-        }, // TODO if submission is in PENDING state then score is not present in db
+        score: doc
+            .get_f64("overallScore")
+            .map_or_else(|_| None, |val| Some(Score { score: val })),
     }
 }
 
