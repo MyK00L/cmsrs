@@ -2,6 +2,8 @@ syntax = "proto2";
 
 package scoring;
 
+import "common.proto";
+
 // scoring info messages
 
 // Testcase scoring is the checker
@@ -12,7 +14,7 @@ message Subtask {
 		SUM = 1; // sum of all testcases
 	}
 	required Method method = 1;
-	required double max_score = 2; // calculated score gets transformed linearly in [0,max_score]
+	required common.Score max_score = 2; // weight of a subtask, calculated score gets transformed linearly in [0,max_score]
 }
 
 // Submission scoring same as Problem, considering only the single submission
@@ -33,17 +35,11 @@ message User {
 			MAX = 1;
 		}
 		required Aggregation aggregation_method = 1;
-		required double score_weight = 2;
-		required double wrong_submission_count_weight = 3;
-		required double time_secs_weight = 4;
+		required common.Score score_weight = 2;
+		required common.Score wrong_submission_count_weight = 3;
+		required common.Score time_secs_weight = 4;
 	}
 	required Method main = 1; // users will be ranked by decreasing (main,tiebreakers[0],tiebreakers[1],...)
 	repeated Method tiebreakers = 2;
 }
 
-message OneOfScore {
-	oneof score {
-		bool bool_score = 1;
-		double double_score = 2;
-	}
-}

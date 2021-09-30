@@ -74,8 +74,8 @@ pub mod service {
         rpc_mock_server!(evaluation_server::Evaluation; MockEvaluation;
         (get_user_scoring,GetUserScoringRequest,GetUserScoringResponse),
         (get_problem,GetProblemRequest,GetProblemResponse),
-        (set_contest,SetContestRequest,SetContestResponse),
         (get_contest,GetContestRequest,GetContestResponse),
+        (set_contest,SetContestRequest,SetContestResponse),
         (get_testcase,GetTestcaseRequest,GetTestcaseResponse),
         (get_problem_testcases,GetProblemTestcasesRequest,GetProblemTestcasesResponse),
         (set_testcase,SetTestcaseRequest,SetTestcaseResponse),

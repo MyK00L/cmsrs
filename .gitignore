@@ -1,2 +1,5 @@
 **/target
 **/Cargo.lock
+
+# macOs stuff
+.DS_Store
