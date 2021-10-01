@@ -1,4 +1,5 @@
 use super::*;
+use super::clients::*;
 // use rocket::data::ToByteUnit;
 use rocket::fs::TempFile;
 use std::io::Read;
@@ -27,8 +28,8 @@ pub async fn update_contest(
     contest_client: &State<ContestClient>,
     evaluation_client: &State<EvaluationClient>,
 ) -> Result<Redirect, status::Custom<String>> {
-    let contest_client = contest_client.inner().clone();
-    let evaluation_client = evaluation_client.inner().clone();
+    let mut contest_client = contest_client.inner().clone();
+    let mut evaluation_client = evaluation_client.inner().clone();
     let mut contest = contest.into_inner().into_inner();
     contest.gen_ids_if_none();
 
@@ -62,7 +63,7 @@ pub async fn set_user(
     user: Form<Strict<SetUser>>,
     contest_client: &State<ContestClient>,
 ) -> Result<Redirect, status::Custom<String>> {
-    let contest_client = contest_client.inner().clone();
+    let mut contest_client = contest_client.inner().clone();
     let req = contest::SetUserRequest {
         username: user.username.clone(),
         fullname: user.fullname.clone(),
@@ -91,7 +92,7 @@ pub async fn reply(
     message: Form<Strict<Reply>>,
     contest_client: &State<ContestClient>,
 ) -> Result<Redirect, status::Custom<String>> {
-    let contest_client = contest_client.inner().clone();
+    let mut contest_client = contest_client.inner().clone();
     let req = contest::AddMessageRequest {
         message: contest::Message {
             id: gen_uuid(),
@@ -130,7 +131,7 @@ pub async fn set_evaluation_file(
     data: Form<Strict<SetEvaluationFile<'_>>>,
     evaluation_client: &State<EvaluationClient>,
 ) -> Result<Redirect, status::Custom<String>> {
-    let evaluation_client = evaluation_client.inner().clone();
+    let mut evaluation_client = evaluation_client.inner().clone();
     let mut file = std::fs::File::open(data.file.path().unwrap()).unwrap();
     let mut raw = Vec::<u8>::new();
     file.read_to_end(&mut raw).unwrap();
@@ -173,7 +174,7 @@ pub async fn add_testcase(
     data: Form<Strict<AddTestcase<'_>>>,
     evaluation_client: &State<EvaluationClient>,
 ) -> Result<Redirect, status::Custom<String>> {
-    let evaluation_client = evaluation_client.inner().clone();
+    let mut evaluation_client = evaluation_client.inner().clone();
     let mut file = std::fs::File::open(data.file.path().unwrap()).unwrap();
     let mut raw = Vec::<u8>::new();
     file.read_to_end(&mut raw).unwrap();
@@ -224,7 +225,7 @@ pub async fn get_evaluation_file(
     file_type: String,
     evaluation_client: &State<EvaluationClient>,
 ) -> Option<String> {
-    let evaluation_client = evaluation_client.inner().clone();
+    let mut evaluation_client = evaluation_client.inner().clone();
     let file_type = evaluation::evaluation_file::Type::from_str(file_type.as_str()).unwrap();
     let req = evaluation::GetProblemEvaluationFileRequest {
         problem_id,
@@ -245,7 +246,7 @@ pub async fn get_testcase(
     testcase_id: u64,
     evaluation_client: &State<EvaluationClient>,
 ) -> Option<String> {
-    let evaluation_client = evaluation_client.inner().clone();
+    let mut evaluation_client = evaluation_client.inner().clone();
     let req = evaluation::GetTestcaseRequest {
         problem_id,
         //subtask_id

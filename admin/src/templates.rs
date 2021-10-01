@@ -1,4 +1,5 @@
 use super::*;
+use super::clients::*;
 
 #[get("/users")]
 pub async fn users_template(_admin: Admin) -> Result<Template, status::Custom<String>> {
@@ -149,7 +150,7 @@ pub async fn submission_details_template(
     submission_client: &State<SubmissionClient>,
     id: u64,
 ) -> Result<Template, status::Custom<String>> {
-    let submission_client = submission_client.inner().clone();
+    let mut submission_client = submission_client.inner().clone();
     match submission_client
         .get_submission_details(tonic::Request::new(
             submission::GetSubmissionDetailsRequest { submission_id: id },
@@ -209,7 +210,7 @@ pub async fn questions_template(
     _admin: Admin,
     contest_client: &State<ContestClient>,
 ) -> Result<Template, status::Custom<String>> {
-    let contest_client = contest_client.inner().clone();
+    let mut contest_client = contest_client.inner().clone();
     match contest_client
         .get_question_list(tonic::Request::new(
             contest::GetQuestionListRequest::default(),
@@ -247,7 +248,7 @@ pub async fn submissions_template(
     _admin: Admin,
     submission_client: &State<SubmissionClient>,
 ) -> Result<Template, status::Custom<String>> {
-    let submission_client = submission_client.inner().clone();
+    let mut submission_client = submission_client.inner().clone();
     match submission_client
         .get_submission_list(tonic::Request::new(
             submission::GetSubmissionListRequest::default(),
@@ -547,8 +548,8 @@ impl ContestTemplate {
         }
     }
     async fn from_clients(
-        contest_client: ContestClient,
-        evaluation_client: EvaluationClient,
+        mut contest_client: ContestClient,
+        mut evaluation_client: EvaluationClient,
     ) -> Result<Self, status::Custom<String>> {
         let (user_contest_response, evaluation_contest_response) = future::join(
             contest_client.get_contest_metadata(tonic::Request::new(
@@ -576,6 +577,8 @@ impl ContestTemplate {
                 ));
             }
         };
+        // TODO: user problem metadata
+        /*
         #[allow(clippy::type_complexity)]
         let user_problem_requests: Vec<
             core::pin::Pin<
@@ -612,7 +615,8 @@ impl ContestTemplate {
             evaluation_contest,
             user_contest,
             user_problem_responses,
-        ))
+        ))*/
+        unimplemented!();
     }
     pub fn gen_ids_if_none(&mut self) {
         for p in self.problems.iter_mut() {
