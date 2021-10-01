@@ -1,26 +1,46 @@
 use rocket::*;
 use rocket_dyn_templates::Template;
 
-#[cfg(test)]
+#[cfg(feature = "mock")]
 mod clients {
+    use protos::service::contest;
+    pub use protos::service::contest::contest_server::Contest;
+    use protos::service::submission;
     // clients for testing
     pub type ContestClient = contest::MockContest;
     pub type SubmissionClient = submission::MockSubmission;
+    use fake::{Fake, Faker};
     pub fn get_contest_client() -> ContestClient {
-        ContestClient::default()
+        let mut mock = contest::MockContest::default();
+
+        let mut ql: contest::GetQuestionListResponse = Faker.fake();
+        for q in ql.questions.iter_mut() {
+            q.sent_at = std::time::SystemTime::now().into();
+        }
+        mock.get_question_list_set(ql);
+
+        let mut al: contest::GetAnnouncementListResponse = Faker.fake();
+        for a in al.announcements.iter_mut() {
+            a.sent_at = std::time::SystemTime::now().into();
+        }
+        mock.get_announcement_list_set(al);
+
+        mock
     }
     pub fn get_submission_client() -> SubmissionClient {
-        SubmissionClient::default()
+        let mock = submission::MockSubmission::default();
+        mock
     }
 }
 
-#[cfg(not(test))]
+#[cfg(not(feature = "mock"))]
 mod clients {
+    use protos::service::contest;
+    use protos::service::submission;
     // clients for production
-    pub type ContestClient =
-        protos::service::contest::contest_client::ContestClient<tonic::transport::Channel>;
+    pub type ContestClient = contest::contest_client::ContestClient<tonic::transport::Channel>;
     pub type SubmissionClient =
-        protos::service::submission::submission_client::SubmissionClient<tonic::transport::Channel>;
+        submission::submission_client::SubmissionClient<tonic::transport::Channel>;
     pub fn get_contest_client() -> ContestClient {
         ContestClient::new(protos::utils::get_new_channel(
             protos::utils::Service::CONTEST,
@@ -34,6 +54,7 @@ mod clients {
 }
 
 mod auth;
+mod questions;
 
 #[launch]
 fn rocket() -> _ {
@@ -44,7 +65,14 @@ fn rocket() -> _ {
         .manage(submission_client)
         .mount(
             "/",
-            routes![auth::root, auth::root_logged, auth::login, auth::logout],
+            routes![
+                auth::root,
+                auth::root_logged,
+                auth::not_logged_redirect,
+                auth::login,
+                auth::logout,
+                questions::questions
+            ],
         )
         .attach(Template::fairing())
 }

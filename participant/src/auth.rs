@@ -22,12 +22,19 @@ impl<'r> FromRequest<'r> for User {
 #[get("/")]
 pub async fn root_logged(_user: User) -> Redirect {
     // TODO redirect to main page
-    unimplemented!();
+    Redirect::to(uri!(super::questions::questions))
 }
 #[get("/", rank = 2)]
 pub async fn root() -> Result<Template, status::Custom<String>> {
-    // TODO login page
-    unimplemented!();
+    Ok(Template::render(
+        "login",
+        std::collections::HashMap::<String, String>::new(),
+    ))
+}
+
+#[rocket::get("/<_path..>", rank = 8)]
+pub async fn not_logged_redirect(_path: std::path::PathBuf) -> Redirect {
+    Redirect::to(uri!(root))
 }
 
 #[derive(FromForm)]
@@ -38,6 +45,7 @@ pub struct Login {
 #[post("/api/login", data = "<login>")]
 pub async fn login(cookies: &CookieJar<'_>, login: Form<Strict<Login>>) -> Redirect {
     // TODO check password
+    #[allow(clippy::branches_sharing_code)] // clippy be weird
     if login.pass == *"hi" {
         cookies.add_private(Cookie::new("user", login.name.clone()));
         Redirect::to(uri!(root_logged))
