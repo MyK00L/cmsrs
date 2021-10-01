@@ -1,0 +1,16 @@
+{% extends "base" %}
+{% block title %}Announcements and Questions{% endblock title %}
+{% block content %}
+{% for message in messages %}
+<hr/>
+<div>
+	{% if message.is_question %}
+	<p>Question</p>
+	{% else %}
+	<p>Announcement</p>
+	{% endif %}
+	<p>{{message.subject}}</p>
+	<p>{{message.text}}</p>
+</div>
+{% endfor %}
+{% endblock content %}
