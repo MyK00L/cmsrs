@@ -6,6 +6,7 @@ mod clients {
     use protos::service::contest;
     pub use protos::service::contest::contest_server::Contest;
     use protos::service::submission;
+    use std::time::{Duration, SystemTime};
     // clients for testing
     pub type ContestClient = contest::MockContest;
     pub type SubmissionClient = submission::MockSubmission;
@@ -15,18 +16,27 @@ mod clients {
 
         let mut ql: contest::GetQuestionListResponse = Faker.fake();
         for q in ql.questions.iter_mut() {
-            q.sent_at = std::time::SystemTime::now().into();
+            q.sent_at = SystemTime::now().into();
         }
         mock.get_question_list_set(ql);
 
         let mut al: contest::GetAnnouncementListResponse = Faker.fake();
         for a in al.announcements.iter_mut() {
-            a.sent_at = std::time::SystemTime::now().into();
+            a.sent_at = SystemTime::now().into();
         }
         mock.get_announcement_list_set(al);
 
         mock.auth_user_set(contest::AuthUserResponse {
             response: Some(contest::auth_user_response::Response::Success(Faker.fake())),
+        });
+
+        mock.get_contest_metadata_set(contest::GetContestMetadataResponse {
+            metadata: contest::ContestMetadata {
+                name: String::from("contestname"),
+                description: String::from("best contest ever"),
+                start_time: Some(SystemTime::now().into()),
+                end_time: Some((SystemTime::now() + Duration::from_secs(3600)).into()),
+            },
         });
 
         mock

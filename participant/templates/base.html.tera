@@ -2,7 +2,7 @@
 <html lang="en">
 	<head>
 		<meta charset="UTF-8">
-		<title>{% block title %}{% endblock title %}</title>
+		<title>{{contest.name}} - {% block title %}{% endblock title %}</title>
 		{% block scripts %}{% endblock scripts %}
 	</head>
 	<body>
