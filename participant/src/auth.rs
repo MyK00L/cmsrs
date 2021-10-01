@@ -1,4 +1,7 @@
+use super::clients::*;
+use protos::service::contest;
 use rocket::form::{Form, Strict};
+use rocket::http::Status;
 use rocket::http::{Cookie, CookieJar};
 use rocket::outcome::IntoOutcome;
 use rocket::request::FromRequest;
@@ -25,7 +28,7 @@ pub async fn root_logged(_user: User) -> Redirect {
     Redirect::to(uri!(super::questions::questions))
 }
 #[get("/", rank = 2)]
-pub async fn root() -> Result<Template, status::Custom<String>> {
+pub async fn root() -> Result<Template, status::Custom<()>> {
     Ok(Template::render(
         "login",
         std::collections::HashMap::<String, String>::new(),
@@ -43,14 +46,27 @@ pub struct Login {
     pass: String,
 }
 #[post("/api/login", data = "<login>")]
-pub async fn login(cookies: &CookieJar<'_>, login: Form<Strict<Login>>) -> Redirect {
-    // TODO check password
-    #[allow(clippy::branches_sharing_code)] // clippy be weird
-    if login.pass == *"hi" {
-        cookies.add_private(Cookie::new("user", login.name.clone()));
-        Redirect::to(uri!(root_logged))
-    } else {
-        Redirect::to(uri!(root))
+pub async fn login(
+    cookies: &CookieJar<'_>,
+    contest_client: &State<ContestClient>,
+    login: Form<Strict<Login>>,
+) -> Result<Redirect, status::Custom<()>> {
+    let mut contest_client = contest_client.inner().clone();
+    match contest_client
+        .auth_user(tonic::Request::new(contest::AuthUserRequest {
+            username: login.name.clone(),
+            password: login.pass.clone(),
+        }))
+        .await
+    {
+        Ok(response) => match response.into_inner().response.unwrap() {
+            contest::auth_user_response::Response::Success(_) => {
+                cookies.add_private(Cookie::new("user", login.name.clone()));
+                Ok(Redirect::to(uri!(root_logged)))
+            }
+            _ => Ok(Redirect::to(uri!(root))),
+        },
+        Err(_) => Err(status::Custom(Status::InternalServerError, ())),
     }
 }
 
