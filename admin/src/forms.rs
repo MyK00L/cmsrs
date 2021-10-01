@@ -1,5 +1,5 @@
-use super::*;
 use super::clients::*;
+use super::*;
 // use rocket::data::ToByteUnit;
 use rocket::fs::TempFile;
 use std::io::Read;
@@ -185,7 +185,7 @@ pub async fn add_testcase(
     };
     let req = evaluation::SetTestcaseRequest {
         problem_id: data.problem_id,
-        //subtask_id: data.subtask_id,
+        subtask_id: data.subtask_id,
         command: Some(evaluation::set_testcase_request::Command::AddTestcase(
             stuff,
         )),

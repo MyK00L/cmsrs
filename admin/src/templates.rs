@@ -1,5 +1,5 @@
-use super::*;
 use super::clients::*;
+use super::*;
 
 #[get("/users")]
 pub async fn users_template(_admin: Admin) -> Result<Template, status::Custom<String>> {
@@ -88,7 +88,7 @@ impl From<protos::evaluation::CompilationResult> for CompilationResult {
                 protos::evaluation::compilation_result::Outcome::from_i32(cr.outcome).unwrap()
             ),
             resources: cr.used_resources.into(),
-            error: cr.error_message.unwrap_or_default(),
+            error: String::default(), //cr.error_message.unwrap_or_default(),
         }
     }
 }
@@ -294,7 +294,7 @@ impl From<protos::scoring::Subtask> for SubtaskScoring {
                 "{:?}",
                 protos::scoring::subtask::Method::from_i32(s.method).unwrap()
             ),
-            max_score: s.max_score,
+            max_score: s.max_score.score,
         }
     }
 }
@@ -306,7 +306,7 @@ impl From<SubtaskScoring> for protos::scoring::Subtask {
                 "Sum" => protos::scoring::subtask::Method::Sum as i32,
                 _ => panic!("Bad subtask scoring string"),
             },
-            max_score: s.max_score,
+            max_score: protos::common::Score { score: s.max_score },
         }
     }
 }
@@ -452,9 +452,9 @@ impl From<protos::scoring::user::Method> for UserScoringMethod {
                 "{:?}",
                 protos::scoring::user::method::Aggregation::from_i32(us.aggregation_method)
             ),
-            score_weight: us.score_weight,
-            wrong_submission_count_weight: us.wrong_submission_count_weight,
-            time_secs_weight: us.time_secs_weight,
+            score_weight: us.score_weight.score,
+            wrong_submission_count_weight: us.wrong_submission_count_weight.score,
+            time_secs_weight: us.time_secs_weight.score,
         }
     }
 }
@@ -466,9 +466,15 @@ impl From<UserScoringMethod> for protos::scoring::user::Method {
                 "Max" => protos::scoring::user::method::Aggregation::Max as i32,
                 _ => panic!("Invalid user scoring method aggregation string"),
             },
-            score_weight: us.score_weight,
-            wrong_submission_count_weight: us.wrong_submission_count_weight,
-            time_secs_weight: us.time_secs_weight,
+            score_weight: protos::common::Score {
+                score: us.score_weight,
+            },
+            wrong_submission_count_weight: protos::common::Score {
+                score: us.wrong_submission_count_weight,
+            },
+            time_secs_weight: protos::common::Score {
+                score: us.time_secs_weight,
+            },
         }
     }
 }
