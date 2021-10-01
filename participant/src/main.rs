@@ -25,11 +25,9 @@ mod clients {
         }
         mock.get_announcement_list_set(al);
 
-        mock.auth_user_set(
-            contest::AuthUserResponse{
-                response:Some(contest::auth_user_response::Response::Success(Faker.fake()))
-            }
-        );
+        mock.auth_user_set(contest::AuthUserResponse {
+            response: Some(contest::auth_user_response::Response::Success(Faker.fake())),
+        });
 
         mock
     }
