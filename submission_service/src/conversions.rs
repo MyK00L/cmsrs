@@ -1,12 +1,8 @@
 use std::time::SystemTime;
 
 use ::utils::{gen_uuid, mongo::*};
-use mongodb::bson::{
-    bson, doc,
-    spec::{BinarySubtype, ElementType},
-    Binary, Bson, Document,
-};
-use protos::scoring::{one_of_score, OneOfScore};
+use mongodb::bson::{bson, doc, spec::BinarySubtype, Binary, Bson, Document};
+use protos::common::Score;
 use protos::service::submission::*;
 use protos::utils::*;
 use protos::{
@@ -17,8 +13,6 @@ use protos::{
     },
     *,
 };
-
-const DUMMY_MESSAGE: String = String::new();
 
 fn expected_field(field_name: &str) -> String {
     format!(
@@ -31,38 +25,6 @@ fn convert_to_i64(x: u64) -> i64 {
     x as i64
 }
 
-fn score_option_bson_to_struct(
-    opt_bson_score: Option<&Bson>,
-    expected: bool,
-    expect_message: String,
-) -> OneOfScore {
-    OneOfScore {
-        score: if let Some(bson_score) = opt_bson_score {
-            match bson_score.element_type() {
-                ElementType::Double => Some(one_of_score::Score::DoubleScore(
-                    bson_score.as_f64().unwrap(),
-                )),
-                ElementType::Boolean => Some(one_of_score::Score::BoolScore(
-                    bson_score.as_bool().unwrap(),
-                )),
-                _ => panic!("score cannot have this type"),
-            }
-        } else if expected {
-            panic!("{}", expect_message.as_str())
-        } else {
-            None
-        },
-    }
-}
-
-fn score_struct_to_bson(score_struct: OneOfScore) -> Option<Bson> {
-    match score_struct.score {
-        Some(one_of_score::Score::DoubleScore(double_score)) => Some(Bson::Double(double_score)),
-        Some(one_of_score::Score::BoolScore(bool_score)) => Some(Bson::Boolean(bool_score)),
-        _ => None,
-    }
-}
-
 pub fn get_item_from_doc(doc: Document) -> get_submission_list_response::Item {
     get_submission_list_response::Item {
         submission_id: doc.get_i64("_id").unwrap() as u64,
@@ -72,7 +34,9 @@ pub fn get_item_from_doc(doc: Document) -> get_submission_list_response::Item {
         state: doc
             .get_i32("state")
             .unwrap_or_else(|_| panic!("{}", expected_field("state"))),
-        score: score_option_bson_to_struct(doc.get("overallScore"), false, DUMMY_MESSAGE),
+        score: doc
+            .get_f64("overallScore")
+            .map_or_else(|_| None, |val| Some(Score { score: val })),
     }
 }
 
@@ -107,21 +71,18 @@ fn time_ns_to_duration(time_ns: i64) -> common::Duration {
 }
 
 fn compilation_data_to_db_obj(compilation_result: CompilationResult) -> Bson {
-    let mut db_obj_document = doc! {
+    bson! ({
         "outcome": compilation_result.outcome,
         "timeNs": duration_to_time_ns(compilation_result.used_resources.time),
-        "memoryB": convert_to_i64(compilation_result.used_resources.memory_bytes),
-    };
-    if let Some(err_msg) = compilation_result.error_message {
-        db_obj_document.insert("error", err_msg);
-    }
-    db_obj_document.into()
+        "memoryB": convert_to_i64(compilation_result.used_resources.memory_bytes)
+    })
 }
 
 fn testcase_data_to_db_obj(testcase_data: &TestcaseResult) -> Bson {
     bson! ({
+        "testcaseId": convert_to_i64(testcase_data.id),
         "outcome": testcase_data.outcome,
-        "score": score_struct_to_bson(testcase_data.score.clone()).unwrap(),
+        "score": testcase_data.score.score,
         "timeNs": duration_to_time_ns(testcase_data.used_resources.time.clone()),
         "memoryB": convert_to_i64(testcase_data.used_resources.memory_bytes)
     })
@@ -129,7 +90,8 @@ fn testcase_data_to_db_obj(testcase_data: &TestcaseResult) -> Bson {
 
 fn subtask_data_to_db_obj(subtask_data: &SubtaskResult) -> Bson {
     bson! ({
-        "subtaskScore": score_struct_to_bson(subtask_data.score.clone()),
+        "subtaskId": convert_to_i64(subtask_data.id),
+        "subtaskScore": subtask_data.score.score,
         "testcases":
             subtask_data.testcase_results
                 .iter()
@@ -146,7 +108,9 @@ pub fn insert_evaluation_data_into_document(
         "compilation",
         compilation_data_to_db_obj(evaluation_result.compilation_result.clone()),
     );
-    if evaluation_result.compilation_result.outcome == compilation_result::Outcome::Success as i32 {
+    doc_updated.insert("overallScore", evaluation_result.score.score);
+
+    if evaluation_result.compilation_result.outcome() == compilation_result::Outcome::Success {
         // if compilation succeeded, then fill evaluation and score fields
         doc_updated.insert(
             "evaluation",
@@ -161,14 +125,6 @@ pub fn insert_evaluation_data_into_document(
                         .collect::<Bson>()
             }),
         );
-
-        doc_updated.insert(
-            "overallScore",
-            score_struct_to_bson(evaluation_result.score.clone())
-                .expect("Score should have just been evaluated."),
-        );
-    } else {
-        doc_updated.insert("overallScore", Bson::Double(0f64));
     }
 }
 
@@ -188,12 +144,6 @@ fn compilation_doc_to_struct(compilation_doc: &Document) -> CompilationResult {
                 .unwrap_or_else(|_| panic!("{}", expected_field("memoryB")))
                 as u64,
         },
-        error_message: compilation_doc.get("error").map(|bson_string| {
-            bson_string
-                .as_str()
-                .expect("This should not happen. \'error\' must be stored as Bson::String")
-                .to_string()
-        }),
     }
 }
 
@@ -213,19 +163,18 @@ fn single_testcase_db_to_struct(testcase_doc: &Document) -> TestcaseResult {
                 .unwrap_or_else(|_| panic!("{}", expected_field("memoryB")))
                 as u64,
         },
-        score: score_option_bson_to_struct(
-            testcase_doc.get("score"),
-            true,
-            expected_field("score"),
-        ), // expected
+        score: Score {
+            score: testcase_doc
+                .get_f64("score")
+                .unwrap_or_else(|_| panic!("{}", expected_field("score"))),
+        },
+        id: testcase_doc
+            .get_i64("testcaseId")
+            .unwrap_or_else(|_| panic!("{}", expected_field("testcaseId"))) as u64,
     }
 }
 
 fn single_subtask_db_to_struct(subtask_doc: &Document) -> SubtaskResult {
-    let subtask_score_bson = subtask_doc
-        .get("subtaskScore")
-        .unwrap_or_else(|| panic!("{}", expected_field("subtaskScore")));
-
     SubtaskResult {
         testcase_results: subtask_doc
             .get_array("testcases")
@@ -236,7 +185,14 @@ fn single_subtask_db_to_struct(subtask_doc: &Document) -> SubtaskResult {
                 single_testcase_db_to_struct(testcase)
             })
             .collect::<Vec<TestcaseResult>>(),
-        score: score_option_bson_to_struct(Some(subtask_score_bson), false, DUMMY_MESSAGE),
+        score: Score {
+            score: subtask_doc
+                .get_f64("subtaskScore")
+                .unwrap_or_else(|_| panic!("{}", expected_field("subtaskScore"))),
+        },
+        id: subtask_doc
+            .get_i64("subtaskId")
+            .unwrap_or_else(|_| panic!("{}", expected_field("subtaskId"))) as u64,
     }
 }
 
@@ -252,6 +208,7 @@ fn subtasks_db_to_struct(evaluation_doc: &Document) -> Vec<SubtaskResult> {
         .collect::<Vec<SubtaskResult>>()
 }
 
+/// Pre: state is Evaluated
 pub fn document_to_evaluation_result_struct(submission_doc: Document) -> EvaluationResult {
     let compilation_result_struct = compilation_doc_to_struct(
         submission_doc
@@ -260,7 +217,8 @@ pub fn document_to_evaluation_result_struct(submission_doc: Document) -> Evaluat
             .as_document()
             .unwrap(),
     );
-    let compilation_succeeded = compilation_result_struct.outcome == 1i32;
+    let compilation_succeeded =
+        compilation_result_struct.outcome() == compilation_result::Outcome::Success;
     EvaluationResult {
         compilation_result: compilation_result_struct,
         subtask_results: if compilation_succeeded {
@@ -274,10 +232,10 @@ pub fn document_to_evaluation_result_struct(submission_doc: Document) -> Evaluat
         } else {
             vec![]
         },
-        score: score_option_bson_to_struct(
-            submission_doc.get("overallScore"),
-            true,
-            expected_field("overallScore"),
-        ), // expected
+        score: Score {
+            score: submission_doc
+                .get_f64("overallScore")
+                .unwrap_or_else(|_| panic!("{}", expected_field("overallScore"))),
+        },
     }
 }

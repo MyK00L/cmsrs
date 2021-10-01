@@ -2,8 +2,8 @@ syntax = "proto2";
 
 package service.evaluation;
 
-import "scoring.proto";
 import "common.proto";
+import "scoring.proto";
 
 // Schema-defining messages
 
@@ -73,15 +73,15 @@ message GetProblemResponse {
     required Problem info = 1;
 }
 
-message SetContestRequest {
-    required Contest info = 1;
-}
-message SetContestResponse {}
-
 message GetContestRequest {}
 message GetContestResponse {
     required Contest info = 1;
 }
+
+message SetContestRequest {
+    required Contest info = 1;
+}
+message SetContestResponse {}
 
 // vv admin only vv we are gonna need to do streaming stuff for these
 message GetTestcaseRequest {
@@ -99,10 +99,11 @@ message GetProblemTestcasesResponse {
 }
 message SetTestcaseRequest {
     required uint64 problem_id = 1;
+    required uint64 subtask_id = 2;
     oneof command {
-        Testcase add_testcase = 2;
-        Testcase update_testcase = 3;
-        uint64 delete_testcase_id = 4;
+        Testcase add_testcase = 3;
+        Testcase update_testcase = 4;
+        uint64 delete_testcase_id = 5;
     }
 }
 message SetTestcaseResponse {}
@@ -127,8 +128,8 @@ service Evaluation {
     rpc get_user_scoring(GetUserScoringRequest)
         returns (GetUserScoringResponse);
     rpc get_problem(GetProblemRequest) returns (GetProblemResponse);
-    rpc set_contest(SetContestRequest) returns (SetContestResponse);
     rpc get_contest(GetContestRequest) returns (GetContestResponse);
+    rpc set_contest(SetContestRequest) returns (SetContestResponse);
     rpc get_testcase(GetTestcaseRequest) returns (GetTestcaseResponse);
     rpc get_problem_testcases(GetProblemTestcasesRequest)
         returns (GetProblemTestcasesResponse);
