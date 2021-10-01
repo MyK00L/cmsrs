@@ -61,8 +61,6 @@ pub async fn questions(
             ..Default::default()
         })),
     );
-    drop(cc0);
-    drop(cc1);
     let announcements = match announcements {
         Ok(response) => response.into_inner().announcements,
         Err(_) => {
