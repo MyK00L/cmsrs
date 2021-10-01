@@ -6,7 +6,7 @@ use rocket::response::{status, Redirect};
 use rocket::*;
 use rocket_dyn_templates::Template;
 
-pub struct User(String);
+pub struct User(pub String);
 #[rocket::async_trait]
 impl<'r> FromRequest<'r> for User {
     type Error = ();

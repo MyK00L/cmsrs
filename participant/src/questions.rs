@@ -1,14 +1,14 @@
+use super::auth::User;
+use super::clients::*;
 use protos::service::contest;
-
+use rocket::form::{Form, Strict};
 use rocket::http::Status;
-
-use rocket::response::status;
+use rocket::response::{status, Redirect};
 use rocket::serde::Serialize;
 use rocket::*;
 use rocket_dyn_templates::Template;
-
-use super::auth::User;
-use super::clients::*;
+use std::time::SystemTime;
+use utils::gen_uuid;
 
 #[derive(Serialize)]
 #[serde(crate = "rocket::serde")]
@@ -57,7 +57,7 @@ pub async fn questions(
             contest::GetAnnouncementListRequest::default()
         )),
         cc1.get_question_list(tonic::Request::new(contest::GetQuestionListRequest {
-            user_id: None, // Some(user.0) but rn this is a uint64 o.O
+            user_id: None, // TODO: Some(user.0) but rn this is a uint64 o.O
             ..Default::default()
         })),
     );
@@ -91,4 +91,33 @@ pub async fn questions(
         "questions",
         MessageListTemplate { messages },
     ))
+}
+
+#[derive(FromForm)]
+pub struct QuestionForm {
+    subject: String,
+    text: String,
+}
+#[post("/api/post_question", data = "<message>")]
+pub async fn post_question(
+    user: User,
+    message: Form<Strict<QuestionForm>>,
+    contest_client: &State<ContestClient>,
+) -> Result<Redirect, status::Custom<()>> {
+    let mut contest_client = contest_client.inner().clone();
+    let req = contest::AddMessageRequest {
+        message: contest::Message {
+            id: gen_uuid(),
+            subject: message.subject.clone(),
+            problem_id: None,
+            text: message.text.clone(),
+            to: None,
+            from: Some(user.0.clone()),
+            sent_at: SystemTime::now().into(),
+        },
+    };
+    match contest_client.add_message(tonic::Request::new(req)).await {
+        Ok(_) => Ok(Redirect::to(uri!(questions))),
+        Err(_) => Err(status::Custom(Status::InternalServerError, ())),
+    }
 }
