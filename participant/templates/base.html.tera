@@ -9,7 +9,7 @@
 		<nav>
 			<a href="/problems">problems</a> |
 			<a href="/questions">questions</a> |
-			<a href="/logout">logout</a> |
+			<a href="/api/logout" onclick="return confirm('Are you sure you want to log out?')">logout</a> |
 		</nav>
 		<main>
 			{% block content %}{% endblock content %}

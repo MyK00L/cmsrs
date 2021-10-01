@@ -70,7 +70,7 @@ pub async fn login(
     }
 }
 
-#[post("/api/logout")]
+#[get("/api/logout")]
 pub async fn logout(cookies: &CookieJar<'_>) -> Redirect {
     cookies.remove_private(Cookie::named("user"));
     Redirect::to(uri!(root))
