@@ -7,7 +7,6 @@ edition = "2018"
 
 [features]
 mock = ["fake"]
-#default = ["mock"] # TODO: remove
 
 [dependencies]
 tonic = "0.5"

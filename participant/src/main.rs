@@ -71,7 +71,8 @@ fn rocket() -> _ {
                 auth::not_logged_redirect,
                 auth::login,
                 auth::logout,
-                questions::questions
+                questions::questions,
+                questions::post_question,
             ],
         )
         .attach(Template::fairing())
