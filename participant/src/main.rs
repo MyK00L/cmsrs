@@ -58,8 +58,8 @@ mod clients {
 }
 
 mod auth;
-mod questions;
 mod common;
+mod questions;
 
 #[launch]
 fn rocket() -> _ {

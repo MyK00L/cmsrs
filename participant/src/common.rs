@@ -1,11 +1,8 @@
-use rocket::serde::Serialize;
 use protos::service::contest;
+use rocket::serde::Serialize;
 use std::convert::TryInto;
 
-fn render_timestamp(
-    timestamp: protos::common::Timestamp,
-    format_string: &str,
-) -> String {
+fn render_timestamp(timestamp: protos::common::Timestamp, format_string: &str) -> String {
     let naive = chrono::prelude::NaiveDateTime::from_timestamp(
         timestamp.secs.try_into().unwrap_or_default(),
         timestamp.nanos,
@@ -24,7 +21,7 @@ impl From<contest::Problem> for Problem {
     fn from(p: contest::Problem) -> Self {
         Self {
             id: p.id,
-            name: p.name.clone(),
+            name: p.name,
         }
     }
 }
@@ -41,12 +38,15 @@ impl From<contest::ContestMetadata> for ContestMetadata {
     fn from(c: contest::ContestMetadata) -> Self {
         Self {
             name: c.name.clone(),
-            start_time: c.start_time.map(|x| render_timestamp(x, "%FT%T")).unwrap_or_default(),
-            end_time: c.end_time.map(|x| render_timestamp(x, "%FT%T")).unwrap_or_default(),
+            start_time: c
+                .start_time
+                .map(|x| render_timestamp(x, "%FT%T"))
+                .unwrap_or_default(),
+            end_time: c
+                .end_time
+                .map(|x| render_timestamp(x, "%FT%T"))
+                .unwrap_or_default(),
             problems: vec![],
         }
     }
 }
-
-
-
