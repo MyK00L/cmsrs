@@ -17,4 +17,5 @@ rocket_dyn_templates = {version="0.1.0-rc.1", features=["tera"] }
 futures = "0.3"
 chrono = "0.4"
 fake = { version = "2.4", optional = true }
+strum = "0.21"
 

@@ -1,12 +1,18 @@
 use super::auth::*;
 use super::clients::*;
-use protos::service::{contest, submission};
+use protos::service::submission;
+use rocket::data::Capped;
+use rocket::form::{Form, Strict};
 use rocket::fs::TempFile;
 use rocket::http::Status;
 use rocket::response::{status, Redirect};
 use rocket::serde::Serialize;
 use rocket::*;
 use rocket_dyn_templates::Template;
+use std::io::Read;
+use std::str::FromStr;
+use std::string::ToString;
+use strum::IntoEnumIterator;
 
 #[derive(Serialize)]
 #[serde(crate = "rocket::serde")]
@@ -31,6 +37,7 @@ pub struct ProblemsTemplate {
     problem: Problem,
     // score: f64,
     submissions: Vec<SubmissionTemplate>,
+    languages: Vec<String>,
 }
 
 #[get("/problem/<id>")]
@@ -66,12 +73,16 @@ pub async fn problems(
             return Err(status::Custom(Status::InternalServerError, ()));
         }
     };
+    let languages = protos::common::ProgrammingLanguage::iter()
+        .map(|l| l.to_string())
+        .collect();
     Ok(Template::render(
         "problems",
         ProblemsTemplate {
             contest,
             running_contest,
             problem,
+            languages,
             submissions,
         },
     ))
@@ -81,13 +92,56 @@ pub async fn problems(
 pub struct SubmitForm<'v> {
     problem_id: u64,
     language: String,
-    file: TempFile<'v>,
+    file: Capped<TempFile<'v>>,
 }
-#[post("/api/submit")]
+#[post("/api/submit", data = "<submission>")]
 pub async fn submit(
     user: User,
     _running_contest: RunningContest,
+    submission: Form<Strict<SubmitForm<'_>>>,
     submission_client: &State<SubmissionClient>,
 ) -> Result<Redirect, status::Custom<()>> {
-    unimplemented!();
+    if !submission.file.is_complete() {
+        return Err(status::Custom(Status::PayloadTooLarge, ()));
+    }
+    let lang = match protos::common::ProgrammingLanguage::from_str(submission.language.as_str()) {
+        Ok(lang) => lang,
+        Err(_) => {
+            return Err(status::Custom(Status::InternalServerError, ()));
+        }
+    };
+    let mut raw = Vec::<u8>::new();
+    let path = match submission.file.path() {
+        Some(path) => path,
+        None => {
+            return Err(status::Custom(Status::InternalServerError, ()));
+        }
+    };
+    let mut file = match std::fs::File::open(path) {
+        Ok(file) => file,
+        Err(_) => {
+            return Err(status::Custom(Status::InternalServerError, ()));
+        }
+    };
+    if file.read_to_end(&mut raw).is_err() {
+        return Err(status::Custom(Status::InternalServerError, ()));
+    }
+    let req = submission::EvaluateSubmissionRequest {
+        sub: protos::evaluation::Submission {
+            user: user.0,
+            problem_id: submission.problem_id,
+            source: protos::common::Source {
+                lang: lang as i32,
+                code: raw,
+            },
+        },
+    };
+    let mut submission_client = submission_client.inner().clone();
+    match submission_client
+        .evaluate_submission(tonic::Request::new(req))
+        .await
+    {
+        Ok(_) => Ok(Redirect::to(uri!(problems(submission.problem_id)))),
+        Err(_) => Err(status::Custom(Status::InternalServerError, ())),
+    }
 }

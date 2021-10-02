@@ -4,11 +4,13 @@
 		<meta charset="UTF-8">
 		<title>{{contest.name}} - {% block title %}{% endblock title %}</title>
 		{% block scripts %}{% endblock scripts %}
+		{% if contest.start_time and contest.end_time %}
 		<script>
 			const start_time = new Date({{contest.start_time}}).getTime();
 			const end_time = new Date({{contest.end_time}}).getTime();
 		</script>
 		<script src="/scripts/timer.js"></script>
+		{% endif %}
 	</head>
 	<body>
 		<nav>
