@@ -1,6 +1,5 @@
-use super::auth::User;
+use super::auth::*;
 use super::clients::*;
-use super::common::*;
 use protos::service::contest;
 use rocket::form::{Form, Strict};
 use rocket::http::Status;
@@ -44,17 +43,19 @@ impl MessageTemplate {
 #[serde(crate = "rocket::serde")]
 pub struct QuestionsTemplate {
     messages: Vec<MessageTemplate>,
-    contest: ContestMetadata,
+    contest: ContestData,
+    running_contest: Option<RunningContest>,
 }
 #[get("/questions")]
 pub async fn questions(
     _user: User,
+    contest: ContestData,
+    running_contest: Option<RunningContest>,
     contest_client: &State<ContestClient>,
 ) -> Result<Template, status::Custom<()>> {
     let mut cc0 = contest_client.inner().clone();
     let mut cc1 = contest_client.inner().clone();
-    let mut cc2 = contest_client.inner().clone();
-    let (announcements, questions, metadata) = futures::join!(
+    let (announcements, questions) = futures::join!(
         cc0.get_announcement_list(tonic::Request::new(
             contest::GetAnnouncementListRequest::default()
         )),
@@ -62,9 +63,6 @@ pub async fn questions(
             user_id: None, // TODO: Some(user.0) but rn this is a uint64 o.O
             ..Default::default()
         })),
-        cc2.get_contest_metadata(tonic::Request::new(
-            contest::GetContestMetadataRequest::default()
-        )),
     );
     let announcements = match announcements {
         Ok(response) => response.into_inner().announcements,
@@ -78,13 +76,6 @@ pub async fn questions(
             return Err(status::Custom(Status::InternalServerError, ()));
         }
     };
-    let contest: ContestMetadata = match metadata {
-        Ok(response) => response.into_inner().metadata,
-        Err(_) => {
-            return Err(status::Custom(Status::InternalServerError, ()));
-        }
-    }
-    .into();
     let mut messages: Vec<MessageTemplate> = questions
         .into_iter()
         .map(MessageTemplate::from_question)
@@ -99,7 +90,11 @@ pub async fn questions(
 
     Ok(Template::render(
         "questions",
-        QuestionsTemplate { messages, contest },
+        QuestionsTemplate {
+            messages,
+            contest,
+            running_contest,
+        },
     ))
 }
 
