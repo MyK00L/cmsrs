@@ -85,6 +85,7 @@ fn rocket() -> _ {
             routes![
                 auth::root,
                 auth::root_logged,
+                auth::statics,
                 auth::not_logged_redirect,
                 auth::login,
                 auth::logout,
