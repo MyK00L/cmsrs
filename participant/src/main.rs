@@ -92,6 +92,7 @@ fn rocket() -> _ {
                 questions::questions,
                 questions::post_question,
                 problems::problems,
+                problems::submit,
             ],
         )
         .attach(Template::fairing())
