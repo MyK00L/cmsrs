@@ -14,9 +14,11 @@
 		<nav>
 			<a href="/api/logout" onclick="return confirm('Are you sure you want to log out?')">logout</a>
 			| <a href="/questions">questions</a>
-			{% for problem in contest.problems %}
+			{% if running_contest %}
+			{% for problem in running_contest.problems %}
 				| <a href="/problem/{{problem.id}}">{{problem.name}}</a>
 			{% endfor %}
+			{% endif %}
 		</nav>
 		<p id="timer"></p>
 		<main>

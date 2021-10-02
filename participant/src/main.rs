@@ -70,7 +70,6 @@ mod clients {
 }
 
 mod auth;
-mod common;
 mod problems;
 mod questions;
 
