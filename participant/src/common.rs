@@ -1,15 +1,17 @@
 use protos::service::contest;
 use rocket::serde::Serialize;
-use std::convert::TryInto;
+use std::time::Duration;
+use std::time::SystemTime;
 
-fn render_timestamp(timestamp: protos::common::Timestamp, format_string: &str) -> String {
+//use std::convert::TryInto;
+/*fn render_timestamp(timestamp: protos::common::Timestamp, format_string: &str) -> String {
     let naive = chrono::prelude::NaiveDateTime::from_timestamp(
         timestamp.secs.try_into().unwrap_or_default(),
         timestamp.nanos,
     );
     let datetime = chrono::prelude::DateTime::<chrono::Utc>::from_utc(naive, chrono::Utc);
     datetime.format(format_string).to_string()
-}
+}*/
 
 #[derive(Serialize)]
 #[serde(crate = "rocket::serde")]
@@ -30,7 +32,7 @@ impl From<contest::Problem> for Problem {
 #[serde(crate = "rocket::serde")]
 pub struct ContestMetadata {
     name: String,
-    start_time: String,
+    start_time: String, // millis from unix epoch
     end_time: String,
     problems: Vec<Problem>,
 }
@@ -38,14 +40,22 @@ impl From<contest::ContestMetadata> for ContestMetadata {
     fn from(c: contest::ContestMetadata) -> Self {
         Self {
             name: c.name.clone(),
-            start_time: c
-                .start_time
-                .map(|x| render_timestamp(x, "%FT%T"))
-                .unwrap_or_default(),
-            end_time: c
-                .end_time
-                .map(|x| render_timestamp(x, "%FT%T"))
-                .unwrap_or_default(),
+            start_time: SystemTime::from(
+                c.start_time.unwrap_or_else(|| {
+                    (SystemTime::now() + Duration::from_secs(60 * 60 * 24)).into()
+                }),
+            )
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis().to_string(),
+            end_time: SystemTime::from(
+                c.end_time.unwrap_or_else(|| {
+                    (SystemTime::now() + Duration::from_secs(60 * 60 * 24)).into()
+                }),
+            )
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis().to_string(),
             problems: vec![],
         }
     }

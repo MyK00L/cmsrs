@@ -34,8 +34,10 @@ mod clients {
             metadata: contest::ContestMetadata {
                 name: String::from("contestname"),
                 description: String::from("best contest ever"),
-                start_time: Some(SystemTime::now().into()),
-                end_time: Some((SystemTime::now() + Duration::from_secs(3600)).into()),
+                start_time: Some((SystemTime::now()+Duration::from_secs(22)).into()),
+                end_time: Some(
+                    (SystemTime::now() + Duration::from_secs(3622)).into(),
+                ),
             },
         });
 
