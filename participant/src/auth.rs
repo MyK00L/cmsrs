@@ -1,13 +1,13 @@
 use super::clients::*;
 use protos::service::contest;
 use rocket::form::{Form, Strict};
+use rocket::fs::{relative, NamedFile};
 use rocket::http::Status;
 use rocket::http::{Cookie, CookieJar};
 use rocket::outcome::IntoOutcome;
 use rocket::request::FromRequest;
 use rocket::response::{status, Redirect};
 use rocket::*;
-use rocket::fs::{relative, NamedFile};
 use std::path::{Path, PathBuf};
 
 pub struct User(pub String);

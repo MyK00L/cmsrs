@@ -6,6 +6,7 @@ mod clients {
     use protos::service::contest;
     pub use protos::service::contest::contest_server::Contest;
     use protos::service::submission;
+    pub use protos::service::submission::submission_server::Submission;
     use std::time::{Duration, SystemTime};
     // clients for testing
     pub type ContestClient = contest::MockContest;
@@ -34,17 +35,16 @@ mod clients {
             metadata: contest::ContestMetadata {
                 name: String::from("contestname"),
                 description: String::from("best contest ever"),
-                start_time: Some((SystemTime::now()+Duration::from_secs(22)).into()),
-                end_time: Some(
-                    (SystemTime::now() + Duration::from_secs(3622)).into(),
-                ),
+                start_time: Some((SystemTime::now() + Duration::from_secs(22)).into()),
+                end_time: Some((SystemTime::now() + Duration::from_secs(3622)).into()),
             },
         });
 
         mock
     }
     pub fn get_submission_client() -> SubmissionClient {
-        let mock = submission::MockSubmission::default();
+        let mut mock = submission::MockSubmission::default();
+        mock.get_submission_list_set(Faker.fake());
         mock
     }
 }
@@ -71,6 +71,7 @@ mod clients {
 
 mod auth;
 mod common;
+mod problems;
 mod questions;
 
 #[launch]
@@ -91,6 +92,7 @@ fn rocket() -> _ {
                 auth::logout,
                 questions::questions,
                 questions::post_question,
+                problems::problems,
             ],
         )
         .attach(Template::fairing())

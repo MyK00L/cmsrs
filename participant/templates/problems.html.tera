@@ -1,0 +1,24 @@
+{% extends "base" %}
+{% block title %}Announcements and Questions{% endblock title %}
+{% block content %}
+<section>
+	<h2>{{problem.name}}</h2>
+	<a href="/statement/{{problem.id}}">statement</a>
+</section>
+<section>
+	<h2>New Submission</h2>
+	<form action="/api/submit/{{problem.id}}" method="post" enctype="multipart/form-data">
+		<label>solution <input type="file" name="file"></label><br/>
+		<input type="submit" value="submit">
+	</form>
+</section>
+<section>
+	<h2>Past Submissions</h2>
+	{% for sub in submissions %}
+	<hr/>
+	<a href="/submission/{{sub.id}}">{{sub.score}}</a>
+	{% endfor %}
+</section>
+
+{% endblock content %}
+

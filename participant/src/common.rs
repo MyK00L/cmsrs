@@ -3,21 +3,11 @@ use rocket::serde::Serialize;
 use std::time::Duration;
 use std::time::SystemTime;
 
-//use std::convert::TryInto;
-/*fn render_timestamp(timestamp: protos::common::Timestamp, format_string: &str) -> String {
-    let naive = chrono::prelude::NaiveDateTime::from_timestamp(
-        timestamp.secs.try_into().unwrap_or_default(),
-        timestamp.nanos,
-    );
-    let datetime = chrono::prelude::DateTime::<chrono::Utc>::from_utc(naive, chrono::Utc);
-    datetime.format(format_string).to_string()
-}*/
-
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 #[serde(crate = "rocket::serde")]
 pub struct Problem {
-    id: u64,
-    name: String,
+    pub id: u64,
+    pub name: String,
 }
 impl From<contest::Problem> for Problem {
     fn from(p: contest::Problem) -> Self {
@@ -28,35 +18,49 @@ impl From<contest::Problem> for Problem {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 #[serde(crate = "rocket::serde")]
 pub struct ContestMetadata {
-    name: String,
-    start_time: String, // millis from unix epoch
-    end_time: String,
-    problems: Vec<Problem>,
+    pub name: String,
+    pub start_time: String, // millis from unix epoch
+    pub end_time: String,
+    pub problems: Vec<Problem>,
 }
 impl From<contest::ContestMetadata> for ContestMetadata {
     fn from(c: contest::ContestMetadata) -> Self {
+        let now = SystemTime::now();
+        let is_running = match (c.start_time.clone(), c.end_time.clone()) {
+            (Some(start_time), Some(end_time)) => {
+                now >= SystemTime::from(start_time) && now < SystemTime::from(end_time)
+            }
+            _ => false,
+        };
         Self {
             name: c.name.clone(),
             start_time: SystemTime::from(
-                c.start_time.unwrap_or_else(|| {
-                    (SystemTime::now() + Duration::from_secs(60 * 60 * 24)).into()
-                }),
+                c.start_time
+                    .unwrap_or_else(|| (now + Duration::from_secs(60)).into()),
             )
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap_or_default()
-            .as_millis().to_string(),
+            .as_millis()
+            .to_string(),
             end_time: SystemTime::from(
-                c.end_time.unwrap_or_else(|| {
-                    (SystemTime::now() + Duration::from_secs(60 * 60 * 24)).into()
-                }),
+                c.end_time
+                    .unwrap_or_else(|| (now + Duration::from_secs(60 * 60 * 24)).into()),
             )
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap_or_default()
-            .as_millis().to_string(),
-            problems: vec![],
+            .as_millis()
+            .to_string(),
+            problems: if is_running {
+                vec![Problem {
+                    id: 42,
+                    name: String::from("problem ei"),
+                }]
+            } else {
+                vec![]
+            },
         }
     }
 }
