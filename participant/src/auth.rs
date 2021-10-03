@@ -71,7 +71,11 @@ pub async fn login(
         }))
         .await
     {
-        Ok(response) => match response.into_inner().response.unwrap() {
+        Ok(response) => match response
+            .into_inner()
+            .response
+            .ok_or(status::Custom(Status::InternalServerError, ()))?
+        {
             contest::auth_user_response::Response::Success(_) => {
                 cookies.add_private(Cookie::new("user", login.name.clone()));
                 Ok(Redirect::to(uri!(root_logged)))
