@@ -101,6 +101,7 @@ pub async fn questions(
 #[derive(FromForm)]
 pub struct QuestionForm {
     subject: String,
+    problem: Option<u64>,
     text: String,
 }
 #[post("/api/post_question", data = "<message>")]
@@ -114,7 +115,7 @@ pub async fn post_question(
         message: contest::Message {
             id: gen_uuid(),
             subject: message.subject.clone(),
-            problem_id: None,
+            problem_id: message.problem,
             text: message.text.clone(),
             to: None,
             from: Some(user.0.clone()),

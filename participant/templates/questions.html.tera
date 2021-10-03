@@ -5,6 +5,16 @@
 	<p>New Question:</p>
 	<form action="/api/post_question" method="post" enctype="multipart/form-data">
 		<label>Subject <input type="text" name="subject" required></label><br/>
+		<label>Problem
+			<select name="problem">
+				<option>None</option>
+				{% if running_contest %}
+				{% for problem in running_contest.problems %}
+				<option value={{problem.id}}>{{problem.name}}</option>
+				{% endfor %}
+				{% endif %}
+			</select>
+		</label><br/>
 		<label>Text <textarea name="text" required></textarea></label><br/>
 		<input type="submit" value="send"/>
 	</form>
