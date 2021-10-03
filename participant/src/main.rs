@@ -45,6 +45,41 @@ mod clients {
     pub fn get_submission_client() -> SubmissionClient {
         let mut mock = submission::MockSubmission::default();
         mock.get_submission_list_set(Faker.fake());
+        mock.get_submission_details_set(submission::GetSubmissionDetailsResponse {
+            sub: protos::evaluation::Submission {
+                user: String::from("hi"),
+                problem_id: 2,
+                source: protos::common::Source {
+                    code: "#define OII\nint main(){\n\treturn 0;\n}"
+                        .as_bytes()
+                        .to_vec(),
+                    lang: protos::common::ProgrammingLanguage::Cpp as i32,
+                },
+            },
+            state: protos::service::submission::SubmissionState::Evaluated as i32,
+            res: Some(protos::evaluation::EvaluationResult {
+                compilation_result: protos::evaluation::CompilationResult {
+                    outcome: protos::evaluation::compilation_result::Outcome::Success as i32,
+                    ..Default::default()
+                },
+                subtask_results: vec![
+                    protos::evaluation::SubtaskResult {
+                        testcase_results: vec![
+                            protos::evaluation::TestcaseResult {
+                                outcome: protos::evaluation::testcase_result::Outcome::Ok as i32,
+                                score: Faker.fake(),
+                                ..Default::default()
+                            };
+                            9
+                        ],
+                        score: Faker.fake(),
+                        ..Default::default()
+                    };
+                    5
+                ],
+                score: Faker.fake(),
+            }),
+        });
         mock
     }
 }
@@ -93,6 +128,7 @@ fn rocket() -> _ {
                 questions::post_question,
                 problems::problems,
                 problems::submit,
+                problems::submission_details_template,
             ],
         )
         .attach(Template::fairing())
