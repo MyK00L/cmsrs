@@ -13,6 +13,8 @@ use std::io::Read;
 use std::str::FromStr;
 use std::string::ToString;
 use strum::IntoEnumIterator;
+use std::convert::TryFrom;
+use std::convert::TryInto;
 
 #[derive(Serialize)]
 #[serde(crate = "rocket::serde")]
@@ -145,3 +147,139 @@ pub async fn submit(
         Err(_) => Err(status::Custom(Status::InternalServerError, ())),
     }
 }
+
+
+// submission details
+
+#[derive(Serialize, FromForm, Debug, Clone)]
+#[serde(crate = "rocket::serde")]
+pub struct Resources {
+    nanos: u64,
+    bytes: u64,
+}
+impl TryFrom<protos::common::Resources> for Resources {
+    type Error = (); // !
+    fn try_from(r: protos::common::Resources) -> Result<Self,Self::Error> {
+        Ok(Self {
+            nanos: r.time.nanos as u64 + r.time.secs * 1000000000,
+            bytes: r.memory_bytes,
+        })
+    }
+}
+#[derive(Serialize, Debug, Clone)]
+#[serde(crate = "rocket::serde")]
+struct CompilationResult {
+    outcome: String,
+    resources: Resources,
+}
+impl TryFrom<protos::evaluation::CompilationResult> for CompilationResult {
+    type Error = ();
+    fn try_from(cr: protos::evaluation::CompilationResult) -> Result<Self,Self::Error> {
+        Ok(Self {
+            outcome: protos::evaluation::compilation_result::Outcome::from_i32(cr.outcome).ok_or(())?.to_string(),
+            resources: cr.used_resources.try_into()?,
+        })
+    }
+}
+#[derive(Serialize, Debug, Clone)]
+#[serde(crate = "rocket::serde")]
+struct TestcaseResult {
+    outcome: String,
+    score: String,
+    resources: Resources,
+}
+impl TryFrom<protos::evaluation::TestcaseResult> for TestcaseResult {
+    type Error = ();
+    fn try_from(tr: protos::evaluation::TestcaseResult) -> Result<Self,Self::Error> {
+        Ok(Self {
+            outcome: protos::evaluation::testcase_result::Outcome::from_i32(tr.outcome).ok_or(())?.to_string(),
+            score: tr.score.score.to_string(),
+            resources: tr.used_resources.try_into()?,
+        })
+    }
+}
+#[derive(Serialize, Debug, Clone)]
+#[serde(crate = "rocket::serde")]
+struct SubtaskResult {
+    score: String,
+    testcase_results: Vec<TestcaseResult>,
+}
+impl TryFrom<protos::evaluation::SubtaskResult> for SubtaskResult {
+    type Error = ();
+    fn try_from(sr: protos::evaluation::SubtaskResult) -> Result<Self,Self::Error> {
+        Ok(Self {
+            score: sr.score.score.to_string(),
+            testcase_results: sr
+                .testcase_results
+                .into_iter()
+                .map(|x| TestcaseResult::try_from(x)?)
+                .collect(),
+        })
+    }
+}
+#[derive(Serialize, Debug, Clone)]
+#[serde(crate = "rocket::serde")]
+struct EvaluationResult {
+    compilation: CompilationResult,
+    score: String,
+    subtask_results: Vec<SubtaskResult>,
+}
+impl TryFrom<protos::evaluation::EvaluationResult> for EvaluationResult {
+    type Error = ();
+    fn try_from(er: protos::evaluation::EvaluationResult) -> Result<Self,Self::Error> {
+        Ok(Self {
+            compilation: er.compilation_result.try_into()?,
+            score: er.score.score.to_string(),
+            subtask_results: er
+                .subtask_results
+                .into_iter()
+                .map(|x| SubtaskResult::try_from(x)?)
+                .collect(),
+        })
+    }
+}
+#[derive(Serialize, Debug, Clone)]
+#[serde(crate = "rocket::serde")]
+struct SubmissionDetails {
+    state: String,
+    problem_id: u64,
+    lang: String,
+    code: String,
+    evaluation: Option<EvaluationResult>,
+}
+impl TryFrom<submission::GetSubmissionDetailsResponse> for SubmissionDetails {
+    type Error = ();
+    fn try_from(res: submission::GetSubmissionDetailsResponse) -> Result<Self,Self::Error> {
+        Ok(Self {
+            state: submission::SubmissionState::from_i32(res.state).ok_or(())?.to_string(),
+            problem_id: res.sub.problem_id,
+            lang: protos::common::ProgrammingLanguage::from_i32(res.sub.source.lang).ok_or(())?.to_string(),
+            code: String::from_utf8(res.sub.source.code.clone()).map_err(|_|())?,
+            evaluation: res.res.map(|x| EvaluationResult::try_from(x)?),
+        })
+    }
+}
+
+#[get("/submission/<id>")]
+pub async fn submission_details_template(
+    user: User,
+    _running_contest: RunningContest,
+    submission_client: &State<SubmissionClient>,
+    id: u64,
+) -> Result<Template, status::Custom<()>> {
+    let mut submission_client = submission_client.inner().clone();
+    match submission_client
+        .get_submission_details(tonic::Request::new(
+            submission::GetSubmissionDetailsRequest { submission_id: id },
+        ))
+        .await
+    {
+        Ok(response) => {
+            let res = response.into_inner();
+            let submission_details = SubmissionDetails::from(res.try_into().unwrap());
+            Ok(Template::render("submission_details", submission_details))
+        }
+        Err(_) => Err(status::Custom(Status::InternalServerError,())),
+    }
+}
+
