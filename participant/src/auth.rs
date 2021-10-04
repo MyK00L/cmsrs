@@ -4,7 +4,7 @@ use rocket::form::{Form, Strict};
 use rocket::fs::{relative, NamedFile};
 use rocket::http::Status;
 use rocket::http::{Cookie, CookieJar};
-use rocket::outcome::IntoOutcome;
+use rocket::outcome::{try_outcome,IntoOutcome};
 use rocket::request::{FromRequest, Outcome};
 use rocket::response::{status, Redirect};
 use rocket::serde::Serialize;
@@ -94,6 +94,37 @@ pub async fn logout(cookies: &CookieJar<'_>) -> Redirect {
 
 // contest metadata request utilities
 
+struct ContestMetadataWrapper(contest::ContestMetadata);
+#[rocket::async_trait]
+impl<'r> FromRequest<'r> for &'r ContestMetadataWrapper {
+    type Error = std::convert::Infallible;
+
+    async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
+        // This closure will execute at most once per request, regardless of
+        // the number of times the `RunningContest` guard is executed.
+        let result = request
+            .local_cache_async(async {
+                let mut contest_client = request
+                    .guard::<&State<ContestClient>>()
+                    .await
+                    .succeeded()?
+                    .inner()
+                    .clone();
+                let metadata = contest_client
+                    .get_contest_metadata(tonic::Request::new(
+                        contest::GetContestMetadataRequest::default(),
+                    ))
+                    .await
+                    .ok()?
+                    .into_inner()
+                    .metadata;
+                Some(ContestMetadataWrapper(metadata))
+            })
+            .await;
+        result.as_ref().or_forward(())
+    }
+}
+
 #[derive(Serialize, Clone)]
 #[serde(crate = "rocket::serde")]
 pub struct Problem {
@@ -117,47 +148,25 @@ pub struct RunningContest {
 #[rocket::async_trait]
 impl<'r> FromRequest<'r> for RunningContest {
     type Error = std::convert::Infallible;
-
     async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
-        // This closure will execute at most once per request, regardless of
-        // the number of times the `RunningContest` guard is executed.
-        let result = request
-            .local_cache_async(async {
-                let mut contest_client = request
-                    .guard::<&State<ContestClient>>()
-                    .await
-                    .succeeded()?
-                    .inner()
-                    .clone();
-                let metadata = contest_client
-                    .get_contest_metadata(tonic::Request::new(
-                        contest::GetContestMetadataRequest::default(),
-                    ))
-                    .await
-                    .ok()?
-                    .into_inner()
-                    .metadata;
-                let now = SystemTime::now();
-                let is_running = match (metadata.start_time, metadata.end_time) {
-                    (Some(start_time), Some(end_time)) => {
-                        now >= SystemTime::from(start_time) && now < SystemTime::from(end_time)
-                    }
-                    _ => false,
-                };
-                if is_running {
-                    Some(RunningContest {
-                        problems: vec![Problem {
-                            id: 42,
-                            name: String::from("problem ei"),
-                        }],
-                    })
-                } else {
-                    None
-                }
+        let now = SystemTime::now();
+        let metadata = &try_outcome!(request.guard::<&ContestMetadataWrapper>().await).0;
+        let is_running = match (metadata.start_time.as_ref(), metadata.end_time.as_ref()) {
+            (Some(start_time), Some(end_time)) => {
+                now >= SystemTime::from(start_time.clone()) && now < SystemTime::from(end_time.clone())
+            }
+            _ => false,
+        };
+        if is_running {
+            Outcome::Success(RunningContest {
+                problems: vec![Problem {
+                    id: 42,
+                    name: String::from("problem ei"),
+                }],
             })
-            .await;
-
-        result.clone().or_forward(())
+        } else {
+            Outcome::Forward(())
+        }
     }
 }
 
@@ -168,12 +177,12 @@ pub struct ContestData {
     pub start_time: Option<String>, // millis from unix epoch
     pub end_time: Option<String>,
 }
-impl From<contest::ContestMetadata> for ContestData {
-    fn from(c: contest::ContestMetadata) -> Self {
+impl From<&contest::ContestMetadata> for ContestData {
+    fn from(c: &contest::ContestMetadata) -> Self {
         Self {
             name: c.name.clone(),
             start_time: c
-                .start_time
+                .start_time.clone()
                 .map(|t| {
                     SystemTime::from(t)
                         .duration_since(SystemTime::UNIX_EPOCH)
@@ -182,7 +191,7 @@ impl From<contest::ContestMetadata> for ContestData {
                 .flatten()
                 .map(|t| t.as_millis().to_string()),
             end_time: c
-                .end_time
+                .end_time.clone()
                 .map(|t| {
                     SystemTime::from(t)
                         .duration_since(SystemTime::UNIX_EPOCH)
@@ -196,30 +205,8 @@ impl From<contest::ContestMetadata> for ContestData {
 #[rocket::async_trait]
 impl<'r> FromRequest<'r> for ContestData {
     type Error = std::convert::Infallible;
-
     async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
-        // This closure will execute at most once per request, regardless of
-        // the number of times the `RunningContest` guard is executed.
-        let result = request
-            .local_cache_async(async {
-                let mut contest_client = request
-                    .guard::<&State<ContestClient>>()
-                    .await
-                    .succeeded()?
-                    .inner()
-                    .clone();
-                let metadata = contest_client
-                    .get_contest_metadata(tonic::Request::new(
-                        contest::GetContestMetadataRequest::default(),
-                    ))
-                    .await
-                    .ok()?
-                    .into_inner()
-                    .metadata;
-                Some(metadata.into())
-            })
-            .await;
-
-        result.clone().or_forward(())
+        let metadata = &try_outcome!(request.guard::<&ContestMetadataWrapper>().await).0;
+        Outcome::Success(metadata.into())
     }
 }
