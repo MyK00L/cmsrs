@@ -31,7 +31,7 @@ mod clients {
             response: Some(contest::auth_user_response::Response::Success(Faker.fake())),
         });
 
-        let secs_until_start = 0;
+        let secs_until_start = 10;
         mock.get_contest_metadata_set(contest::GetContestMetadataResponse {
             metadata: contest::ContestMetadata {
                 name: String::from("contestname"),
