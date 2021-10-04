@@ -1,13 +1,13 @@
 use failure::{format_err, Error};
 use protos::{
-    common::{self, Duration, ProgrammingLanguage, Resources, Source},
-    evaluation::{compilation_result, CompilationResult, TestcaseResult},
+    common::{self, Duration, ProgrammingLanguage, Resources, Score, Source},
+    evaluation::{compilation_result, testcase_result::Outcome, CompilationResult, TestcaseResult},
     scoring,
     service::{
         evaluation::{
             evaluation_server::Evaluation, problem, GetProblemEvaluationFileRequest,
-            GetProblemRequest, GetProblemResponse, GetProblemTestcasesRequest, MockEvaluation,
-            Problem, Testcase, GetProblemTestcasesResponse
+            GetProblemRequest, GetProblemResponse, GetProblemTestcasesRequest,
+            GetProblemTestcasesResponse, MockEvaluation, Problem, Testcase,
         },
         worker::{
             worker_server::{Worker, WorkerServer},
@@ -18,7 +18,10 @@ use protos::{
     utils::{get_local_address, Service},
     worker,
 };
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    process::ExitStatus,
+};
 use tabox::{
     configuration::SandboxConfiguration,
     result::SandboxExecutionResult,
@@ -27,7 +30,6 @@ use tabox::{
 };
 use tabox::{result::ResourceUsage, Sandbox};
 use tonic::{transport::Server, Code, Request, Response, Status};
-use which::which;
 
 mod languages_info;
 
@@ -42,6 +44,7 @@ const READABLE_DIRS: &[&str] = &[
     "/usr",
     "/bin",
     "/opt",
+    // "/proc",
     // update-alternatives stuff, sometimes the executables are symlinked here
     "/etc/alternatives/",
     "/var/lib/dpkg/alternatives/",
@@ -67,22 +70,6 @@ fn get_extension(lang: ProgrammingLanguage) -> String {
         ProgrammingLanguage::Rust => String::from(".rs"),
         ProgrammingLanguage::Cpp => String::from(".cpp"),
     }
-}
-
-fn save_source_code(source: Source, path: PathBuf) -> Result<(), Error> {
-    // Save source.code to path.
-    std::fs::create_dir_all(path.parent().unwrap()).map_err(|io_error| {
-        format_err!(
-            "While creating parent dir for sandbox-accessible source code file: {}",
-            io_error.to_string()
-        )
-    })?;
-    std::fs::write(path, source.code).map_err(|io_error| {
-        format_err!(
-            "While creating sandbox-accessible source code file: {}",
-            io_error.to_string()
-        )
-    })
 }
 
 fn save_file(content: Vec<u8>, path: PathBuf) -> Result<(), Error> {
@@ -123,7 +110,8 @@ fn get_compilation_config(
         .working_directory(compilation_dir.clone())
         .memory_limit(problem_metadata.compilation_limits.memory_bytes)
         .time_limit(problem_metadata.compilation_limits.time.secs)
-        .wall_time_limit(30 * problem_metadata.compilation_limits.time.secs)
+        .wall_time_limit(5 * problem_metadata.compilation_limits.time.secs)
+        .env("PATH", std::env::var("PATH").unwrap_or_default())
         .executable(get_compiler(source.lang()))
         .arg("-o")
         .arg(EXECUTABLE_NAME)
@@ -139,11 +127,6 @@ fn get_compilation_config(
             compilation_dir.clone(),
             String::from("stdout.txt"),
         )))
-        .syscall_filter(SyscallFilter {
-            default_action: SyscallFilterAction::Allow,
-            // Overwrites the default behaviour for the specified rules.
-            rules: vec![],
-        })
         .uid(1000) // Configured in the Dockerfile.
         .gid(1000);
 
@@ -153,8 +136,9 @@ fn get_compilation_config(
         }
     }
 
-    save_source_code(
-        source,
+    // save source code into a sandbox-accessible file
+    save_file(
+        source.code,
         PathBuf::from(join_path_str(compilation_dir, source_code_file)),
     )?;
 
@@ -163,10 +147,10 @@ fn get_compilation_config(
 
 fn get_execution_config(
     problem_metadata: Problem,
-    input_file_path: PathBuf
+    input_file_path: PathBuf,
 ) -> Result<SandboxConfiguration, Error> {
     let mut execution_config = SandboxConfiguration::default();
-    
+
     let compilation_dir = PathBuf::from("/tmp/tabox/compilation");
     let execution_dir = PathBuf::from("/tmp/tabox/execution");
 
@@ -182,15 +166,11 @@ fn get_execution_config(
             EXECUTABLE_NAME.to_string(),
         )))
         .stdin(input_file_path)
-        /*.stdout(PathBuf::from(join_path_str(
+        .stdout(PathBuf::from(join_path_str(
             execution_dir.clone(),
             String::from("stdout.txt"),
-        ))) */
-        .syscall_filter(SyscallFilter {
-            default_action: SyscallFilterAction::Kill,
-            // Overwrites the default behaviour for the specified rules.
-            rules: vec![],
-        })
+        )))
+        .syscall_filter(SyscallFilter::build(false, false))
         .uid(1000) // Configured in the Dockerfile.
         .gid(1000);
 
@@ -250,20 +230,26 @@ impl Worker for WorkerService {
             .into_inner()
             .info;
 
-        // TODO NEED TO SET UP THE DIRECTORIES MANUALLY, check this file entirely:
-        // https://github.com/edomora97/task-maker-rust/blob/master/task-maker-exec/src/sandbox.rs
-
-        let compilation_config = get_compilation_config(problem_metadata.clone(), request_inner.source)
-            .map_err(|e| Status::new(Code::Aborted, e.to_string()))?;
+        let compilation_config =
+            get_compilation_config(problem_metadata.clone(), request_inner.source)
+                .map_err(|e| Status::new(Code::Aborted, e.to_string()))?;
         println!("Compilation config: {:?}", compilation_config);
-        // println!("Run results: {:?}", run_sandbox(compilation_config));
-        // println!("{0} is an existing directory? {1}", "/tmp/tabox/compilation", PathBuf::from("/tmp/tabox/compilation").exists());
-        // return Err(Status::new(Code::Unimplemented, "Stopped here"));
 
         let mut evaluation_response: EvaluateSubmissionResponse;
         match run_sandbox(compilation_config) {
             Ok(res) => {
-                println!("Compilation successfull? {}, exit status {:?}", res.status.success(), res.status);
+                println!(
+                    "Compilation successfull? {}, exit status {:?}",
+                    res.status.success(),
+                    res.status
+                );
+
+                println!(
+                    "{}",
+                    std::fs::read_to_string(PathBuf::from("/tmp/tabox/compilation/stderr.txt"))
+                        .expect("cannot read")
+                );
+
                 evaluation_response = EvaluateSubmissionResponse {
                     compilation_result: CompilationResult {
                         outcome: compilation_result::Outcome::Success as i32,
@@ -283,14 +269,25 @@ impl Worker for WorkerService {
             }
         }
 
-        println!("Executable exists? {}", PathBuf::from(join_path_str(
-            PathBuf::from("/tmp/tabox/compilation"),
-            EXECUTABLE_NAME.to_string(),
-        )).exists());
-        println!("Compilation directory exists? {}", PathBuf::from("/tmp/tabox/compilation").exists());
+        println!(
+            "Executable exists? {}",
+            PathBuf::from(join_path_str(
+                PathBuf::from("/tmp/tabox/compilation"),
+                EXECUTABLE_NAME.to_string(),
+            ))
+            .exists()
+        );
+        println!(
+            "Compilation directory exists? {}",
+            PathBuf::from("/tmp/tabox/compilation").exists()
+        );
 
         evaluation_service.get_problem_testcases_set(GetProblemTestcasesResponse {
-            testcases: vec![Testcase {id: 1, input: Some(vec![]), output: None}]
+            testcases: vec![Testcase {
+                id: 1,
+                input: Some("1".as_bytes().to_vec()),
+                output: None,
+            }],
         });
         let testcases = evaluation_service
             .get_problem_testcases(Request::new(GetProblemTestcasesRequest {
@@ -299,44 +296,84 @@ impl Worker for WorkerService {
             .await?
             .into_inner()
             .testcases;
+        
+        let input_file_path = PathBuf::from("/tmp/tabox/execution/stdin.txt");
+        let output_file_path = PathBuf::from("/tmp/tabox/execution/stdout.txt");
+            
+        let execution_config =
+            get_execution_config(problem_metadata.clone(), input_file_path.clone())
+            .map_err(|e| Status::aborted(e.to_string()))?;
 
         evaluation_response.testcase_results = testcases
             .iter()
             .map(|testcase: &Testcase| {
-                let input_file_path = PathBuf::from("/tmp/tabox/execution/stdin.txt");
+                // save the testcase input in the file
                 save_file(testcase.input.clone().unwrap(), input_file_path.clone()).unwrap();
-                // TODO create execution_config once and always use the same
-                let execution_config = 
-                    get_execution_config(problem_metadata.clone(), input_file_path.clone())
+
+                println!("Running the execution in the sandbox");
+
+                let execution_res = run_sandbox(execution_config.clone())
                     .map_err(|e| {
-                        panic!("{:?}", Status::new(Code::Aborted, e.to_string()));
-                    })
-                    .unwrap();
-                
-                let execution_res = run_sandbox(execution_config)
-                    .map_err(|e| {
-                        panic!("{:?}", Status::new(Code::Aborted, e.to_string()));
+                        panic!("{:?}", Status::aborted(e.to_string()));
                     })
                     .unwrap();
 
-                println!("{}", std::fs::read_to_string(input_file_path).expect("cannot read"));
-                
-                todo!()
+                println!("Execution in the sandbox terminated");
+
+                println!(
+                    "Execution directory exists? {}",
+                    PathBuf::from("/tmp/tabox/execution").exists()
+                );
+                println!(
+                    "Execution successfull? {}, exit status {:?} {:?}",
+                    execution_res.status.success(),
+                    execution_res.status,
+                    execution_res.status.signal_name()
+                );
+                println!(
+                    "content of stdin.txt: \"{}\"",
+                    std::fs::read_to_string(input_file_path.clone()).expect("cannot read")
+                );
+                println!(
+                    "content of stdout.txt: \"{}\"",
+                    std::fs::read_to_string(output_file_path.clone()).expect("cannot read")
+                );
+
+                if !execution_res.status.success() {
+                    let is_mle = execution_config.memory_limit.map_or(false, |memory_limit| {
+                        memory_limit < execution_res.resource_usage.memory_usage
+                    });
+                    let is_tle = execution_config.time_limit.map_or(false, |time_limit| {
+                        time_limit
+                            < ((execution_res.resource_usage.user_cpu_time * 1_000_000_000f64)
+                                as u64)
+                    });
+                    return TestcaseResult {
+                        outcome: {
+                            if is_tle {
+                                Outcome::Tle as i32
+                            } else if is_mle {
+                                Outcome::Mle as i32
+                            } else {
+                                Outcome::Rte as i32
+                            }
+                        },
+                        score: Score { score: 0f64 },
+                        used_resources: map_used_resources(execution_res.resource_usage),
+                        id: testcase.id,
+                    };
+                }
+                println!("Successfull!");
+
+                // run sandbox with checker to check if the result is correct
+                todo!("Checker execution to be done")
+
                 // write testcase to file (we must allow the sandbox to access that file)
                 // run sandbox to execute this testcase
                 // if reached a result in time, run sandbox to run the checker on the result
             })
             .collect::<Vec<TestcaseResult>>();
         Ok(Response::new(evaluation_response))
-        // fetch problem data:
-        //     - invoke get_testcases from Evaluation Service to get all the testcases
-        //     - invoke get_problem from Evaluation Service to get problem metadata
-        //       (in particular we need the compilation/execution limits)
-        //     - do we need the evaluation file?
-        // populate configuration based on data  ^
-        // compilation
-        // run the execution inside the sandbox
-        // get the sandbox results and build the worker response
     }
 
     async fn update_testcase(
@@ -394,8 +431,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let request = EvaluateSubmissionRequest {
         problem_id: 1,
         source: Source {
-            lang: ProgrammingLanguage::Rust as i32,
-            code: "fn main() { println!(\"Hey there!\"); }".as_bytes().to_vec()
+            lang: ProgrammingLanguage::Cpp as i32,
+            code: "#include<iostream>\nint main() { int x; std::cin >> x; std::cout << \"Hey there! \" << x << \" is a great number\"; return 0; }".as_bytes().to_vec()
+            // code: "#include<iostream>\nint main() { std::cout << \"Hey there!\"; return 0; }".as_bytes().to_vec()
+            // lang: ProgrammingLanguage::Rust as i32,
+            // code: "fn main() { println!(\"Hey there!\"); }".as_bytes().to_vec()
         },
     };
     println!("Request is:\n\n{:?}\n\n", request.clone());
