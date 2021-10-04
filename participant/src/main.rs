@@ -31,12 +31,17 @@ mod clients {
             response: Some(contest::auth_user_response::Response::Success(Faker.fake())),
         });
 
+        let secs_until_start = 0;
         mock.get_contest_metadata_set(contest::GetContestMetadataResponse {
             metadata: contest::ContestMetadata {
                 name: String::from("contestname"),
                 description: String::from("best contest ever"),
-                start_time: Some((SystemTime::now() + Duration::from_secs(22)).into()),
-                end_time: Some((SystemTime::now() + Duration::from_secs(3622)).into()),
+                start_time: Some(
+                    (SystemTime::now() + Duration::from_secs(secs_until_start)).into(),
+                ),
+                end_time: Some(
+                    (SystemTime::now() + Duration::from_secs(3600 + secs_until_start)).into(),
+                ),
             },
         });
 
