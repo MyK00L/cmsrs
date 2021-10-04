@@ -4,7 +4,7 @@ use rocket::form::{Form, Strict};
 use rocket::fs::{relative, NamedFile};
 use rocket::http::Status;
 use rocket::http::{Cookie, CookieJar};
-use rocket::outcome::{try_outcome,IntoOutcome};
+use rocket::outcome::{try_outcome, IntoOutcome};
 use rocket::request::{FromRequest, Outcome};
 use rocket::response::{status, Redirect};
 use rocket::serde::Serialize;
@@ -153,7 +153,8 @@ impl<'r> FromRequest<'r> for RunningContest {
         let metadata = &try_outcome!(request.guard::<&ContestMetadataWrapper>().await).0;
         let is_running = match (metadata.start_time.as_ref(), metadata.end_time.as_ref()) {
             (Some(start_time), Some(end_time)) => {
-                now >= SystemTime::from(start_time.clone()) && now < SystemTime::from(end_time.clone())
+                now >= SystemTime::from(start_time.clone())
+                    && now < SystemTime::from(end_time.clone())
             }
             _ => false,
         };
@@ -182,7 +183,8 @@ impl From<&contest::ContestMetadata> for ContestData {
         Self {
             name: c.name.clone(),
             start_time: c
-                .start_time.clone()
+                .start_time
+                .clone()
                 .map(|t| {
                     SystemTime::from(t)
                         .duration_since(SystemTime::UNIX_EPOCH)
@@ -191,7 +193,8 @@ impl From<&contest::ContestMetadata> for ContestData {
                 .flatten()
                 .map(|t| t.as_millis().to_string()),
             end_time: c
-                .end_time.clone()
+                .end_time
+                .clone()
                 .map(|t| {
                     SystemTime::from(t)
                         .duration_since(SystemTime::UNIX_EPOCH)
