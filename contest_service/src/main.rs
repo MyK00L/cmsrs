@@ -1,6 +1,7 @@
 use futures::stream::StreamExt;
 use std::convert::TryFrom;
 
+use ::utils::mongo::*;
 use mappings::chat::Message;
 use mongodb::{
     bson::{doc, Document},
@@ -126,7 +127,7 @@ impl Contest for ContestService {
     ) -> Result<Response<GetProblemResponse>, Status> {
         let problem_id = request.into_inner().problem_id;
         self.get_problems_collection()
-            .find_one(doc! {"_id": problem_id as i64}, None)
+            .find_one(doc! {"_id": u64_to_i64(problem_id)}, None)
             .await
             .map_err(internal_error)?
             .map(mappings::problem::ProblemData::from)

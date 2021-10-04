@@ -12,3 +12,10 @@ pub fn systime_to_timestamp(st: std::time::SystemTime) -> bson::Timestamp {
         increment: 0,
     }
 }
+
+pub fn u64_to_i64(x: u64) -> i64 {
+    i64::from_le_bytes(x.to_le_bytes())
+}
+pub fn i64_to_u64(x: i64) -> u64 {
+    u64::from_le_bytes(x.to_le_bytes())
+}

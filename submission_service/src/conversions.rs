@@ -21,15 +21,11 @@ fn expected_field(field_name: &str) -> String {
     )
 }
 
-fn convert_to_i64(x: u64) -> i64 {
-    x as i64
-}
-
 pub fn get_item_from_doc(doc: Document) -> get_submission_list_response::Item {
     get_submission_list_response::Item {
-        submission_id: doc.get_i64("_id").unwrap() as u64,
+        submission_id: i64_to_u64(doc.get_i64("_id").unwrap()),
         user: doc.get_str("user").unwrap().to_string(),
-        problem_id: doc.get_i64("problemId").unwrap() as u64,
+        problem_id: i64_to_u64(doc.get_i64("problemId").unwrap()),
         timestamp: timestamp_to_systime(doc.get_timestamp("created").unwrap()).into(),
         state: doc
             .get_i32("state")
@@ -42,9 +38,9 @@ pub fn get_item_from_doc(doc: Document) -> get_submission_list_response::Item {
 
 pub fn create_pending_submission_document(submission: evaluation::Submission) -> Document {
     doc! {
-        "_id": convert_to_i64(gen_uuid()),
+        "_id": u64_to_i64(gen_uuid()),
         "user": submission.user,
-        "problemId": submission.problem_id as i64,
+        "problemId": u64_to_i64(submission.problem_id),
         "created": systime_to_timestamp(SystemTime::now()),
         "source": Bson::Binary(Binary {
                 subtype: BinarySubtype::Generic,
@@ -74,23 +70,23 @@ fn compilation_data_to_db_obj(compilation_result: CompilationResult) -> Bson {
     bson! ({
         "outcome": compilation_result.outcome,
         "timeNs": duration_to_time_ns(compilation_result.used_resources.time),
-        "memoryB": convert_to_i64(compilation_result.used_resources.memory_bytes)
+        "memoryB": u64_to_i64(compilation_result.used_resources.memory_bytes)
     })
 }
 
 fn testcase_data_to_db_obj(testcase_data: &TestcaseResult) -> Bson {
     bson! ({
-        "testcaseId": convert_to_i64(testcase_data.id),
+        "testcaseId": u64_to_i64(testcase_data.id),
         "outcome": testcase_data.outcome,
         "score": testcase_data.score.score,
         "timeNs": duration_to_time_ns(testcase_data.used_resources.time.clone()),
-        "memoryB": convert_to_i64(testcase_data.used_resources.memory_bytes)
+        "memoryB": u64_to_i64(testcase_data.used_resources.memory_bytes)
     })
 }
 
 fn subtask_data_to_db_obj(subtask_data: &SubtaskResult) -> Bson {
     bson! ({
-        "subtaskId": convert_to_i64(subtask_data.id),
+        "subtaskId": u64_to_i64(subtask_data.id),
         "subtaskScore": subtask_data.score.score,
         "testcases":
             subtask_data.testcase_results
@@ -139,10 +135,11 @@ fn compilation_doc_to_struct(compilation_doc: &Document) -> CompilationResult {
                     .get_i64("timeNs")
                     .unwrap_or_else(|_| panic!("{}", expected_field("timeNs"))),
             ),
-            memory_bytes: compilation_doc
-                .get_i64("memoryB")
-                .unwrap_or_else(|_| panic!("{}", expected_field("memoryB")))
-                as u64,
+            memory_bytes: i64_to_u64(
+                compilation_doc
+                    .get_i64("memoryB")
+                    .unwrap_or_else(|_| panic!("{}", expected_field("memoryB"))),
+            ),
         },
     }
 }
@@ -158,19 +155,22 @@ fn single_testcase_db_to_struct(testcase_doc: &Document) -> TestcaseResult {
                     .get_i64("timeNs")
                     .unwrap_or_else(|_| panic!("{}", expected_field("timeNs"))),
             ),
-            memory_bytes: testcase_doc
-                .get_i64("memoryB")
-                .unwrap_or_else(|_| panic!("{}", expected_field("memoryB")))
-                as u64,
+            memory_bytes: i64_to_u64(
+                testcase_doc
+                    .get_i64("memoryB")
+                    .unwrap_or_else(|_| panic!("{}", expected_field("memoryB"))),
+            ),
         },
         score: Score {
             score: testcase_doc
                 .get_f64("score")
                 .unwrap_or_else(|_| panic!("{}", expected_field("score"))),
         },
-        id: testcase_doc
-            .get_i64("testcaseId")
-            .unwrap_or_else(|_| panic!("{}", expected_field("testcaseId"))) as u64,
+        id: i64_to_u64(
+            testcase_doc
+                .get_i64("testcaseId")
+                .unwrap_or_else(|_| panic!("{}", expected_field("testcaseId"))),
+        ),
     }
 }
 
@@ -190,9 +190,11 @@ fn single_subtask_db_to_struct(subtask_doc: &Document) -> SubtaskResult {
                 .get_f64("subtaskScore")
                 .unwrap_or_else(|_| panic!("{}", expected_field("subtaskScore"))),
         },
-        id: subtask_doc
-            .get_i64("subtaskId")
-            .unwrap_or_else(|_| panic!("{}", expected_field("subtaskId"))) as u64,
+        id: i64_to_u64(
+            subtask_doc
+                .get_i64("subtaskId")
+                .unwrap_or_else(|_| panic!("{}", expected_field("subtaskId"))),
+        ),
     }
 }
 

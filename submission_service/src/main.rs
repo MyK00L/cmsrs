@@ -4,6 +4,7 @@ use core::panic;
 
 use futures::stream::StreamExt;
 
+use ::utils::mongo::*;
 use ::utils::scoring::{calc_submission_score, calc_subtask_score};
 use mongodb::{
     bson::{doc, Bson, Document},
@@ -45,10 +46,6 @@ fn expected_field(field_name: &str) -> String {
         "This should not happen. In this context, {} is a required field in db",
         field_name
     )
-}
-
-fn convert_to_i64(x: u64) -> i64 {
-    x as i64
 }
 
 async fn init_contest_service_db(db: Database) -> Result<(), Box<dyn std::error::Error>> {
@@ -284,7 +281,7 @@ impl Submission for SubmissionService {
         Ok(Response::new(
             protos::service::submission::EvaluateSubmissionResponse {
                 res: mut_evaluation_result,
-                submission_id: id as u64,
+                submission_id: i64_to_u64(id),
             },
         ))
     }
@@ -303,7 +300,7 @@ impl Submission for SubmissionService {
             doc_filter.insert("user", user);
         }
         if let Some(problem_id) = opt_problem_id {
-            doc_filter.insert("problemId", convert_to_i64(problem_id));
+            doc_filter.insert("problemId", u64_to_i64(problem_id));
         }
 
         let submissions = self
@@ -337,7 +334,7 @@ impl Submission for SubmissionService {
     ) -> Result<Response<GetSubmissionDetailsResponse>, Status> {
         self
             .get_collection()
-            .find_one(doc! { "_id": convert_to_i64(request.into_inner().submission_id) }, None)
+            .find_one(doc! { "_id": u64_to_i64(request.into_inner().submission_id) }, None)
             .await
             .map_err(internal_error)?
             .map_or_else(|| Err(Status::new(
@@ -354,10 +351,9 @@ impl Submission for SubmissionService {
                             .get_str("user")
                             .unwrap_or_else(|_| panic!("{}", expected_field("user")))
                             .to_string(),
-                        problem_id: document
+                        problem_id: i64_to_u64(document
                             .get_i64("problemId")
-                            .unwrap_or_else(|_| panic!("{}", expected_field("problemId")))
-                            as u64,
+                            .unwrap_or_else(|_| panic!("{}", expected_field("problemId")))),
                         source: common::Source {
                             lang: document.get_i32("programmingLanguage").unwrap_or_else(|_| {
                                 panic!("{}", expected_field("programmingLanguage"))

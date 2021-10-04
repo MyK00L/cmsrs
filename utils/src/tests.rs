@@ -27,6 +27,13 @@ const SUM_SCORING_METHOD: Subtask = Subtask {
 };
 
 #[test]
+fn convert_u64_and_i64() {
+    assert_eq!(mongo::u64_to_i64(123u64), 123i64);
+    assert_eq!(mongo::i64_to_u64(123i64), 123u64);
+    assert_eq!(mongo::i64_to_u64(mongo::u64_to_i64(0xfeedb0ba)), 0xfeedb0ba);
+}
+
+#[test]
 fn convert_to_mongo_timestamp_and_back_test() {
     let now = std::time::UNIX_EPOCH
         + std::time::Duration::from_secs(

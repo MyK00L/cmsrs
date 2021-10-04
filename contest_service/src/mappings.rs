@@ -3,6 +3,7 @@ use std::convert::TryFrom;
 use mongodb::bson::Document;
 use protos::service::contest::GetContestMetadataResponse;
 use tonic::Response;
+use utils::mongo::*;
 
 #[derive(Debug)]
 pub enum MappingError {
@@ -155,9 +156,9 @@ pub mod chat {
     impl From<Message> for mongodb::bson::Document {
         fn from(m: Message) -> Self {
             let mut resp = Document::new();
-            resp.insert("_id", m.id as i64);
+            resp.insert("_id", u64_to_i64(m.id));
             resp.insert("subject", m.subject.clone());
-            resp.insert("problemId", m.problem_id.map(|id| id as i64));
+            resp.insert("problemId", m.problem_id.map(u64_to_i64));
             resp.insert("text", m.body.clone());
             if m.is_announcement() {
                 resp.insert("to", m.get_recipient());
@@ -171,9 +172,9 @@ pub mod chat {
     impl From<Document> for Message {
         fn from(d: Document) -> Self {
             Self {
-                id: d.get_i64("_id").unwrap() as u64,
+                id: i64_to_u64(d.get_i64("_id").unwrap()),
                 subject: d.get_str("subject").unwrap().to_owned(),
-                problem_id: d.get_i64("problemId").map(|x| x as u64).ok(),
+                problem_id: d.get_i64("problemId").map(i64_to_u64).ok(),
                 body: d.get_str("text").unwrap().to_owned(),
                 to: d.get_str("to").map(|x| x.to_owned()).ok(),
                 from: d.get_str("from").map(|x| x.to_owned()).ok(),
@@ -185,6 +186,7 @@ pub mod chat {
 }
 
 pub mod problem {
+    use utils::mongo::*;
     pub struct ProblemData(Problem, Vec<u8>);
     impl ProblemData {
         pub fn get_problem(&self) -> Problem {
@@ -226,7 +228,7 @@ pub mod problem {
         fn from(mongo_record: Document) -> Self {
             ProblemData(
                 Problem {
-                    id: mongo_record.get_i64("_id").unwrap_or_default() as u64,
+                    id: i64_to_u64(mongo_record.get_i64("_id").unwrap_or_default()),
                     name: mongo_record.get_str("name").unwrap_or_default().to_owned(),
                     long_name: mongo_record
                         .get_str("longName")
@@ -245,7 +247,7 @@ pub mod problem {
             let p = problem_data.get_problem();
             let statement = problem_data.get_statement();
             let mut result = Document::new();
-            result.insert("_id", p.id as i64);
+            result.insert("_id", u64_to_i64(p.id));
             result.insert("name", p.name.clone());
             result.insert("longName", p.long_name);
             result.insert(
