@@ -1,9 +1,10 @@
 "use strict";
+
 function millis_to_string(millis) {
-	let days = Math.floor(millis / (1000 * 60 * 60 * 24));
-	let hours = Math.floor((millis % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-	let minutes = Math.floor((millis % (1000 * 60 * 60)) / (1000 * 60));
-	let seconds = Math.floor((millis % (1000 * 60)) / 1000);
+	const days = Math.floor(millis / (1000 * 60 * 60 * 24));
+	const hours = Math.floor((millis % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+	const minutes = Math.floor((millis % (1000 * 60 * 60)) / (1000 * 60));
+	const seconds = Math.floor((millis % (1000 * 60)) / 1000);
 	if(days>0) {
 		return days+"d "+hours+"h "+minutes+"m ";
 	} else {
@@ -11,23 +12,21 @@ function millis_to_string(millis) {
 	}
 }
 let now = Date.now();
+
 const stage = now<start_time ? 0 : now<end_time ? 1 : 2;
-let x = setInterval(function() {
+const stage_string = ["start in ","end in ","ended "];
+function update_timer() {
 	now = Date.now();
-	if(now<start_time) {
-		if(stage!=0) {
+	const new_stage = now<start_time ? 0 : now<end_time ? 1 : 2;
+	if(stage!=new_stage) {
 			window.location.reload();
-		}
-		document.getElementById("timer").innerHTML="start in "+millis_to_string(start_time-now);
-	} else if(now<end_time) {
-		if(stage!=1) {
-			window.location.reload();
-		}
-		document.getElementById("timer").innerHTML="end in "+millis_to_string(end_time-now);
 	} else {
-		if(stage!=2) {
-			window.location.reload();
-		}
-		document.getElementById("timer").innerHTML="ended "+millis_to_string(now-end_time);
+		document.getElementById("timer").innerHTML=stage_string[stage]+millis_to_string(stage==0 ? start_time-now : stage==1 ? end_time-now : now-end_time);
 	}
-}, 1000);
+}
+
+function start_timer() {
+	update_timer();
+	let x = setInterval(update_timer, 1000);
+}
+
