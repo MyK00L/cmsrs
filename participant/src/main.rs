@@ -55,7 +55,7 @@ mod clients {
                 user: String::from("hi"),
                 problem_id: 2,
                 source: protos::common::Source {
-                    code: "#define OII\nint main(){\n\treturn 0;\n}"
+                    code: "#define OII\nint main(){\n\treturn 0;\n}\n/*\n<b>a</b>\n*/\n"
                         .as_bytes()
                         .to_vec(),
                     lang: protos::common::ProgrammingLanguage::Cpp as i32,
