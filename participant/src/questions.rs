@@ -48,7 +48,7 @@ pub struct QuestionsTemplate {
 }
 #[get("/questions")]
 pub async fn questions(
-    _user: User,
+    user: User,
     contest: ContestData,
     running_contest: Option<RunningContest>,
     contest_client: &State<ContestClient>,
@@ -82,6 +82,7 @@ pub async fn questions(
         .chain(
             announcements
                 .into_iter()
+                .filter(|x| x.to.is_none() || x.to.as_ref() == Some(&user.0))
                 .map(MessageTemplate::from_announcement),
         )
         .collect();
