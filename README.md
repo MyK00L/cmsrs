@@ -1,5 +1,7 @@
 # cmsrs
 
+![ci](https://github.com/MyK00L/cmsrs/actions/workflows/ci.yml/badge.svg)
+
 A contest management system for local competitive programming contests like [ioi](https://ioinformatics.org/) or [icpc](https://icpc.global/).
 
 Inspired by other similar projects like [cms](https://cms-dev.github.io/) and [DOMjudge](https://www.domjudge.org/).
