@@ -4,7 +4,7 @@
 <hr>
 <p>state: {{sub.state}}</p>
 <p>lang: {{sub.lang}}</p>
-<textarea readonly="readonly">{{sub.code}}</textarea>
+<pre><code>{{sub.code}}</code></pre>
 {% if sub.evaluation %}
 <p>compilation: {{sub.evaluation.compilation.outcome}} {{sub.evaluation.compilation.resources.nanos}}ns {{sub.evaluation.compilation.resources.bytes}}b</p>
 <p>{{sub.evaluation.score}}</p>
