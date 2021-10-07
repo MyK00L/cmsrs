@@ -2,7 +2,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     tonic_build::configure()
         .type_attribute(".", "#[allow(unused_imports)]\nuse fake::*;\n#[derive(::serde::Serialize,::serde::Deserialize,::fake::Dummy)]") // hacky hacks
         .type_attribute("common.ProgrammingLanguage","#[derive(::strum_macros::EnumString,::strum_macros::ToString,::strum_macros::EnumIter)]")
-        .type_attribute("common.CompilationResult.Outcome","#[derive(::strum_macros::EnumString,::strum_macros::ToString,::strum_macros::EnumIter)]")
+        .type_attribute("evaluation.CompilationResult.Outcome","#[derive(::strum_macros::EnumString,::strum_macros::ToString,::strum_macros::EnumIter)]")
+        .type_attribute("evaluation.TestcaseResult.Outcome","#[derive(::strum_macros::EnumString,::strum_macros::ToString,::strum_macros::EnumIter)]")
         .type_attribute("scoring.Subtask.Method","#[derive(::strum_macros::EnumString,::strum_macros::ToString,::strum_macros::EnumIter)]")
         .type_attribute("scoring.Problem.Method","#[derive(::strum_macros::EnumString,::strum_macros::ToString,::strum_macros::EnumIter)]")
         .type_attribute("scoring.User.Method.Aggregation","#[derive(::strum_macros::EnumString,::strum_macros::ToString,::strum_macros::EnumIter)]")
