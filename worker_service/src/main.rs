@@ -1,6 +1,6 @@
 use failure::{format_err, Error};
 use protos::{
-    common::{self, Duration, ProgrammingLanguage, Resources, Score, Source},
+    common::{self, Duration, ProgrammingLanguage, Resources, Score, Source, Timestamp},
     evaluation::{compilation_result, testcase_result::Outcome, CompilationResult, TestcaseResult},
     scoring,
     service::{
@@ -16,11 +16,14 @@ use protos::{
         },
     },
     utils::{get_local_address, Service},
-    worker,
+    worker::{self, Testcase},
 };
 use std::{
+    collections::HashMap,
+    iter::Map,
     path::{Path, PathBuf},
     process::ExitStatus,
+    thread::{sleep, spawn, JoinHandle},
 };
 use tabox::{
     configuration::SandboxConfiguration,
@@ -52,11 +55,120 @@ const READABLE_DIRS: &[&str] = &[
     "/var/lib/texmf/",
 ];
 
-pub struct WorkerService {}
+struct FileStatus {
+    testcases: HashMap<u64, Timestamp>,
+    checkers: HashMap<u64, Timestamp>,
+}
+
+struct EvaluationFileStatus {
+    // vectors of id and correspondent timestamp
+    testcases: Vec<(u64, Timestamp)>,
+    checkers: Vec<(u64, Timestamp)>,
+}
+
+pub struct WorkerService {
+    status: FileStatus,
+    pull_join_handler: JoinHandle<()>,
+}
+
+fn update_testcase_helper(
+    worker: &WorkerService,
+    testcase_id: u64,
+) -> Result<Response<UpdateTestcaseResponse>, Status> {
+    worker.update_testcase(Request::new(UpdateTestcaseRequest {
+        tc: worker::Testcase {
+            problem_id: todo!(), // TODO change this RPC message to PULL mode!!!!!
+            testcase_id,
+            testcase: None, // TODO remove
+        },
+    }))
+}
+
+fn update_checker_helper(
+    worker: &WorkerService,
+    problem_id: u64,
+) -> Result<Response<UpdateSourceResponse>, Status> {
+    worker.update_source(Request::new(UpdateSourceRequest {
+        file: worker::SourceFile {
+            problem_id,
+            r#type: todo!(), // do I really need this? In any case the compilation is the same...
+            source: todo!(), // TODO remove
+        },
+    }))
+}
+
+fn diff_and_update_status(worker: &WorkerService, actual_status: EvaluationFileStatus) {
+    actual_status
+        .testcases
+        .iter()
+        .for_each(|(testcase_id, actual_timestamp)| {
+            // insert the new one and get the older value associated to the key
+            let old_timestamp = worker
+                .status
+                .testcases
+                .insert(testcase_id, actual_timestamp);
+
+            if (old_timestamp.is_none() || old_timestamp.unwrap() < actual_timestamp) {
+                // try pulling until it succeeds
+                loop {
+                    if let Ok(_) = update_testcase_helper(worker, testcase_id) {
+                        break;
+                    }
+                }
+            }
+        });
+    
+    actual_status
+        .checkers
+        .iter()
+        .for_each(|(problem_id, actual_timestamp)| {
+            // insert the new one and get the older value associated to the key
+            let old_timestamp = worker
+                .status
+                .checkers
+                .insert(problem_id, actual_timestamp);
+
+            if (old_timestamp.is_none() || old_timestamp.unwrap() < actual_timestamp) {
+                // pull until it succeeds
+                loop {
+                    if let Ok(_) = update_checker_helper(worker, problem_id) {
+                        break;
+                    }
+                }
+            }
+        });
+}
 
 impl WorkerService {
     pub fn new() -> Self {
-        WorkerService {}
+        let pull_join_handler: JoinHandle<()>;
+        let worker = WorkerService {
+            status: FileStatus {
+                testcases: HashMap::new(),
+                checkers: HashMap::new(),
+            },
+            pull_join_handler,
+        };
+
+        // kill this thread when the worker goes down using the pull_join_handler
+        pull_join_handler = spawn(|| {
+            loop {
+                // sleep 30 secs
+                sleep(std::time::Duration::new(30, 0));
+
+                // pull status. TODO actually do the pull
+                let actual_status: EvaluationFileStatus;
+
+                // diff and update
+                diff_and_update_status(&worker, actual_status);
+            }
+        });
+
+        // if this fails, substitute pull_join_handler with worker.pull_join_handler
+        // on the spawn line
+        assert!(pull_join_handler == worker.pull_join_handler);
+
+        worker
     }
 }
 
