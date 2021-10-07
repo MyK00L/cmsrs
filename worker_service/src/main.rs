@@ -148,7 +148,7 @@ fn get_compilation_config(
 fn get_execution_config(
     problem_metadata: Problem,
     input_file_path: PathBuf,
-) -> Result<SandboxConfiguration, Error> {
+) -> SandboxConfiguration {
     let mut execution_config = SandboxConfiguration::default();
 
     let compilation_dir = PathBuf::from("/tmp/tabox/compilation");
@@ -180,7 +180,44 @@ fn get_execution_config(
         }
     }
 
-    Ok(execution_config.build())
+    execution_config.build()
+}
+
+fn get_checker_execution_config(
+    problem_metadata: Problem,
+    output_file_path: PathBuf,
+    correct_output_file_path: PathBuf,
+) -> Result<SandboxConfiguration, Error> {
+    let mut checker_execution_config = SandboxConfiguration::default();
+
+    let execution_dir = PathBuf::from("/tmp/tabox/execution");
+    let checker_dir = PathBuf::from("/tmp/tabox/checker");
+
+    checker_execution_config
+        .mount(execution_dir.clone(), execution_dir.clone(), false) // to read the execution output file
+        .mount(checker_dir.clone(), checker_dir.clone(), true)
+        .working_directory(checker_dir.clone())
+        .wall_time_limit(3 * problem_metadata.execution_limits.time.secs) // all the stuff that the checker reads must have also been written within the time limit
+        // .executable(todo!("path to checker executable"))
+        .arg(format!("{}", correct_output_file_path.display()))
+        .stdin(output_file_path)
+        // how to set another stdin ?? just give him access to the file and pass it as CLI argument (see 2 lines above)
+        .stdout(PathBuf::from(join_path_str(
+            checker_dir.clone(),
+            String::from("checker-stdout.txt"),
+        )))
+        .syscall_filter(SyscallFilter::build(false, false))
+        .uid(1000) // Configured in the Dockerfile.
+        .gid(1000);
+
+    // all necessary?
+    for dir in READABLE_DIRS {
+        if Path::new(dir).is_dir() {
+            checker_execution_config.mount(dir, dir, false);
+        }
+    }
+
+    Ok(checker_execution_config.build())
 }
 
 fn run_sandbox(config: SandboxConfiguration) -> Result<SandboxExecutionResult, Error> {
@@ -211,8 +248,7 @@ impl Worker for WorkerService {
         let request_inner = request.into_inner();
 
         if let ProgrammingLanguage::None = request_inner.source.lang() {
-            return Err(Status::new(
-                Code::InvalidArgument,
+            return Err(Status::invalid_argument(
                 "The source code has None programming language",
             ));
         }
@@ -236,6 +272,7 @@ impl Worker for WorkerService {
         println!("Compilation config: {:?}", compilation_config);
 
         let mut evaluation_response: EvaluateSubmissionResponse;
+
         match run_sandbox(compilation_config) {
             Ok(res) => {
                 println!(
@@ -252,20 +289,15 @@ impl Worker for WorkerService {
 
                 evaluation_response = EvaluateSubmissionResponse {
                     compilation_result: CompilationResult {
-                        outcome: compilation_result::Outcome::Success as i32,
+                        outcome: compilation_result::Outcome::Success as i32, // Nope! Depends on res.status
                         used_resources: map_used_resources(res.resource_usage),
                     },
                     testcase_results: vec![], // yet to be evaluated
                 }
             }
             Err(e) => {
-                return Ok(Response::new(EvaluateSubmissionResponse {
-                    compilation_result: CompilationResult {
-                        outcome: todo!(),        // deduce from e
-                        used_resources: todo!(), // not applicable
-                    },
-                    testcase_results: vec![],
-                }));
+                // problems with sandbox
+                return Err(Status::aborted(e.to_string()));
             }
         }
 
@@ -296,13 +328,12 @@ impl Worker for WorkerService {
             .await?
             .into_inner()
             .testcases;
-        
+
         let input_file_path = PathBuf::from("/tmp/tabox/execution/stdin.txt");
         let output_file_path = PathBuf::from("/tmp/tabox/execution/stdout.txt");
-            
+
         let execution_config =
-            get_execution_config(problem_metadata.clone(), input_file_path.clone())
-            .map_err(|e| Status::aborted(e.to_string()))?;
+            get_execution_config(problem_metadata.clone(), input_file_path.clone());
 
         evaluation_response.testcase_results = testcases
             .iter()
@@ -363,14 +394,43 @@ impl Worker for WorkerService {
                         id: testcase.id,
                     };
                 }
+
                 println!("Successfull!");
 
                 // run sandbox with checker to check if the result is correct
-                todo!("Checker execution to be done")
+                todo!("Checker execution to be done");
+                let checker_config = SandboxConfiguration::default();
 
-                // write testcase to file (we must allow the sandbox to access that file)
-                // run sandbox to execute this testcase
-                // if reached a result in time, run sandbox to run the checker on the result
+                let checker_res = run_sandbox(checker_config.clone())
+                    .map_err(|e| {
+                        panic!("{:?}", Status::aborted(e.to_string()));
+                    })
+                    .unwrap();
+
+                if checker_res.status.success() {
+                    // Pre: checker-output.txt contains just an f64 number
+                    TestcaseResult {
+                        outcome: Outcome::Ok as i32,
+                        score: todo!(), // read from checker output
+                        used_resources: map_used_resources(execution_res.resource_usage),
+                        id: testcase.id,
+                    }
+                } else {
+                    // map sandbox result status to execution outcome
+                    TestcaseResult {
+                        outcome: {
+                            // CHECKER ERROR directly ?
+                            match checker_res.status {
+                                tabox::result::ExitStatus::ExitCode(_) => todo!(),
+                                tabox::result::ExitStatus::Signal(_) => todo!(),
+                                tabox::result::ExitStatus::Killed => todo!(),
+                            }
+                        },
+                        score: todo!(), // read from checker output
+                        used_resources: map_used_resources(execution_res.resource_usage),
+                        id: testcase.id,
+                    }
+                }
             })
             .collect::<Vec<TestcaseResult>>();
         Ok(Response::new(evaluation_response))
@@ -445,6 +505,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .evaluate_submission(Request::new(request))
             .await?
             .into_inner()
+    );
+    println!(
+        "Compilation directory exists? {}",
+        PathBuf::from("/tmp/tabox/compilation").exists()
+    );
+    println!(
+        "Execution directory exists? {}",
+        PathBuf::from("/tmp/tabox/execution").exists()
+    );
+    println!(
+        "Checker directory exists? {}",
+        PathBuf::from("/tmp/tabox/checker").exists()
     );
     println!("Finished hardcoded example");
 
