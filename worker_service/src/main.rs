@@ -5,9 +5,10 @@ use protos::{
     scoring,
     service::{
         evaluation::{
-            evaluation_server::Evaluation, problem, GetProblemEvaluationFileRequest,
-            GetProblemRequest, GetProblemResponse, GetProblemTestcasesRequest,
-            GetProblemTestcasesResponse, MockEvaluation, Problem, Testcase,
+            evaluation_client::EvaluationClient, evaluation_file, evaluation_server::Evaluation,
+            problem, EvaluationFile, GetProblemEvaluationFileRequest, GetProblemRequest,
+            GetProblemResponse, GetProblemTestcasesRequest, GetProblemTestcasesResponse,
+            GetTestcaseRequest, MockEvaluation, Problem, Testcase,
         },
         worker::{
             worker_server::{Worker, WorkerServer},
@@ -16,13 +17,15 @@ use protos::{
         },
     },
     utils::{get_local_address, Service},
-    worker::{self, Testcase},
+    worker::{self},
 };
 use std::{
     collections::HashMap,
+    fs::File,
     iter::Map,
     path::{Path, PathBuf},
     process::ExitStatus,
+    sync::{Arc, Mutex, MutexGuard},
     thread::{sleep, spawn, JoinHandle},
 };
 use tabox::{
@@ -34,302 +37,154 @@ use tabox::{
 use tabox::{result::ResourceUsage, Sandbox};
 use tonic::{transport::Server, Code, Request, Response, Status};
 
-mod languages_info;
+#[path = "./configurations.rs"]
+mod configurations;
+use configurations::*;
 
-const SOURCE_CODE_NAME: &str = "main";
-const EXECUTABLE_NAME: &str = "executable";
+fn timestamp_cmp(a: Timestamp, b: Timestamp) -> u64 {
+    if a.secs == b.secs {
+        (a.nanos - b.nanos) as u64
+    } else {
+        a.secs - b.secs
+    }
+}
 
-// The list of all the system-wide readable directories inside the sandbox.
-// TODO: probably not all of these are needed, remove the unneeded.
-const READABLE_DIRS: &[&str] = &[
-    "/lib",
-    "/lib64",
-    "/usr",
-    "/bin",
-    "/opt",
-    // "/proc",
-    // update-alternatives stuff, sometimes the executables are symlinked here
-    "/etc/alternatives/",
-    "/var/lib/dpkg/alternatives/",
-    // required by texlive on Ubuntu
-    "/var/lib/texmf/",
-];
+type ProblemId = u64;
+type TestcaseId = u64;
 
+#[derive(Debug)]
 struct FileStatus {
-    testcases: HashMap<u64, Timestamp>,
-    checkers: HashMap<u64, Timestamp>,
+    testcases: HashMap<(ProblemId, TestcaseId), Timestamp>,
+    checkers: HashMap<(ProblemId, evaluation_file::Type), Timestamp>,
+}
+
+impl FileStatus {
+    fn new() -> Self {
+        FileStatus {
+            testcases: HashMap::new(),
+            checkers: HashMap::new(),
+        }
+    }
 }
 
 struct EvaluationFileStatus {
     // vectors of id and correspondent timestamp
-    testcases: Vec<(u64, Timestamp)>,
-    checkers: Vec<(u64, Timestamp)>,
+    testcases: Vec<(ProblemId, TestcaseId, Timestamp)>,
+    checkers: Vec<(ProblemId, evaluation_file::Type, Timestamp)>,
 }
 
 pub struct WorkerService {
-    status: FileStatus,
+    status: Arc<Mutex<FileStatus>>,
     pull_join_handler: JoinHandle<()>,
+    evaluation_service: EvaluationClient<tonic::transport::Channel>,
 }
 
-fn update_testcase_helper(
-    worker: &WorkerService,
-    testcase_id: u64,
-) -> Result<Response<UpdateTestcaseResponse>, Status> {
-    worker.update_testcase(Request::new(UpdateTestcaseRequest {
-        tc: worker::Testcase {
-            problem_id: todo!(), // TODO change this RPC message to PULL mode!!!!!
-            testcase_id,
-            testcase: None, // TODO remove
-        },
-    }))
+async fn pull_testcase(
+    evaluation_service: &mut EvaluationClient<tonic::transport::Channel>,
+    problem_id: ProblemId,
+    testcase_id: TestcaseId,
+) -> Testcase {
+    loop {
+        if let Ok(testcase) = evaluation_service
+            .get_testcase(Request::new(GetTestcaseRequest {
+                problem_id,
+                testcase_id,
+            }))
+            .await
+        {
+            return testcase.into_inner().testcase;
+        }
+    }
 }
 
-fn update_checker_helper(
-    worker: &WorkerService,
-    problem_id: u64,
-) -> Result<Response<UpdateSourceResponse>, Status> {
-    worker.update_source(Request::new(UpdateSourceRequest {
-        file: worker::SourceFile {
-            problem_id,
-            r#type: todo!(), // do I really need this? In any case the compilation is the same...
-            source: todo!(), // TODO remove
-        },
-    }))
+async fn pull_checker(
+    evaluation_service: &mut EvaluationClient<tonic::transport::Channel>,
+    problem_id: ProblemId,
+    checker_type: evaluation_file::Type,
+) -> EvaluationFile {
+    loop {
+        if let Ok(evaluation_file) = evaluation_service
+            .get_problem_evaluation_file(Request::new(GetProblemEvaluationFileRequest {
+                problem_id,
+                r#type: checker_type as i32,
+            }))
+            .await
+        {
+            return evaluation_file.into_inner().file;
+        }
+    }
 }
 
-fn diff_and_update_status(worker: &WorkerService, actual_status: EvaluationFileStatus) {
-    actual_status
-        .testcases
-        .iter()
-        .for_each(|(testcase_id, actual_timestamp)| {
-            // insert the new one and get the older value associated to the key
-            let old_timestamp = worker
-                .status
-                .testcases
-                .insert(testcase_id, actual_timestamp);
+async fn diff_and_update_status(
+    evaluation_service: &mut EvaluationClient<tonic::transport::Channel>,
+    wrapped_status: &Arc<Mutex<FileStatus>>,
+    actual_status: EvaluationFileStatus,
+) {
+    let mut status = wrapped_status.lock().unwrap();
 
-            if (old_timestamp.is_none() || old_timestamp.unwrap() < actual_timestamp) {
-                // try pulling until it succeeds
-                loop {
-                    if let Ok(_) = update_testcase_helper(worker, testcase_id) {
-                        break;
-                    }
-                }
-            }
-        });
-    
-    actual_status
-        .checkers
-        .iter()
-        .for_each(|(problem_id, actual_timestamp)| {
-            // insert the new one and get the older value associated to the key
-            let old_timestamp = worker
-                .status
-                .checkers
-                .insert(problem_id, actual_timestamp);
+    for (problem_id, testcase_id, actual_timestamp) in actual_status.testcases {
+        // insert the new one and get the older value associated to the key
+        let old_timestamp = status
+            .testcases
+            .insert((problem_id, testcase_id), actual_timestamp.clone());
 
-            if (old_timestamp.is_none() || old_timestamp.unwrap() < actual_timestamp) {
-                // pull until it succeeds
-                loop {
-                    if let Ok(_) = update_checker_helper(worker, problem_id) {
-                        break;
-                    }
-                }
-            }
-        });
+        if old_timestamp.is_none() || timestamp_cmp(old_timestamp.unwrap(), actual_timestamp) < 0 {
+            // pull updated testcase
+            let testcase = pull_testcase(evaluation_service, problem_id, testcase_id).await;
+            // save testcase
+            todo!()
+        }
+    }
+
+    for (problem_id, checker_type, actual_timestamp) in actual_status.checkers {
+        // insert the new one and get the older value associated to the key
+        let old_timestamp = status
+            .checkers
+            .insert((problem_id, checker_type), actual_timestamp.clone());
+
+        if old_timestamp.is_none() || timestamp_cmp(old_timestamp.unwrap(), actual_timestamp) < 0 {
+            // pull updated checker
+            let checker = pull_checker(evaluation_service, problem_id, checker_type).await;
+            // compile checker in sandbox
+            todo!()
+        }
+    }
 }
 
 impl WorkerService {
-    pub fn new() -> Self {
-        let pull_join_handler: JoinHandle<()>;
-        let worker = WorkerService {
-            status: FileStatus {
-                testcases: HashMap::new(),
-                checkers: HashMap::new(),
-            },
-            pull_join_handler,
-        };
+    async fn new() -> Result<Self, Box<dyn std::error::Error>> {
+        let evaluation_service = EvaluationClient::connect("http://[::1]:50051").await?;
+        let mut evaluation_service_copy = evaluation_service.clone();
 
-        // kill this thread when the worker goes down using the pull_join_handler
-        pull_join_handler = spawn(|| {
+        let wrapped_status = Arc::new(Mutex::new(FileStatus::new()));
+        let wrapped_status_copy = Arc::clone(&wrapped_status);
+
+        let pull_join_handler = spawn(move || {
             loop {
                 // sleep 30 secs
                 sleep(std::time::Duration::new(30, 0));
 
                 // pull status. TODO actually do the pull
-                let actual_status: EvaluationFileStatus;
+                let actual_status = EvaluationFileStatus {
+                    testcases: vec![],
+                    checkers: vec![],
+                };
 
                 // diff and update
-                diff_and_update_status(&worker, actual_status);
+                diff_and_update_status(
+                    &mut evaluation_service_copy,
+                    &wrapped_status_copy,
+                    actual_status,
+                );
             }
         });
 
-        // if this fails, substitute pull_join_handler with worker.pull_join_handler
-        // on the spawn line
-        assert!(pull_join_handler == worker.pull_join_handler);
-
-        worker
+        Ok(WorkerService {
+            status: wrapped_status,
+            pull_join_handler, // TODO kill this thread when the worker goes down
+            evaluation_service,
+        })
     }
-}
-
-fn join_path_str(path1: PathBuf, path2: String) -> String {
-    path1.join(path2).into_os_string().into_string().unwrap()
-}
-
-fn get_extension(lang: ProgrammingLanguage) -> String {
-    match lang {
-        ProgrammingLanguage::None => panic!(),
-        ProgrammingLanguage::Rust => String::from(".rs"),
-        ProgrammingLanguage::Cpp => String::from(".cpp"),
-    }
-}
-
-fn save_file(content: Vec<u8>, path: PathBuf) -> Result<(), Error> {
-    // Save content to path.
-    std::fs::create_dir_all(path.parent().unwrap()).map_err(|io_error| {
-        format_err!(
-            "While creating parent dir for sandbox-accessible file: {}",
-            io_error.to_string()
-        )
-    })?;
-    std::fs::write(path, content).map_err(|io_error| {
-        format_err!(
-            "While creating sandbox-accessible file: {}",
-            io_error.to_string()
-        )
-    })
-}
-
-fn get_compiler(lang: ProgrammingLanguage) -> PathBuf {
-    match lang {
-        ProgrammingLanguage::None => panic!(),
-        ProgrammingLanguage::Rust => PathBuf::from("/usr/local/cargo/bin/rustc"),
-        ProgrammingLanguage::Cpp => PathBuf::from("/usr/bin/g++"),
-    }
-}
-
-fn get_compilation_config(
-    problem_metadata: Problem,
-    source: Source,
-) -> Result<SandboxConfiguration, Error> {
-    let mut compilation_config = SandboxConfiguration::default();
-
-    let compilation_dir = PathBuf::from("/tmp/tabox/compilation");
-    let source_code_file = format!("{}{}", SOURCE_CODE_NAME, get_extension(source.lang()));
-
-    compilation_config
-        .mount(compilation_dir.clone(), compilation_dir.clone(), true)
-        .working_directory(compilation_dir.clone())
-        .memory_limit(problem_metadata.compilation_limits.memory_bytes)
-        .time_limit(problem_metadata.compilation_limits.time.secs)
-        .wall_time_limit(5 * problem_metadata.compilation_limits.time.secs)
-        .env("PATH", std::env::var("PATH").unwrap_or_default())
-        .executable(get_compiler(source.lang()))
-        .arg("-o")
-        .arg(EXECUTABLE_NAME)
-        .arg(join_path_str(
-            compilation_dir.clone(),
-            source_code_file.clone(),
-        ))
-        .stderr(PathBuf::from(join_path_str(
-            compilation_dir.clone(),
-            String::from("stderr.txt"),
-        )))
-        .stdout(PathBuf::from(join_path_str(
-            compilation_dir.clone(),
-            String::from("stdout.txt"),
-        )))
-        .uid(1000) // Configured in the Dockerfile.
-        .gid(1000);
-
-    for dir in READABLE_DIRS {
-        if Path::new(dir).is_dir() {
-            compilation_config.mount(dir, dir, false);
-        }
-    }
-
-    // save source code into a sandbox-accessible file
-    save_file(
-        source.code,
-        PathBuf::from(join_path_str(compilation_dir, source_code_file)),
-    )?;
-
-    Ok(compilation_config.build())
-}
-
-fn get_execution_config(
-    problem_metadata: Problem,
-    input_file_path: PathBuf,
-) -> SandboxConfiguration {
-    let mut execution_config = SandboxConfiguration::default();
-
-    let compilation_dir = PathBuf::from("/tmp/tabox/compilation");
-    let execution_dir = PathBuf::from("/tmp/tabox/execution");
-
-    execution_config
-        .mount(execution_dir.clone(), execution_dir.clone(), true)
-        .mount(compilation_dir.clone(), compilation_dir.clone(), false) // to read the executable
-        .working_directory(execution_dir.clone())
-        .memory_limit(problem_metadata.execution_limits.memory_bytes)
-        .time_limit(problem_metadata.execution_limits.time.secs)
-        .wall_time_limit(5 * problem_metadata.execution_limits.time.secs)
-        .executable(PathBuf::from(join_path_str(
-            compilation_dir.clone(),
-            EXECUTABLE_NAME.to_string(),
-        )))
-        .stdin(input_file_path)
-        .stdout(PathBuf::from(join_path_str(
-            execution_dir.clone(),
-            String::from("stdout.txt"),
-        )))
-        .syscall_filter(SyscallFilter::build(false, false))
-        .uid(1000) // Configured in the Dockerfile.
-        .gid(1000);
-
-    for dir in READABLE_DIRS {
-        if Path::new(dir).is_dir() {
-            execution_config.mount(dir, dir, false);
-        }
-    }
-
-    execution_config.build()
-}
-
-fn get_checker_execution_config(
-    problem_metadata: Problem,
-    output_file_path: PathBuf,
-    correct_output_file_path: PathBuf,
-) -> Result<SandboxConfiguration, Error> {
-    let mut checker_execution_config = SandboxConfiguration::default();
-
-    let execution_dir = PathBuf::from("/tmp/tabox/execution");
-    let checker_dir = PathBuf::from("/tmp/tabox/checker");
-
-    checker_execution_config
-        .mount(execution_dir.clone(), execution_dir.clone(), false) // to read the execution output file
-        .mount(checker_dir.clone(), checker_dir.clone(), true)
-        .working_directory(checker_dir.clone())
-        .wall_time_limit(3 * problem_metadata.execution_limits.time.secs) // all the stuff that the checker reads must have also been written within the time limit
-        // .executable(todo!("path to checker executable"))
-        .arg(format!("{}", correct_output_file_path.display()))
-        .stdin(output_file_path)
-        // how to set another stdin ?? just give him access to the file and pass it as CLI argument (see 2 lines above)
-        .stdout(PathBuf::from(join_path_str(
-            checker_dir.clone(),
-            String::from("checker-stdout.txt"),
-        )))
-        .syscall_filter(SyscallFilter::build(false, false))
-        .uid(1000) // Configured in the Dockerfile.
-        .gid(1000);
-
-    // all necessary?
-    for dir in READABLE_DIRS {
-        if Path::new(dir).is_dir() {
-            checker_execution_config.mount(dir, dir, false);
-        }
-    }
-
-    Ok(checker_execution_config.build())
 }
 
 fn run_sandbox(config: SandboxConfiguration) -> Result<SandboxExecutionResult, Error> {
@@ -426,13 +281,7 @@ impl Worker for WorkerService {
             PathBuf::from("/tmp/tabox/compilation").exists()
         );
 
-        evaluation_service.get_problem_testcases_set(GetProblemTestcasesResponse {
-            testcases: vec![Testcase {
-                id: 1,
-                input: Some("1".as_bytes().to_vec()),
-                output: None,
-            }],
-        });
+        // TODO change this: testcase are already saved in the worker
         let testcases = evaluation_service
             .get_problem_testcases(Request::new(GetProblemTestcasesRequest {
                 problem_id: request_inner.problem_id,
@@ -589,6 +438,14 @@ fn init_evaluation_service(evaluation_service: &mut MockEvaluation, problem_id: 
             },
             subtasks: vec![],
         },
+    });
+
+    evaluation_service.get_problem_testcases_set(GetProblemTestcasesResponse {
+        testcases: vec![Testcase {
+            id: 1,
+            input: Some("1".as_bytes().to_vec()),
+            output: None,
+        }],
     });
 }
 

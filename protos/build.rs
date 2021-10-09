@@ -11,7 +11,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .type_attribute("service.evaluation.EvaluationFile.Type","#[derive(::strum_macros::EnumString,::strum_macros::ToString,::strum_macros::EnumIter)]")
         .type_attribute("service.evaluation.Problem.Type","#[derive(::strum_macros::EnumString,::strum_macros::ToString,::strum_macros::EnumIter)]")
         .type_attribute("service.submission.SubmissionState","#[derive(::strum_macros::EnumString,::strum_macros::ToString,::strum_macros::EnumIter)]")
-        .type_attribute("common.Duration", "#[derive(::strum_macros::PartialOrd,::strum_macros::Ord)]")
         .compile(
             &[
                 "protos/common.proto",
