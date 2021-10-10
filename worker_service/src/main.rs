@@ -124,10 +124,7 @@ async fn diff_and_update_status(
             // pull updated testcase
             let testcase = pull_testcase(evaluation_service, problem_id, testcase_id).await;
             // save testcase
-            let working_dir = PathBuf::from("/tmp/tabox-utils/");
-            let problem_dir = working_dir.join(PathBuf::from(format!("problem{}", problem_id)));
-            let testcase_dir = problem_dir.join(PathBuf::from(format!("testcase{}", testcase_id)));
-
+            let testcase_dir = get_testcase_dir_path(problem_id, testcase_id);
             let input_file_path = testcase_dir.join(PathBuf::from("input.txt"));
             let output_file_path = testcase_dir.join(PathBuf::from("output.txt"));
 
@@ -256,16 +253,16 @@ impl Worker for WorkerService {
 
         let compilation_config =
             get_compilation_config(problem_metadata.clone(), request_inner.source)
-                .map_err(|e| Status::new(Code::Aborted, e.to_string()))?;
+                .map_err(|e| Status::aborted(e.to_string()))?;
         println!("Compilation config: {:?}", compilation_config);
 
-        let res = run_sandbox(compilation_config.clone())
+        let compilation_res = run_sandbox(compilation_config.clone())
             .map_err(|e| Status::aborted(e.to_string()))?; // problems with sandbox
         
         println!(
             "Compilation successfull? {}, exit status {:?}",
-            res.status.success(),
-            res.status
+            compilation_res.status.success(),
+            compilation_res.status
         );
 
         println!(
@@ -274,14 +271,40 @@ impl Worker for WorkerService {
                 .expect("cannot read")
         );
 
+        if !compilation_res.status.success() {
+            // unsuccessfull compilation
+            let is_mle = compilation_config.memory_limit.map_or(false, |memory_limit| {
+                memory_limit < compilation_res.resource_usage.memory_usage
+            });
+            let is_tle = compilation_config.time_limit.map_or(false, |time_limit| {
+                time_limit
+                    < ((compilation_res.resource_usage.user_cpu_time * 1_000_000_000f64)
+                        as u64)
+            });
+            return Ok(Response::new(EvaluateSubmissionResponse {
+                compilation_result: CompilationResult {
+                    outcome: if is_tle {
+                        compilation_result::Outcome::Tle as i32
+                    } else if is_mle {
+                        compilation_result::Outcome::Mle as i32
+                    } else {
+                        compilation_result::Outcome::Rte as i32
+                    },
+                    used_resources: map_used_resources(compilation_res.resource_usage),
+                },
+                testcase_results: vec![],
+            }));
+        }
+        // successfull compilation
+        
         let mut evaluation_response = EvaluateSubmissionResponse {
             compilation_result: CompilationResult {
-                outcome: compilation_result::Outcome::Success as i32, // TODO Nope! Depends on res.status
-                used_resources: map_used_resources(res.resource_usage),
+                outcome: compilation_result::Outcome::Success as i32,
+                used_resources: map_used_resources(compilation_res.resource_usage),
             },
             testcase_results: vec![], // yet to be evaluated
         };
-        
+
         println!(
             "Executable exists? {}",
             PathBuf::from(join_path_str(
@@ -299,11 +322,12 @@ impl Worker for WorkerService {
         let input_file_path = PathBuf::from("/tmp/tabox/execution/stdin.txt");
         let output_file_path = PathBuf::from("/tmp/tabox/execution/stdout.txt");
 
-        let execution_config =
+        let exec_config =
             get_execution_config(problem_metadata.clone(), input_file_path.clone());
 
         let outer_problem_id = request_inner.problem_id;
         let wrapped_status_copy = &Arc::clone(&self.status);
+
         evaluation_response.testcase_results = wrapped_status_copy
             .lock()
             .await
@@ -316,10 +340,12 @@ impl Worker for WorkerService {
                 let testcase_dir = get_testcase_dir_path(*problem_id, *testcase_id);
                 std::fs::copy(testcase_dir.join("input.txt"), input_file_path.clone())
                     .expect("Failed to copy the testcase input into the working directory.");
+                std::fs::copy(testcase_dir.join("output.txt"), output_file_path.clone())
+                    .expect("Failed to copy the testcase input into the working directory.");
 
                 println!("Running the execution in the sandbox");
 
-                let execution_res = run_sandbox(execution_config.clone())
+                let execution_res = run_sandbox(exec_config.clone())
                     .map_err(|e| {
                         panic!("{:?}", Status::aborted(e.to_string()));
                     })
@@ -347,10 +373,10 @@ impl Worker for WorkerService {
                 );
 
                 if !execution_res.status.success() {
-                    let is_mle = execution_config.memory_limit.map_or(false, |memory_limit| {
+                    let is_mle = exec_config.memory_limit.map_or(false, |memory_limit| {
                         memory_limit < execution_res.resource_usage.memory_usage
                     });
-                    let is_tle = execution_config.time_limit.map_or(false, |time_limit| {
+                    let is_tle = exec_config.time_limit.map_or(false, |time_limit| {
                         time_limit
                             < ((execution_res.resource_usage.user_cpu_time * 1_000_000_000f64)
                                 as u64)
@@ -373,10 +399,15 @@ impl Worker for WorkerService {
 
                 println!("Successfull!");
 
-                // run sandbox with checker to check if the result is correct
-                let checker_config = SandboxConfiguration::default();
+                let checker_exec_config = 
+                    get_checker_execution_config(problem_metadata.clone(), testcase_dir.join("output.txt"))
+                        .map_err(|e| {
+                            panic!("{:?}", Status::aborted(e.to_string()));
+                        })
+                        .unwrap();
 
-                let checker_res = run_sandbox(checker_config.clone())
+                // run sandbox with checker to check if the result is correct
+                let checker_res = run_sandbox(checker_exec_config)
                     .map_err(|e| {
                         panic!("{:?}", Status::aborted(e.to_string()));
                     })
@@ -395,8 +426,7 @@ impl Worker for WorkerService {
                         id: *testcase_id,
                     }
                 } else {
-                    // code returned by the checker execution is not zero 
-                    // map sandbox result status to execution outcome
+                    // code returned by the checker execution is not zero
                     TestcaseResult {
                         outcome: Outcome::CheckerError as i32,
                         score: Score { score: 0f64 },

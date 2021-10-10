@@ -16,7 +16,6 @@ const READABLE_DIRS: &[&str] = &[
     "/usr",
     "/bin",
     "/opt",
-    // "/proc",
     // update-alternatives stuff, sometimes the executables are symlinked here
     "/etc/alternatives/",
     "/var/lib/dpkg/alternatives/",
@@ -27,6 +26,65 @@ const READABLE_DIRS: &[&str] = &[
 pub const SOURCE_CODE_NAME: &str = "main";
 pub const EXECUTABLE_NAME: &str = "executable";
 pub const CHECKER_EXECUTABLE_NAME: &str = "checker-executable";
+
+pub fn get_extension(lang: ProgrammingLanguage) -> String {
+    match lang {
+        ProgrammingLanguage::None => panic!(),
+        ProgrammingLanguage::Rust => String::from(".rs"),
+        ProgrammingLanguage::Cpp => String::from(".cpp"),
+    }
+}
+
+pub fn get_compiler(lang: ProgrammingLanguage) -> PathBuf {
+    match lang {
+        ProgrammingLanguage::None => panic!(),
+        ProgrammingLanguage::Rust => PathBuf::from("/usr/local/cargo/bin/rustc"),
+        ProgrammingLanguage::Cpp => PathBuf::from("/usr/bin/g++"),
+    }
+}
+
+pub fn get_testcase_dir_path(problem_id: ProblemId, testcase_id: TestcaseId) -> PathBuf {
+    get_problem_dir_path(problem_id).join(format!("testcase{}", testcase_id))
+}
+
+pub fn get_problem_dir_path(problem_id: ProblemId) -> PathBuf {
+    PathBuf::from(format!("/tmp/tabox-utils/problem{}", problem_id))
+}
+
+pub fn get_checker_executable_name(checker_type: evaluation_file::Type) -> String {
+    format!("{}-{}", CHECKER_EXECUTABLE_NAME, checker_type.to_string()).to_string()
+}
+
+pub fn get_checker_source_name(
+    checker_type: evaluation_file::Type,
+    lang: ProgrammingLanguage,
+) -> String {
+    format!(
+        "checker-{}{}",
+        checker_type.to_string(),
+        get_extension(lang)
+    )
+}
+
+pub fn join_path_str(path1: PathBuf, path2: String) -> String {
+    path1.join(path2).into_os_string().into_string().unwrap()
+}
+
+pub fn save_file(content: Vec<u8>, path: PathBuf) -> Result<(), Error> {
+    // Save content to path.
+    std::fs::create_dir_all(path.parent().unwrap()).map_err(|io_error| {
+        format_err!(
+            "While creating parent dir for sandbox-accessible file: {}",
+            io_error.to_string()
+        )
+    })?;
+    std::fs::write(path, content).map_err(|io_error| {
+        format_err!(
+            "While creating sandbox-accessible file: {}",
+            io_error.to_string()
+        )
+    })
+}
 
 pub fn get_compilation_config(
     problem_metadata: Problem,
@@ -115,29 +173,6 @@ pub fn get_execution_config(
     execution_config.build()
 }
 
-pub fn get_testcase_dir_path(problem_id: ProblemId, testcase_id: TestcaseId) -> PathBuf {
-    get_problem_dir_path(problem_id).join(format!("testcase{}", testcase_id))
-}
-
-pub fn get_problem_dir_path(problem_id: ProblemId) -> PathBuf {
-    PathBuf::from(format!("/tmp/tabox-utils/problem{}", problem_id))
-}
-
-pub fn get_checker_executable_name(checker_type: evaluation_file::Type) -> String {
-    format!("{}{}", CHECKER_EXECUTABLE_NAME, checker_type.to_string()).to_string()
-}
-
-pub fn get_checker_source_name(
-    checker_type: evaluation_file::Type,
-    lang: ProgrammingLanguage,
-) -> String {
-    format!(
-        "checker-{}{}",
-        checker_type.to_string(),
-        get_extension(lang)
-    )
-}
-
 pub fn get_checker_compilation_config(
     problem_id: ProblemId,
     checker_type: evaluation_file::Type,
@@ -197,7 +232,6 @@ pub fn get_checker_compilation_config(
 
 pub fn get_checker_execution_config(
     problem_metadata: Problem,
-    output_file_path: PathBuf,
     correct_output_file_path: PathBuf,
 ) -> Result<SandboxConfiguration, Error> {
     let mut checker_execution_config = SandboxConfiguration::default();
@@ -223,8 +257,10 @@ pub fn get_checker_execution_config(
                 .into_string()
                 .unwrap()
         )) // pass the path to the correct output file as command-line argument
-        .stdin(output_file_path)
-        // how to set another stdin ?? just give him access to the file and pass it as CLI argument (see 2 lines above)
+        .stdin(PathBuf::from(join_path_str(
+            execution_dir.clone(),
+            String::from("stdout.txt"),
+        ))) // the output of the participant's solution
         .stdout(PathBuf::from(join_path_str(
             checker_dir.clone(),
             String::from("checker-stdout.txt"),
@@ -241,40 +277,4 @@ pub fn get_checker_execution_config(
     }
 
     Ok(checker_execution_config.build())
-}
-
-pub fn join_path_str(path1: PathBuf, path2: String) -> String {
-    path1.join(path2).into_os_string().into_string().unwrap()
-}
-
-pub fn get_extension(lang: ProgrammingLanguage) -> String {
-    match lang {
-        ProgrammingLanguage::None => panic!(),
-        ProgrammingLanguage::Rust => String::from(".rs"),
-        ProgrammingLanguage::Cpp => String::from(".cpp"),
-    }
-}
-
-pub fn save_file(content: Vec<u8>, path: PathBuf) -> Result<(), Error> {
-    // Save content to path.
-    std::fs::create_dir_all(path.parent().unwrap()).map_err(|io_error| {
-        format_err!(
-            "While creating parent dir for sandbox-accessible file: {}",
-            io_error.to_string()
-        )
-    })?;
-    std::fs::write(path, content).map_err(|io_error| {
-        format_err!(
-            "While creating sandbox-accessible file: {}",
-            io_error.to_string()
-        )
-    })
-}
-
-pub fn get_compiler(lang: ProgrammingLanguage) -> PathBuf {
-    match lang {
-        ProgrammingLanguage::None => panic!(),
-        ProgrammingLanguage::Rust => PathBuf::from("/usr/local/cargo/bin/rustc"),
-        ProgrammingLanguage::Cpp => PathBuf::from("/usr/bin/g++"),
-    }
 }
