@@ -6,7 +6,7 @@ use protos::{
 use std::path::{Path, PathBuf};
 use tabox::{configuration::SandboxConfiguration, syscall_filter::SyscallFilter};
 
-use crate::ProblemId;
+use crate::{ProblemId, TestcaseId};
 
 // The list of all the system-wide readable directories inside the sandbox.
 // TODO: probably not all of these are needed, remove the unneeded.
@@ -115,6 +115,10 @@ pub fn get_execution_config(
     execution_config.build()
 }
 
+pub fn get_testcase_dir_path(problem_id: ProblemId, testcase_id: TestcaseId) -> PathBuf {
+    get_problem_dir_path(problem_id).join(format!("testcase{}", testcase_id))
+}
+
 pub fn get_problem_dir_path(problem_id: ProblemId) -> PathBuf {
     PathBuf::from(format!("/tmp/tabox-utils/problem{}", problem_id))
 }
@@ -218,7 +222,7 @@ pub fn get_checker_execution_config(
                 .into_os_string()
                 .into_string()
                 .unwrap()
-        ))
+        )) // pass the path to the correct output file as command-line argument
         .stdin(output_file_path)
         // how to set another stdin ?? just give him access to the file and pass it as CLI argument (see 2 lines above)
         .stdout(PathBuf::from(join_path_str(
