@@ -1,14 +1,15 @@
-use failure::{Error, Fail, format_err};
+use failure::{format_err, Error};
+use futures::lock::Mutex;
 use protos::{
-    common::{self, Duration, ProgrammingLanguage, Resources, Score, Source, Timestamp},
+    common::{Duration, ProgrammingLanguage, Resources, Score, Source, Timestamp},
     evaluation::{compilation_result, testcase_result::Outcome, CompilationResult, TestcaseResult},
     scoring,
     service::{
         evaluation::{
             evaluation_client::EvaluationClient, evaluation_file, evaluation_server::Evaluation,
             problem, EvaluationFile, GetProblemEvaluationFileRequest, GetProblemRequest,
-            GetProblemResponse, GetProblemTestcasesRequest, GetProblemTestcasesResponse,
-            GetTestcaseRequest, MockEvaluation, Problem, Testcase,
+            GetProblemResponse, GetProblemTestcasesResponse, GetTestcaseRequest, MockEvaluation,
+            Problem, Testcase,
         },
         worker::{
             worker_server::{Worker, WorkerServer},
@@ -16,19 +17,18 @@ use protos::{
             UpdateSourceResponse, UpdateTestcaseRequest, UpdateTestcaseResponse,
         },
     },
-    utils::{get_local_address, Service},
-    worker::{self},
 };
-use futures::lock::Mutex;
-use std::{collections::HashMap, fs::File, iter::Map, path::{Path, PathBuf}, process::ExitStatus, sync::{Arc, MutexGuard}, thread::{sleep, spawn, JoinHandle}};
+use std::{
+    collections::HashMap,
+    path::PathBuf,
+    sync::Arc,
+    thread::{sleep, spawn},
+};
 use tabox::{
-    configuration::SandboxConfiguration,
-    result::SandboxExecutionResult,
-    syscall_filter::{SyscallFilter, SyscallFilterAction},
-    SandboxImplementation,
+    configuration::SandboxConfiguration, result::SandboxExecutionResult, SandboxImplementation,
 };
 use tabox::{result::ResourceUsage, Sandbox};
-use tonic::{transport::Server, Code, Request, Response, Status};
+use tonic::{transport::Server, Request, Response, Status};
 
 #[path = "./configurations.rs"]
 mod configurations;
@@ -155,9 +155,7 @@ async fn diff_and_update_status(
                 get_checker_compilation_config(problem_id, checker.r#type(), checker.source)
                     .expect("Unable to get checker compilation configuration.");
             let sandbox_res = run_sandbox(config).expect("Failed to run sandbox.");
-            if !sandbox_res.status.success() {
-                panic!();
-            }
+            assert!(sandbox_res.status.success(), "checker compilation must succeed");
             // success is good
         }
     }
@@ -165,7 +163,7 @@ async fn diff_and_update_status(
 
 async fn pull_join_handler_action(
     evaluation_service: EvaluationClient<tonic::transport::Channel>,
-    wrapped_status: Arc<Mutex<FileStatus>>
+    wrapped_status: Arc<Mutex<FileStatus>>,
 ) {
     let mut evaluation_service = evaluation_service.clone();
     sleep(std::time::Duration::new(30, 0));
@@ -180,11 +178,7 @@ async fn pull_join_handler_action(
         };
 
         // diff and update
-        diff_and_update_status(
-            &mut evaluation_service,
-            &wrapped_status,
-            actual_status,
-        ).await;
+        diff_and_update_status(&mut evaluation_service, &wrapped_status, actual_status).await;
     }
 }
 
@@ -256,9 +250,9 @@ impl Worker for WorkerService {
                 .map_err(|e| Status::aborted(e.to_string()))?;
         println!("Compilation config: {:?}", compilation_config);
 
-        let compilation_res = run_sandbox(compilation_config.clone())
-            .map_err(|e| Status::aborted(e.to_string()))?; // problems with sandbox
-        
+        let compilation_res =
+            run_sandbox(compilation_config.clone()).map_err(|e| Status::aborted(e.to_string()))?; // problems with sandbox
+
         println!(
             "Compilation successfull? {}, exit status {:?}",
             compilation_res.status.success(),
@@ -273,13 +267,14 @@ impl Worker for WorkerService {
 
         if !compilation_res.status.success() {
             // unsuccessfull compilation
-            let is_mle = compilation_config.memory_limit.map_or(false, |memory_limit| {
-                memory_limit < compilation_res.resource_usage.memory_usage
-            });
+            let is_mle = compilation_config
+                .memory_limit
+                .map_or(false, |memory_limit| {
+                    memory_limit < compilation_res.resource_usage.memory_usage
+                });
             let is_tle = compilation_config.time_limit.map_or(false, |time_limit| {
                 time_limit
-                    < ((compilation_res.resource_usage.user_cpu_time * 1_000_000_000f64)
-                        as u64)
+                    < ((compilation_res.resource_usage.user_cpu_time * 1_000_000_000f64) as u64)
             });
             return Ok(Response::new(EvaluateSubmissionResponse {
                 compilation_result: CompilationResult {
@@ -296,7 +291,7 @@ impl Worker for WorkerService {
             }));
         }
         // successfull compilation
-        
+
         let mut evaluation_response = EvaluateSubmissionResponse {
             compilation_result: CompilationResult {
                 outcome: compilation_result::Outcome::Success as i32,
@@ -322,8 +317,7 @@ impl Worker for WorkerService {
         let input_file_path = PathBuf::from("/tmp/tabox/execution/stdin.txt");
         let output_file_path = PathBuf::from("/tmp/tabox/execution/stdout.txt");
 
-        let exec_config =
-            get_execution_config(problem_metadata.clone(), input_file_path.clone());
+        let exec_config = get_execution_config(problem_metadata.clone(), input_file_path.clone());
 
         let outer_problem_id = request_inner.problem_id;
         let wrapped_status_copy = &Arc::clone(&self.status);
@@ -335,7 +329,6 @@ impl Worker for WorkerService {
             .keys()
             .filter(|(problem_id, _)| *problem_id == outer_problem_id)
             .map(|(problem_id, testcase_id)| {
-
                 // save the testcase input in the file
                 let testcase_dir = get_testcase_dir_path(*problem_id, *testcase_id);
                 std::fs::copy(testcase_dir.join("input.txt"), input_file_path.clone())
@@ -399,12 +392,14 @@ impl Worker for WorkerService {
 
                 println!("Successfull!");
 
-                let checker_exec_config = 
-                    get_checker_execution_config(problem_metadata.clone(), testcase_dir.join("output.txt"))
-                        .map_err(|e| {
-                            panic!("{:?}", Status::aborted(e.to_string()));
-                        })
-                        .unwrap();
+                let checker_exec_config = get_checker_execution_config(
+                    problem_metadata.clone(),
+                    testcase_dir.join("output.txt"),
+                )
+                .map_err(|e| {
+                    panic!("{:?}", Status::aborted(e.to_string()));
+                })
+                .unwrap();
 
                 // run sandbox with checker to check if the result is correct
                 let checker_res = run_sandbox(checker_exec_config)
@@ -419,9 +414,9 @@ impl Worker for WorkerService {
                     TestcaseResult {
                         outcome: match score {
                             Ok(_) => Outcome::Ok as i32,
-                            Err(_) => Outcome::CheckerError as i32
+                            Err(_) => Outcome::CheckerError as i32,
                         },
-                        score: score.unwrap_or(Score { score: 0f64 }), 
+                        score: score.unwrap_or(Score { score: 0f64 }),
                         used_resources: map_used_resources(execution_res.resource_usage),
                         id: *testcase_id,
                     }
@@ -501,11 +496,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let status_copy = Arc::clone(&worker_service.status);
     let evaluation_service_copy = worker_service.evaluation_service.clone();
 
-    let _pull_thread_handler = spawn(move || 
-        pull_join_handler_action(
-            evaluation_service_copy, 
-            status_copy
-        ));
+    let _pull_thread_handler =
+        spawn(move || pull_join_handler_action(evaluation_service_copy, status_copy));
 
     let request = EvaluateSubmissionRequest {
         problem_id: 1,

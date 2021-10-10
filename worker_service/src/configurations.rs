@@ -52,7 +52,7 @@ pub fn get_problem_dir_path(problem_id: ProblemId) -> PathBuf {
 }
 
 pub fn get_checker_executable_name(checker_type: evaluation_file::Type) -> String {
-    format!("{}-{}", CHECKER_EXECUTABLE_NAME, checker_type.to_string()).to_string()
+    format!("{}-{}", CHECKER_EXECUTABLE_NAME, checker_type.to_string())
 }
 
 pub fn get_checker_source_name(
@@ -152,12 +152,12 @@ pub fn get_execution_config(
         .time_limit(problem_metadata.execution_limits.time.secs)
         .wall_time_limit(5 * problem_metadata.execution_limits.time.secs)
         .executable(PathBuf::from(join_path_str(
-            compilation_dir.clone(),
+            compilation_dir,
             EXECUTABLE_NAME.to_string(),
         )))
         .stdin(input_file_path)
         .stdout(PathBuf::from(join_path_str(
-            execution_dir.clone(),
+            execution_dir,
             String::from("stdout.txt"),
         )))
         .syscall_filter(SyscallFilter::build(false, false))
@@ -250,19 +250,18 @@ pub fn get_checker_execution_config(
                 get_checker_executable_name(evaluation_file::Type::Checker),
             ), // TODO generify this
         )
-        .arg(format!(
-            "{}",
+        .arg(
             correct_output_file_path
                 .into_os_string()
                 .into_string()
-                .unwrap()
-        )) // pass the path to the correct output file as command-line argument
+                .unwrap(),
+        ) // pass the path to the correct output file as command-line argument
         .stdin(PathBuf::from(join_path_str(
-            execution_dir.clone(),
+            execution_dir,
             String::from("stdout.txt"),
         ))) // the output of the participant's solution
         .stdout(PathBuf::from(join_path_str(
-            checker_dir.clone(),
+            checker_dir,
             String::from("checker-stdout.txt"),
         )))
         .syscall_filter(SyscallFilter::build(false, false))
