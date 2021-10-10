@@ -43,7 +43,7 @@ use configurations::*;
 
 fn timestamp_cmp(a: Timestamp, b: Timestamp) -> i64 {
     if a.secs == b.secs {
-        (a.nanos as i64) - (b.nanos as i64) 
+        (a.nanos as i64) - (b.nanos as i64)
     } else {
         (a.secs as i64) - (b.secs as i64)
     }
@@ -139,10 +139,16 @@ async fn diff_and_update_status(
             let input_file_path = testcase_dir.join(PathBuf::from("input.txt"));
             let output_file_path = testcase_dir.join(PathBuf::from("output.txt"));
 
-            save_file(testcase.input.expect("Testcase input should be present"), input_file_path)
-                .expect("Unable to save the testcase input");
-            save_file(testcase.output.expect("Testcase output should be present"), output_file_path)
-                .expect("Unable to save the testcase output");
+            save_file(
+                testcase.input.expect("Testcase input should be present"),
+                input_file_path,
+            )
+            .expect("Unable to save the testcase input");
+            save_file(
+                testcase.output.expect("Testcase output should be present"),
+                output_file_path,
+            )
+            .expect("Unable to save the testcase output");
         }
     }
 
@@ -156,7 +162,14 @@ async fn diff_and_update_status(
             // pull updated checker
             let checker = pull_checker(evaluation_service, problem_id, checker_type).await;
             // compile checker in sandbox
-            todo!()
+            let config =
+                get_checker_compilation_config(problem_id, checker.r#type(), checker.source)
+                    .expect("Unable to get checker compilation configuration.");
+            let sandbox_res = run_sandbox(config).expect("Failed to run sandbox.");
+            if !sandbox_res.status.success() {
+                panic!();
+            }
+            // success is good
         }
     }
 }
@@ -266,7 +279,7 @@ impl Worker for WorkerService {
 
                 evaluation_response = EvaluateSubmissionResponse {
                     compilation_result: CompilationResult {
-                        outcome: compilation_result::Outcome::Success as i32, // Nope! Depends on res.status
+                        outcome: compilation_result::Outcome::Success as i32, // TODO Nope! Depends on res.status
                         used_resources: map_used_resources(res.resource_usage),
                     },
                     testcase_results: vec![], // yet to be evaluated
@@ -369,7 +382,6 @@ impl Worker for WorkerService {
                 println!("Successfull!");
 
                 // run sandbox with checker to check if the result is correct
-                todo!("Checker execution to be done");
                 let checker_config = SandboxConfiguration::default();
 
                 let checker_res = run_sandbox(checker_config.clone())
