@@ -41,11 +41,11 @@ use tonic::{transport::Server, Code, Request, Response, Status};
 mod configurations;
 use configurations::*;
 
-fn timestamp_cmp(a: Timestamp, b: Timestamp) -> u64 {
+fn timestamp_cmp(a: Timestamp, b: Timestamp) -> i64 {
     if a.secs == b.secs {
-        (a.nanos - b.nanos) as u64
+        (a.nanos as i64) - (b.nanos as i64) 
     } else {
-        a.secs - b.secs
+        (a.secs as i64) - (b.secs as i64)
     }
 }
 
@@ -132,7 +132,17 @@ async fn diff_and_update_status(
             // pull updated testcase
             let testcase = pull_testcase(evaluation_service, problem_id, testcase_id).await;
             // save testcase
-            todo!()
+            let working_dir = PathBuf::from("/tmp/tabox-utils/");
+            let problem_dir = working_dir.join(PathBuf::from(format!("problem{}", problem_id)));
+            let testcase_dir = problem_dir.join(PathBuf::from(format!("testcase{}", testcase_id)));
+
+            let input_file_path = testcase_dir.join(PathBuf::from("input.txt"));
+            let output_file_path = testcase_dir.join(PathBuf::from("output.txt"));
+
+            save_file(testcase.input.expect("Testcase input should be present"), input_file_path)
+                .expect("Unable to save the testcase input");
+            save_file(testcase.output.expect("Testcase output should be present"), output_file_path)
+                .expect("Unable to save the testcase output");
         }
     }
 
@@ -455,7 +465,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::env::set_var("RUST_BACKTRACE", "1");
 
     let addr: _ = "127.0.0.1:50051".parse()?;
-    let worker_service = WorkerService::new();
+    let worker_service = WorkerService::new().await?;
 
     let request = EvaluateSubmissionRequest {
         problem_id: 1,
