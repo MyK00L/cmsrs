@@ -1,4 +1,4 @@
-use failure::{format_err, Error};
+use failure::{Error, Fail, format_err};
 use protos::{
     common::{self, Duration, ProgrammingLanguage, Resources, Score, Source, Timestamp},
     evaluation::{compilation_result, testcase_result::Outcome, CompilationResult, TestcaseResult},
@@ -19,15 +19,8 @@ use protos::{
     utils::{get_local_address, Service},
     worker::{self},
 };
-use std::{
-    collections::HashMap,
-    fs::File,
-    iter::Map,
-    path::{Path, PathBuf},
-    process::ExitStatus,
-    sync::{Arc, Mutex, MutexGuard},
-    thread::{sleep, spawn, JoinHandle},
-};
+use futures::lock::Mutex;
+use std::{collections::HashMap, fs::File, iter::Map, path::{Path, PathBuf}, process::ExitStatus, sync::{Arc, MutexGuard}, thread::{sleep, spawn, JoinHandle}};
 use tabox::{
     configuration::SandboxConfiguration,
     result::SandboxExecutionResult,
@@ -75,7 +68,6 @@ struct EvaluationFileStatus {
 
 pub struct WorkerService {
     status: Arc<Mutex<FileStatus>>,
-    pull_join_handler: JoinHandle<()>,
     evaluation_service: EvaluationClient<tonic::transport::Channel>,
 }
 
@@ -120,7 +112,7 @@ async fn diff_and_update_status(
     wrapped_status: &Arc<Mutex<FileStatus>>,
     actual_status: EvaluationFileStatus,
 ) {
-    let mut status = wrapped_status.lock().unwrap();
+    let mut status = wrapped_status.lock().await;
 
     for (problem_id, testcase_id, actual_timestamp) in actual_status.testcases {
         // insert the new one and get the older value associated to the key
@@ -174,37 +166,37 @@ async fn diff_and_update_status(
     }
 }
 
+async fn pull_join_handler_action(
+    evaluation_service: EvaluationClient<tonic::transport::Channel>,
+    wrapped_status: Arc<Mutex<FileStatus>>
+) {
+    let mut evaluation_service = evaluation_service.clone();
+    sleep(std::time::Duration::new(30, 0));
+    loop {
+        // sleep 30 secs
+        sleep(std::time::Duration::new(30, 0));
+
+        // pull status. TODO actually do the pull
+        let actual_status = EvaluationFileStatus {
+            testcases: vec![],
+            checkers: vec![],
+        };
+
+        // diff and update
+        diff_and_update_status(
+            &mut evaluation_service,
+            &wrapped_status,
+            actual_status,
+        ).await;
+    }
+}
+
 impl WorkerService {
     async fn new() -> Result<Self, Box<dyn std::error::Error>> {
         let evaluation_service = EvaluationClient::connect("http://[::1]:50051").await?;
-        let mut evaluation_service_copy = evaluation_service.clone();
-
-        let wrapped_status = Arc::new(Mutex::new(FileStatus::new()));
-        let wrapped_status_copy = Arc::clone(&wrapped_status);
-
-        let pull_join_handler = spawn(move || {
-            loop {
-                // sleep 30 secs
-                sleep(std::time::Duration::new(30, 0));
-
-                // pull status. TODO actually do the pull
-                let actual_status = EvaluationFileStatus {
-                    testcases: vec![],
-                    checkers: vec![],
-                };
-
-                // diff and update
-                diff_and_update_status(
-                    &mut evaluation_service_copy,
-                    &wrapped_status_copy,
-                    actual_status,
-                );
-            }
-        });
 
         Ok(WorkerService {
-            status: wrapped_status,
-            pull_join_handler, // TODO kill this thread when the worker goes down
+            status: Arc::new(Mutex::new(FileStatus::new())),
             evaluation_service,
         })
     }
@@ -226,6 +218,12 @@ fn map_used_resources(resource_used: ResourceUsage) -> Resources {
         time: Duration { secs, nanos },
         memory_bytes: resource_used.memory_usage,
     }
+}
+
+fn read_score() -> Result<Score, Error> {
+    let score = std::fs::read_to_string(PathBuf::from("/tmp/tabox/checker/checker-stdout.txt"))?
+        .parse::<f64>()?;
+    Ok(Score { score })
 }
 
 #[tonic::async_trait]
@@ -261,36 +259,29 @@ impl Worker for WorkerService {
                 .map_err(|e| Status::new(Code::Aborted, e.to_string()))?;
         println!("Compilation config: {:?}", compilation_config);
 
-        let mut evaluation_response: EvaluateSubmissionResponse;
+        let res = run_sandbox(compilation_config.clone())
+            .map_err(|e| Status::aborted(e.to_string()))?; // problems with sandbox
+        
+        println!(
+            "Compilation successfull? {}, exit status {:?}",
+            res.status.success(),
+            res.status
+        );
 
-        match run_sandbox(compilation_config) {
-            Ok(res) => {
-                println!(
-                    "Compilation successfull? {}, exit status {:?}",
-                    res.status.success(),
-                    res.status
-                );
+        println!(
+            "{}",
+            std::fs::read_to_string(PathBuf::from("/tmp/tabox/compilation/stderr.txt"))
+                .expect("cannot read")
+        );
 
-                println!(
-                    "{}",
-                    std::fs::read_to_string(PathBuf::from("/tmp/tabox/compilation/stderr.txt"))
-                        .expect("cannot read")
-                );
-
-                evaluation_response = EvaluateSubmissionResponse {
-                    compilation_result: CompilationResult {
-                        outcome: compilation_result::Outcome::Success as i32, // TODO Nope! Depends on res.status
-                        used_resources: map_used_resources(res.resource_usage),
-                    },
-                    testcase_results: vec![], // yet to be evaluated
-                }
-            }
-            Err(e) => {
-                // problems with sandbox
-                return Err(Status::aborted(e.to_string()));
-            }
-        }
-
+        let mut evaluation_response = EvaluateSubmissionResponse {
+            compilation_result: CompilationResult {
+                outcome: compilation_result::Outcome::Success as i32, // TODO Nope! Depends on res.status
+                used_resources: map_used_resources(res.resource_usage),
+            },
+            testcase_results: vec![], // yet to be evaluated
+        };
+        
         println!(
             "Executable exists? {}",
             PathBuf::from(join_path_str(
@@ -299,19 +290,11 @@ impl Worker for WorkerService {
             ))
             .exists()
         );
+
         println!(
             "Compilation directory exists? {}",
             PathBuf::from("/tmp/tabox/compilation").exists()
         );
-
-        // TODO change this: testcase are already saved in the worker
-        let testcases = evaluation_service
-            .get_problem_testcases(Request::new(GetProblemTestcasesRequest {
-                problem_id: request_inner.problem_id,
-            }))
-            .await?
-            .into_inner()
-            .testcases;
 
         let input_file_path = PathBuf::from("/tmp/tabox/execution/stdin.txt");
         let output_file_path = PathBuf::from("/tmp/tabox/execution/stdout.txt");
@@ -319,11 +302,20 @@ impl Worker for WorkerService {
         let execution_config =
             get_execution_config(problem_metadata.clone(), input_file_path.clone());
 
-        evaluation_response.testcase_results = testcases
-            .iter()
-            .map(|testcase: &Testcase| {
+        let outer_problem_id = request_inner.problem_id;
+        let wrapped_status_copy = &Arc::clone(&self.status);
+        evaluation_response.testcase_results = wrapped_status_copy
+            .lock()
+            .await
+            .testcases
+            .keys()
+            .filter(|(problem_id, _)| *problem_id == outer_problem_id)
+            .map(|(problem_id, testcase_id)| {
+
                 // save the testcase input in the file
-                save_file(testcase.input.clone().unwrap(), input_file_path.clone()).unwrap();
+                let testcase_dir = get_testcase_dir_path(*problem_id, *testcase_id);
+                std::fs::copy(testcase_dir.join("input.txt"), input_file_path.clone())
+                    .expect("Failed to copy the testcase input into the working directory.");
 
                 println!("Running the execution in the sandbox");
 
@@ -375,7 +367,7 @@ impl Worker for WorkerService {
                         },
                         score: Score { score: 0f64 },
                         used_resources: map_used_resources(execution_res.resource_usage),
-                        id: testcase.id,
+                        id: *testcase_id,
                     };
                 }
 
@@ -392,26 +384,24 @@ impl Worker for WorkerService {
 
                 if checker_res.status.success() {
                     // Pre: checker-output.txt contains just an f64 number
+                    let score = read_score();
                     TestcaseResult {
-                        outcome: Outcome::Ok as i32,
-                        score: todo!(), // read from checker output
+                        outcome: match score {
+                            Ok(_) => Outcome::Ok as i32,
+                            Err(_) => Outcome::CheckerError as i32
+                        },
+                        score: score.unwrap_or(Score { score: 0f64 }), 
                         used_resources: map_used_resources(execution_res.resource_usage),
-                        id: testcase.id,
+                        id: *testcase_id,
                     }
                 } else {
+                    // code returned by the checker execution is not zero 
                     // map sandbox result status to execution outcome
                     TestcaseResult {
-                        outcome: {
-                            // CHECKER ERROR directly ?
-                            match checker_res.status {
-                                tabox::result::ExitStatus::ExitCode(_) => todo!(),
-                                tabox::result::ExitStatus::Signal(_) => todo!(),
-                                tabox::result::ExitStatus::Killed => todo!(),
-                            }
-                        },
-                        score: todo!(), // read from checker output
+                        outcome: Outcome::CheckerError as i32,
+                        score: Score { score: 0f64 },
                         used_resources: map_used_resources(execution_res.resource_usage),
-                        id: testcase.id,
+                        id: *testcase_id,
                     }
                 }
             })
@@ -478,6 +468,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let addr: _ = "127.0.0.1:50051".parse()?;
     let worker_service = WorkerService::new().await?;
+    let status_copy = Arc::clone(&worker_service.status);
+    let evaluation_service_copy = worker_service.evaluation_service.clone();
+
+    let _pull_thread_handler = spawn(move || 
+        pull_join_handler_action(
+            evaluation_service_copy, 
+            status_copy
+        ));
 
     let request = EvaluateSubmissionRequest {
         problem_id: 1,
