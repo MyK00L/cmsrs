@@ -1,4 +1,4 @@
-syntax = "proto3";
+syntax = "proto2";
 
 package service.contest;
 
@@ -10,11 +10,11 @@ message AuthUserRequest {
 }
 message AuthUserResponse {
 	message Success {
-		string username = 1;
-		string fullname = 2;
+		required string username = 1;
+		required string fullname = 2;
 	}
 	message Failure {
-		string error = 1;
+		required string error = 1;
 	}
 	oneof response {
 		Success success = 1;
@@ -85,7 +85,7 @@ message SetUserResponse {
 		ADD = 0;
 		UPDATE = 1;
 	}
-	Code code = 1;
+	required Code code = 1;
 }
 
 message SetContestMetadataRequest {
