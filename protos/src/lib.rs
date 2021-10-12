@@ -54,7 +54,8 @@ pub mod service {
         rpc_mock_server!(contest_server::Contest; MockContest;
         (auth_user,AuthUserRequest,AuthUserResponse),
         (get_contest_metadata,GetContestMetadataRequest,GetContestMetadataResponse),
-        (get_problem,GetProblemRequest,GetProblemResponse),
+        (get_problem_statement,GetProblemRequest,GetProblemStatementResponse),
+        (get_problem_info,GetProblemRequest,GetProblemInfoResponse),
         (get_announcement_list,GetAnnouncementListRequest,GetAnnouncementListResponse),
         (get_question_list,GetQuestionListRequest,GetQuestionListResponse),
         (set_user,SetUserRequest,SetUserResponse),
