@@ -524,8 +524,11 @@ impl ContestTemplate {
     fn new(
         evaluation_contest: evaluation::GetContestResponse,
         user_contest: contest::GetContestMetadataResponse,
-        contest_problems: Vec<contest::Problem>,
     ) -> Self {
+        let mut evaluation_problems = evaluation_contest.info.problems;
+        let mut user_problems = user_contest.problems;
+        evaluation_problems.sort_by_key(|x| x.id);
+        user_problems.sort_by_key(|x| x.id);
         Self {
             name: user_contest.metadata.name,
             description: user_contest.metadata.description,
@@ -543,11 +546,9 @@ impl ContestTemplate {
                     "%FT%T",
                 ),
             },
-            problems: evaluation_contest
-                .info
-                .problems
+            problems: evaluation_problems
                 .into_iter()
-                .zip(contest_problems.into_iter())
+                .zip(user_problems.into_iter())
                 .map(|x| Problem::new(x.0, x.1))
                 .collect(),
             user_scoring: evaluation_contest.info.user_scoring_method.into(),
@@ -583,46 +584,7 @@ impl ContestTemplate {
                 ));
             }
         };
-        // TODO: user problem metadata
-        /*
-        #[allow(clippy::type_complexity)]
-        let user_problem_requests: Vec<
-            core::pin::Pin<
-                Box<
-                    dyn futures::Future<
-                            Output = Result<
-                                tonic::Response<contest::GetProblemResponse>,
-                                tonic::Status,
-                            >,
-                        > + std::marker::Send,
-                >,
-            >,
-        > = evaluation_contest
-            .info
-            .problems
-            .clone()
-            .into_iter()
-            .map(|x| {
-                contest_client.get_problem(tonic::Request::new(contest::GetProblemRequest {
-                    problem_id: x.id,
-                }))
-            })
-            .collect();
-        let user_problem_responses: Vec<contest::Problem> = future::join_all(user_problem_requests)
-            .await
-            .into_iter()
-            .map(
-                |x: Result<tonic::Response<contest::GetProblemResponse>, tonic::Status>| {
-                    x.unwrap().into_inner().info // TODO: remove unwrap
-                },
-            )
-            .collect();
-        Ok(Self::new(
-            evaluation_contest,
-            user_contest,
-            user_problem_responses,
-        ))*/
-        unimplemented!();
+        Ok(Self::new(evaluation_contest, user_contest))
     }
     pub fn gen_ids_if_none(&mut self) {
         for p in self.problems.iter_mut() {
@@ -645,6 +607,11 @@ impl From<ContestTemplate> for contest::SetContestMetadataRequest {
                     .ok()
                     .map(|t| SystemTime::from(t).into()),
             },
+            problems: contest
+                .problems
+                .into_iter()
+                .map(contest::Problem::from)
+                .collect(),
         }
     }
 }

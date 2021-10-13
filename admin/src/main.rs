@@ -44,14 +44,14 @@ mod clients {
         }
         mock.get_announcement_list_set(al);
 
-        mock.get_problem_set(contest::GetProblemResponse {
+        /*mock.get_problem_set(contest::GetProblemResponse {
             info: contest::Problem {
                 id: 42,
                 name: String::from("problemname"),
                 long_name: String::from("Loooooong problem name"),
             },
             ..Default::default()
-        });
+        });*/
 
         mock.get_contest_metadata_set(contest::GetContestMetadataResponse {
             metadata: contest::ContestMetadata {
@@ -60,6 +60,7 @@ mod clients {
                 start_time: Some(std::time::SystemTime::now().into()),
                 end_time: None,
             },
+            problems: Faker.fake(),
         });
 
         mock
@@ -73,9 +74,7 @@ mod clients {
                 problem_id: 2,
                 state: submission::SubmissionState::Evaluated as i32,
                 timestamp: std::time::SystemTime::now().into(),
-                score: protos::scoring::OneOfScore {
-                    score: Some(protos::scoring::one_of_score::Score::DoubleScore(42.69)),
-                },
+                score: Some(protos::common::Score { score: 42.69 }),
             }],
         });
         mock.get_submission_details_set(submission::GetSubmissionDetailsResponse {
@@ -97,27 +96,20 @@ mod clients {
                 },
                 subtask_results: vec![
                     protos::evaluation::SubtaskResult {
+                        id: 1234,
                         testcase_results: vec![
                             protos::evaluation::TestcaseResult {
                                 outcome: protos::evaluation::testcase_result::Outcome::Ok as i32,
-                                score: protos::scoring::OneOfScore {
-                                    score: Some(protos::scoring::one_of_score::Score::BoolScore(
-                                        true
-                                    ))
-                                },
+                                score: protos::common::Score { score: 1.0 },
                                 ..Default::default()
                             };
                             9
                         ],
-                        score: protos::scoring::OneOfScore {
-                            score: Some(protos::scoring::one_of_score::Score::DoubleScore(42.69))
-                        }
+                        score: protos::common::Score { score: 1.0 },
                     };
                     5
                 ],
-                score: protos::scoring::OneOfScore {
-                    score: Some(protos::scoring::one_of_score::Score::DoubleScore(3.3)),
-                },
+                score: protos::common::Score { score: 3.3 },
             }),
         });
         mock
