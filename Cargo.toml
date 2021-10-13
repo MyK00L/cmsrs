@@ -7,5 +7,5 @@ members = [
     "rpctest-client",
     "rpctest-server",
     "submission_service",
-		"participant"
+    "participant"
 ]
