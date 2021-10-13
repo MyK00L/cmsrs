@@ -257,7 +257,7 @@ impl Contest for ContestService {
         let document: Document = problem_data.into();
         self.get_problems_collection()
             .update_one(
-                doc! { "_id": document.get_i32("_id").unwrap() },
+                doc! { "_id": document.get_i64("_id").unwrap() },
                 doc! { "$set": document },
                 UpdateOptions::builder().upsert(true).build(),
             )
@@ -309,7 +309,7 @@ impl Contest for ContestService {
 
         self.get_problems_collection()
             .update_one(
-                doc! { "_id": problem_id as i32 },
+                doc! { "_id": problem_id as i64 },
                 doc! { "$set": doc!{"statement": mongodb::bson::Binary {
                     subtype: mongodb::bson::spec::BinarySubtype::Generic,
                     bytes: problem_statement,

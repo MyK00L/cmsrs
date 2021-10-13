@@ -200,9 +200,8 @@ pub mod problem {
     }
 
     impl Problem {
-        /// TODO @MyK00l u sure about 64 bits ids?
-        pub fn get_id(&self) -> i32 {
-            self.id as i32
+        pub fn get_id(&self) -> i64 {
+            self.id as i64
         }
     }
 
