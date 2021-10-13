@@ -91,9 +91,9 @@ pub mod chat {
     use super::*;
 
     pub struct Message {
-        id: u32,
+        id: u64,
         subject: String,
-        problem_id: Option<u32>,
+        problem_id: Option<u64>,
         body: String,
         to: Option<String>,
         from: Option<String>,
@@ -171,9 +171,9 @@ pub mod chat {
     impl From<Document> for Message {
         fn from(d: Document) -> Self {
             Self {
-                id: d.get_i64("_id").unwrap() as u32,
+                id: d.get_i64("_id").unwrap() as u64,
                 subject: d.get_str("subject").unwrap().to_owned(),
-                problem_id: d.get_i64("problemId").map(|x| x as u32).ok(),
+                problem_id: d.get_i64("problemId").map(|x| x as u64).ok(),
                 body: d.get_str("text").unwrap().to_owned(),
                 to: d.get_str("to").map(|x| x.to_owned()).ok(),
                 from: d.get_str("from").map(|x| x.to_owned()).ok(),
