@@ -43,6 +43,7 @@ mod clients {
                     (SystemTime::now() + Duration::from_secs(3600 + secs_until_start)).into(),
                 ),
             },
+            problems: Faker.fake(),
         });
 
         mock
