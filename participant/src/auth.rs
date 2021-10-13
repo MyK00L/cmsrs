@@ -28,7 +28,6 @@ impl<'r> FromRequest<'r> for User {
 // login page, redirects if already logged
 #[get("/")]
 pub async fn root_logged(_user: User) -> Redirect {
-    // TODO redirect to main page
     Redirect::to(uri!(super::questions::questions))
 }
 #[get("/", rank = 2)]
@@ -94,14 +93,14 @@ pub async fn logout(cookies: &CookieJar<'_>) -> Redirect {
 
 // contest metadata request utilities
 
-struct ContestMetadataWrapper(contest::ContestMetadata);
+struct ContestMetadataWrapper(contest::GetContestMetadataResponse);
 #[rocket::async_trait]
 impl<'r> FromRequest<'r> for &'r ContestMetadataWrapper {
     type Error = std::convert::Infallible;
 
     async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
         // This closure will execute at most once per request, regardless of
-        // the number of times the `RunningContest` guard is executed.
+        // the number of times the guard is executed.
         let result = request
             .local_cache_async(async {
                 let mut contest_client = request
@@ -116,8 +115,7 @@ impl<'r> FromRequest<'r> for &'r ContestMetadataWrapper {
                     ))
                     .await
                     .ok()?
-                    .into_inner()
-                    .metadata;
+                    .into_inner();
                 Some(ContestMetadataWrapper(metadata))
             })
             .await;
@@ -131,11 +129,11 @@ pub struct Problem {
     pub id: u64,
     pub name: String,
 }
-impl From<contest::Problem> for Problem {
-    fn from(p: contest::Problem) -> Self {
+impl From<&contest::Problem> for Problem {
+    fn from(p: &contest::Problem) -> Self {
         Self {
             id: p.id,
-            name: p.name,
+            name: p.name.clone(),
         }
     }
 }
@@ -151,7 +149,10 @@ impl<'r> FromRequest<'r> for RunningContest {
     async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
         let now = SystemTime::now();
         let metadata = &try_outcome!(request.guard::<&ContestMetadataWrapper>().await).0;
-        let is_running = match (metadata.start_time.as_ref(), metadata.end_time.as_ref()) {
+        let is_running = match (
+            metadata.metadata.start_time.as_ref(),
+            metadata.metadata.end_time.as_ref(),
+        ) {
             (Some(start_time), Some(end_time)) => {
                 now >= SystemTime::from(start_time.clone())
                     && now < SystemTime::from(end_time.clone())
@@ -160,10 +161,7 @@ impl<'r> FromRequest<'r> for RunningContest {
         };
         if is_running {
             Outcome::Success(RunningContest {
-                problems: vec![Problem {
-                    id: 42,
-                    name: String::from("problem ei"),
-                }],
+                problems: metadata.problems.iter().map(Problem::from).collect(),
             })
         } else {
             Outcome::Forward(())
@@ -210,6 +208,6 @@ impl<'r> FromRequest<'r> for ContestData {
     type Error = std::convert::Infallible;
     async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
         let metadata = &try_outcome!(request.guard::<&ContestMetadataWrapper>().await).0;
-        Outcome::Success(metadata.into())
+        Outcome::Success((&metadata.metadata).into())
     }
 }
