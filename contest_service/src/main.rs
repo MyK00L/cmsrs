@@ -270,14 +270,39 @@ impl Contest for ContestService {
         &self,
         request: Request<UpdateProblemInfoRequest>,
     ) -> Result<Response<SetProblemResponse>, Status> {
-        todo!()
+        let problem_data_from_req = request.into_inner();
+        let problem_data: mappings::problem::Problem = problem_data_from_req.info.into();
+        self.get_problems_collection()
+            .update_one(
+                doc! { "_id": problem_data.get_id() },
+                doc! { "$set": doc!{"name": problem_data.name, "longName": problem_data.long_name} },
+                UpdateOptions::builder().build(),
+            )
+            .await
+            .map_err(internal_error)
+            .map(|_| Response::new(SetProblemResponse {}))
     }
 
     async fn update_problem_statement(
         &self,
         request: Request<UpdateProblemStatementRequest>,
     ) -> Result<Response<SetProblemResponse>, Status> {
-        todo!()
+        let problem_data_from_req = request.into_inner();
+        let problem_statement = problem_data_from_req.statement;
+        let problem_id = problem_data_from_req.problem_id;
+
+        self.get_problems_collection()
+            .update_one(
+                doc! { "_id": problem_id as i32 },
+                doc! { "$set": doc!{"statement": mongodb::bson::Binary {
+                    subtype: mongodb::bson::spec::BinarySubtype::Generic,
+                    bytes: problem_statement,
+                }} },
+                UpdateOptions::builder().build(),
+            )
+            .await
+            .map_err(internal_error)
+            .map(|_| Response::new(SetProblemResponse {}))
     }
 }
 

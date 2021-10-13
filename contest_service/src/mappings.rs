@@ -199,8 +199,15 @@ pub mod problem {
     #[derive(Default, Clone)]
     pub struct Problem {
         id: u64,
-        name: String,
-        long_name: String,
+        pub name: String,
+        pub long_name: String,
+    }
+
+    impl Problem {
+        /// TODO @MyK00l u sure about 64 bits ids?
+        pub fn get_id(&self) -> i32 {
+            self.id as i32
+        }
     }
 
     impl From<protos::service::contest::Problem> for Problem {

@@ -98,7 +98,8 @@ message SetProblemRequest {
 }
 
 message UpdateProblemStatementRequest {
- 	required bytes statement = 1;
+	required uint64 problem_id = 1;
+ 	required bytes statement = 2;
 }
 
 message UpdateProblemInfoRequest {
