@@ -91,9 +91,9 @@ pub mod chat {
     use super::*;
 
     pub struct Message {
-        id: u64,
+        id: u32,
         subject: String,
-        problem_id: Option<u64>,
+        problem_id: Option<u32>,
         body: String,
         to: Option<String>,
         from: Option<String>,
@@ -171,9 +171,9 @@ pub mod chat {
     impl From<Document> for Message {
         fn from(d: Document) -> Self {
             Self {
-                id: d.get_i64("_id").unwrap() as u64,
+                id: d.get_i64("_id").unwrap() as u32,
                 subject: d.get_str("subject").unwrap().to_owned(),
-                problem_id: d.get_i64("problemId").map(|x| x as u64).ok(),
+                problem_id: d.get_i64("problemId").map(|x| x as u32).ok(),
                 body: d.get_str("text").unwrap().to_owned(),
                 to: d.get_str("to").map(|x| x.to_owned()).ok(),
                 from: d.get_str("from").map(|x| x.to_owned()).ok(),
@@ -198,7 +198,7 @@ pub mod problem {
 
     #[derive(Default, Clone)]
     pub struct Problem {
-        id: u64,
+        id: u32,
         name: String,
         long_name: String,
     }
@@ -226,7 +226,7 @@ pub mod problem {
         fn from(mongo_record: Document) -> Self {
             ProblemData(
                 Problem {
-                    id: mongo_record.get_i64("_id").unwrap_or_default() as u64,
+                    id: mongo_record.get_i32("_id").unwrap_or_default() as u32,
                     name: mongo_record.get_str("name").unwrap_or_default().to_owned(),
                     long_name: mongo_record
                         .get_str("longName")
