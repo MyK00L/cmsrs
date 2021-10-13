@@ -135,7 +135,7 @@ impl Contest for ContestService {
                     info: x.get_problem().into(),
                 })
             })
-            .ok_or_else(|| Status::internal("Problem not found"))
+            .ok_or_else(|| Status::not_found("Problem not found"))
     }
 
     async fn get_problem_statement(
@@ -153,7 +153,7 @@ impl Contest for ContestService {
                     statement: x.get_statement(),
                 })
             })
-            .ok_or_else(|| Status::internal("Problem not found"))
+            .ok_or_else(|| Status::not_found("Problem not found"))
     }
 
     async fn get_announcement_list(
