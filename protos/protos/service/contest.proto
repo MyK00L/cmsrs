@@ -1,8 +1,8 @@
 syntax = "proto2";
 
-import "common.proto";
-
 package service.contest;
+
+import "common.proto";
 
 message AuthUserRequest {
 	required string username = 1;
@@ -31,6 +31,7 @@ message ContestMetadata {
 message GetContestMetadataRequest {}
 message GetContestMetadataResponse {
 	required ContestMetadata metadata = 1;
+	repeated Problem problems = 2;
 }
 
 message Problem {
@@ -41,9 +42,12 @@ message Problem {
 message GetProblemRequest {
 	required uint64 problem_id = 1;
 }
-message GetProblemResponse {
+message GetProblemInfoResponse {
  	required Problem info = 1;
-	required bytes statement = 2;
+}
+
+message GetProblemStatementResponse {
+	required bytes statement = 1;
 }
 
 message Message { // questions and announcements are the same
@@ -90,9 +94,19 @@ message SetContestMetadataRequest {
 message SetContestMetadataResponse {}
 
 message SetProblemRequest {
-	optional Problem info = 1;
- 	optional bytes statement = 2;
+	required Problem info = 1;
+ 	required bytes statement = 2;
 }
+
+message UpdateProblemStatementRequest {
+	required uint64 problem_id = 1;
+ 	required bytes statement = 2;
+}
+
+message UpdateProblemInfoRequest {
+	required Problem info = 1;
+}
+
 message SetProblemResponse {}
 
 message AddMessageRequest {
@@ -103,12 +117,15 @@ message AddMessageResponse {}
 service Contest {
 	rpc auth_user(AuthUserRequest) returns (AuthUserResponse);
 	rpc get_contest_metadata(GetContestMetadataRequest) returns (GetContestMetadataResponse);
-	rpc get_problem(GetProblemRequest) returns (GetProblemResponse);
+	rpc get_problem_info(GetProblemRequest) returns (GetProblemInfoResponse);
+	rpc get_problem_statement(GetProblemRequest) returns (GetProblemStatementResponse);
 	rpc get_announcement_list(GetAnnouncementListRequest) returns (GetAnnouncementListResponse);
 	rpc get_question_list(GetQuestionListRequest) returns (GetQuestionListResponse);
 
 	rpc set_user(SetUserRequest) returns (SetUserResponse);
 	rpc set_contest_metadata(SetContestMetadataRequest) returns (SetContestMetadataResponse);
 	rpc set_problem(SetProblemRequest) returns (SetProblemResponse);
+	rpc update_problem_info(UpdateProblemInfoRequest) returns (SetProblemResponse);
+	rpc update_problem_statement(UpdateProblemStatementRequest) returns (SetProblemResponse);
 	rpc add_message(AddMessageRequest) returns (AddMessageResponse);
 }
