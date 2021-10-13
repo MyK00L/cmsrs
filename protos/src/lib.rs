@@ -61,6 +61,8 @@ pub mod service {
         (set_user,SetUserRequest,SetUserResponse),
         (set_contest_metadata,SetContestMetadataRequest,SetContestMetadataResponse),
         (set_problem,SetProblemRequest,SetProblemResponse),
+        (update_problem_info,UpdateProblemInfoRequest,SetProblemResponse),
+        (update_problem_statement,UpdateProblemStatementRequest,SetProblemResponse),
         (add_message,AddMessageRequest,AddMessageResponse)
         );
     }
