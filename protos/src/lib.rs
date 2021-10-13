@@ -54,12 +54,15 @@ pub mod service {
         rpc_mock_server!(contest_server::Contest; MockContest;
         (auth_user,AuthUserRequest,AuthUserResponse),
         (get_contest_metadata,GetContestMetadataRequest,GetContestMetadataResponse),
-        (get_problem,GetProblemRequest,GetProblemResponse),
+        (get_problem_statement,GetProblemRequest,GetProblemStatementResponse),
+        (get_problem_info,GetProblemRequest,GetProblemInfoResponse),
         (get_announcement_list,GetAnnouncementListRequest,GetAnnouncementListResponse),
         (get_question_list,GetQuestionListRequest,GetQuestionListResponse),
         (set_user,SetUserRequest,SetUserResponse),
         (set_contest_metadata,SetContestMetadataRequest,SetContestMetadataResponse),
         (set_problem,SetProblemRequest,SetProblemResponse),
+        (update_problem_info,UpdateProblemInfoRequest,SetProblemResponse),
+        (update_problem_statement,UpdateProblemStatementRequest,SetProblemResponse),
         (add_message,AddMessageRequest,AddMessageResponse)
         );
     }
@@ -74,8 +77,8 @@ pub mod service {
         rpc_mock_server!(evaluation_server::Evaluation; MockEvaluation;
         (get_user_scoring,GetUserScoringRequest,GetUserScoringResponse),
         (get_problem,GetProblemRequest,GetProblemResponse),
-        (set_contest,SetContestRequest,SetContestResponse),
         (get_contest,GetContestRequest,GetContestResponse),
+        (set_contest,SetContestRequest,SetContestResponse),
         (get_testcase,GetTestcaseRequest,GetTestcaseResponse),
         (get_problem_testcases,GetProblemTestcasesRequest,GetProblemTestcasesResponse),
         (set_testcase,SetTestcaseRequest,SetTestcaseResponse),

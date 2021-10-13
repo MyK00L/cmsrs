@@ -4,7 +4,7 @@ use core::panic;
 
 use futures::stream::StreamExt;
 
-use ::utils::scoring_lib::{evaluate_submission_score, evaluate_subtask_score};
+use ::utils::scoring::{calc_submission_score, calc_subtask_score};
 use mongodb::{
     bson::{doc, Bson, Document},
     options::{
@@ -12,11 +12,14 @@ use mongodb::{
     },
     Client, Database,
 };
-use protos::service::evaluation::{evaluation_server::Evaluation, GetProblemRequest};
 use protos::service::submission::submission_server::*;
 use protos::service::submission::*;
 use protos::utils::*;
 use protos::{self, *};
+use protos::{
+    evaluation::compilation_result,
+    service::evaluation::{evaluation_server::Evaluation, GetProblemRequest},
+};
 use protos::{evaluation::EvaluationResult, service::dispatcher::dispatcher_server::*};
 use tonic::{transport::*, Request, Response, Status};
 
@@ -64,7 +67,7 @@ async fn init_contest_service_db(db: Database) -> Result<(), Box<dyn std::error:
                         "problemId": { "bsonType": "long" },
                         "created": { "bsonType": "timestamp" },
                         "source": { "bsonType": "binData" },
-                        "programmingLanguage": { 
+                        "programmingLanguage": {
                             "bsonType": "int",
                             "enum": [0, 1, 2]
                             /*
@@ -74,7 +77,7 @@ async fn init_contest_service_db(db: Database) -> Result<(), Box<dyn std::error:
                             ...
                             */
                         },
-                        "state": { 
+                        "state": {
                             "bsonType": "int",
                             "enum": [0, 1, 2]
                             /*
@@ -87,16 +90,15 @@ async fn init_contest_service_db(db: Database) -> Result<(), Box<dyn std::error:
                             "bsonType": "object",
                             "required": ["outcome", "timeNs", "memoryB"],
                             "properties": {
-                                "outcome": { 
+                                "outcome": {
                                     "bsonType": "int",
-                                    "enum": [0, 1, 2, 3, 4, 5]
+                                    "enum": [0, 1, 2, 3, 4]
                                     /*
                                     0 => NONE
                                     1 => SUCCESS
-                                    2 => REJECTED
-                                    3 => TLE
-                                    4 => MLE
-                                    5 => RTE
+                                    2 => TLE
+                                    3 => MLE
+                                    4 => RTE
                                     */
                                 },
                                 "timeNs": { "bsonType": "long" },
@@ -115,17 +117,12 @@ async fn init_contest_service_db(db: Database) -> Result<(), Box<dyn std::error:
                                     "required": ["subtaskId", "testcases", "subtaskScore"],
                                     "properties": {
                                     "subtaskId": { "bsonType": "long" },
-                                    "subtaskScore": { 
-                                        "oneOf": [ 
-                                            { "bsonType": "bool"},
-                                            { "bsonType": "double"}
-                                        ]
-                                    }, // SubtaskResult.subtask_score
+                                    "subtaskScore": { "bsonType": "double" }, // SubtaskResult.subtask_score
                                     "testcases": {
                                         "bsonType": "array",
                                         "items": {
                                             "bsonType": "object",
-                                            "required": ["testcaseId", "outcome", "score", "timeNs", "memoryB"], 
+                                            "required": ["testcaseId", "outcome", "score", "timeNs", "memoryB"],
                                             "properties": {
                                                 "testcaseId": { "bsonType": "long" },
                                                 "outcome": {
@@ -140,12 +137,7 @@ async fn init_contest_service_db(db: Database) -> Result<(), Box<dyn std::error:
                                                     5 => CHECKER_ERROR
                                                     */
                                                 }, // TestcaseResult.outcome
-                                                "score": { 
-                                                    "oneOf": [ 
-                                                        { "bsonType": "bool"},
-                                                        { "bsonType": "double"}
-                                                    ]
-                                                }, //TestcaseResult.score
+                                                "score": { "bsonType": "double" }, //TestcaseResult.score
                                                 "timeNs": { "bsonType": "long" }, // TestcaseResult.used_resources
                                                 "memoryB": { "bsonType": "long" }, // TestcaseResult.used_resources
                                         }
@@ -156,12 +148,7 @@ async fn init_contest_service_db(db: Database) -> Result<(), Box<dyn std::error:
                                 }
                             } // EvaluationResult.subtask_results
                         },
-                        "overallScore": { 
-                            "oneOf": [ 
-                                { "bsonType": "bool"},
-                                { "bsonType": "double"}
-                            ]
-                        } // EvaluationResult.overall_score
+                        "overallScore": { "bsonType": "double" } // EvaluationResult.overall_score
                     }
                 }
             })
@@ -193,10 +180,18 @@ impl SubmissionService {
     }
 }
 
+/// safe even if compilation didn't succeed
 async fn evaluate_scores(
     mut_evaluation_result: &mut EvaluationResult,
     problem_id: u64,
 ) -> Result<(), Status> {
+    // if compilation failed, update manually submission score and return
+    if mut_evaluation_result.compilation_result.outcome() != compilation_result::Outcome::Success {
+        assert!(mut_evaluation_result.subtask_results.is_empty());
+        mut_evaluation_result.score = protos::common::Score { score: 0f64 };
+        return Ok(());
+    }
+
     let problem_metadata_request = GetProblemRequest { problem_id };
     let mock_evaluation_server = mock_services::get_mock_evaluation(problem_id);
 
@@ -210,16 +205,15 @@ async fn evaluate_scores(
         .iter_mut()
         .enumerate()
         .for_each(|(i, subtask)| {
-            evaluate_subtask_score(
+            subtask.score = calc_subtask_score(
                 &subtask.testcase_results,
                 &problem_metadata.info.subtasks[i].scoring,
-                &mut subtask.score,
             );
         });
 
-    evaluate_submission_score(
+    mut_evaluation_result.score = calc_submission_score(
         &mut_evaluation_result.subtask_results,
-        &mut mut_evaluation_result.score,
+        &protos::scoring::Problem::default(), // TODO: pass the actual options
     );
 
     Ok(())
@@ -341,16 +335,15 @@ impl Submission for SubmissionService {
         &self,
         request: Request<GetSubmissionDetailsRequest>,
     ) -> Result<Response<GetSubmissionDetailsResponse>, Status> {
-        let submission_details_request = request.into_inner();
-        let submission_id = submission_details_request.submission_id;
-        let opt_document = self
+        self
             .get_collection()
-            .find_one(doc! { "_id": convert_to_i64(submission_id) }, None)
+            .find_one(doc! { "_id": convert_to_i64(request.into_inner().submission_id) }, None)
             .await
-            .map_err(internal_error)?;
-
-        match opt_document {
-            Some(document) => {
+            .map_err(internal_error)?
+            .map_or_else(|| Err(Status::new(
+            tonic::Code::NotFound,
+            "Submission id provided is not present in database",
+        )), |document| {
                 let state = document
                     .get_i32("state")
                     .unwrap_or_else(|_| panic!("{}", expected_field("problemId")));
@@ -387,12 +380,7 @@ impl Submission for SubmissionService {
                         None
                     },
                 }))
-            }
-            None => Err(Status::new(
-                tonic::Code::NotFound,
-                "Submission id provided is not present in database",
-            )),
-        }
+            })
     }
 }
 

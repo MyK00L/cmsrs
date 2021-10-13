@@ -9,7 +9,7 @@ use protos::{
     *,
 };
 use protos::{
-    scoring::{one_of_score, OneOfScore},
+    common::Score,
     service::evaluation::{problem, GetProblemResponse, MockEvaluation},
 };
 use rand::Rng;
@@ -20,13 +20,9 @@ fn generate_testcase_result() -> TestcaseResult {
     TestcaseResult {
         outcome,
         score: if outcome == testcase_result::Outcome::Ok as i32 {
-            OneOfScore {
-                score: Some(one_of_score::Score::BoolScore(true)),
-            }
+            Score { score: 1.0 }
         } else {
-            OneOfScore {
-                score: Some(one_of_score::Score::BoolScore(false)),
-            }
+            Score { score: 0.0 }
         },
         used_resources: Resources {
             time: common::Duration {
@@ -48,7 +44,7 @@ fn generate_subtask_result() -> SubtaskResult {
             generate_testcase_result(),
             generate_testcase_result(),
         ],
-        score: OneOfScore::default(),
+        score: Score::default(),
         id: 1u64,
     }
 }
@@ -58,7 +54,7 @@ fn generate_min_subtask_scoring() -> protos::service::evaluation::Subtask {
         id: 0u64,
         scoring: scoring::Subtask {
             method: scoring::subtask::Method::Min as i32,
-            max_score: 20f64,
+            max_score: common::Score { score: 20f64 },
         },
         testcases_id: vec![], // now useless
     }
@@ -76,7 +72,6 @@ fn mock_dispatcher_init(mock_dispatcher: &mut MockDispatcher) {
                     },
                     memory_bytes: 1u64,
                 },
-                error_message: None,
             },
             subtask_results: vec![
                 generate_subtask_result(),
@@ -86,9 +81,7 @@ fn mock_dispatcher_init(mock_dispatcher: &mut MockDispatcher) {
                 generate_subtask_result(),
                 generate_subtask_result(),
             ],
-            score: OneOfScore {
-                score: Some(one_of_score::Score::DoubleScore(0f64)),
-            },
+            score: Score { score: 0f64 },
         },
     });
 }
