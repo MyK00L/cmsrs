@@ -265,6 +265,20 @@ impl Contest for ContestService {
         .map_err(internal_error)?;
         Ok(Response::new(AddMessageResponse {}))
     }
+
+    async fn update_problem_info(
+        &self,
+        request: Request<UpdateProblemInfoRequest>,
+    ) -> Result<Response<SetProblemResponse>, Status> {
+        todo!()
+    }
+
+    async fn update_problem_statement(
+        &self,
+        request: Request<UpdateProblemStatementRequest>,
+    ) -> Result<Response<SetProblemResponse>, Status> {
+        todo!()
+    }
 }
 
 #[tokio::main]
