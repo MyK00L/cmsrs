@@ -2,7 +2,7 @@ version: "3.3"
 
 services:
   contest_service_db:
-    image: mongo:5.0.0
+    image: mongo:4.4.8 #mongo:5.0.0
     restart: always
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
@@ -18,14 +18,14 @@ services:
       dockerfile: ./contest_service/Dockerfile
     ports:
       - 50051:50051
-    depends_on: 
+    depends_on:
       - contest_service_db
-  
+
   evaluation_service:
     build:
       context: .
       dockerfile: ./evaluation_service/Dockerfile
-    ports: 
+    ports:
       - 50052:50051
 
   submission_service_db:
@@ -38,15 +38,15 @@ services:
     # volumes:
       # - ./submission_service/db/init.js:/docker-entrypoint-initdb.d/init.js
       # - submission_service_db_volume:/data/db
-    ports: 
+    ports:
       - 27020:27017
   submission_service:
     build:
       context: .
       dockerfile: ./submission_service/Dockerfile
-    ports: 
+    ports:
       - 50055:50051
-    depends_on: 
+    depends_on:
       - submission_service_db
 
 
