@@ -31,6 +31,7 @@ message ContestMetadata {
 message GetContestMetadataRequest {}
 message GetContestMetadataResponse {
 	required ContestMetadata metadata = 1;
+	repeated Problem problems = 2;
 }
 
 message Problem {

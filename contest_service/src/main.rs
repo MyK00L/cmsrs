@@ -1,3 +1,4 @@
+#![feature(async_closure)]
 use futures::stream::StreamExt;
 use std::convert::TryFrom;
 
@@ -114,11 +115,26 @@ impl Contest for ContestService {
         &self,
         _request: Request<GetContestMetadataRequest>,
     ) -> Result<Response<GetContestMetadataResponse>, Status> {
-        self.get_contest_metadata()
+        let metadata = self
+            .get_contest_metadata()
             .await
             .map(|contest_metadata_doc| {
                 mappings::contest::ContestMetadata::from(contest_metadata_doc).into()
-            })
+            })?;
+        let problems = self
+            .get_problems_collection()
+            .find(None, None)
+            .await
+            .map_err(internal_error)?
+            .filter_map(async move |x| x.ok())
+            .map(mappings::problem::ProblemData::from)
+            .map(|x| x.get_problem().into())
+            .collect()
+            .await;
+        Ok(Response::new(GetContestMetadataResponse {
+            metadata,
+            problems,
+        }))
     }
     async fn get_problem_info(
         &self,

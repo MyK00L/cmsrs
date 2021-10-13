@@ -1,8 +1,6 @@
 use std::convert::TryFrom;
 
 use mongodb::bson::Document;
-use protos::service::contest::GetContestMetadataResponse;
-use tonic::Response;
 
 #[derive(Debug)]
 pub enum MappingError {
@@ -40,16 +38,14 @@ pub mod contest {
             }
         }
     }
-    impl From<ContestMetadata> for Response<GetContestMetadataResponse> {
+    impl From<ContestMetadata> for protos::service::contest::ContestMetadata {
         fn from(md: ContestMetadata) -> Self {
-            Response::new(GetContestMetadataResponse {
-                metadata: protos::service::contest::ContestMetadata {
-                    name: md.name,
-                    description: md.description,
-                    start_time: md.start_time.map(protos::common::Timestamp::from),
-                    end_time: md.end_time.map(protos::common::Timestamp::from),
-                },
-            })
+            protos::service::contest::ContestMetadata {
+                name: md.name,
+                description: md.description,
+                start_time: md.start_time.map(protos::common::Timestamp::from),
+                end_time: md.end_time.map(protos::common::Timestamp::from),
+            }
         }
     }
 
