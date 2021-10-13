@@ -34,12 +34,12 @@ message GetContestMetadataResponse {
 }
 
 message Problem {
-	required uint32 id = 1;
+	required uint64 id = 1;
 	required string name = 2;
 	required string long_name = 3;
 }
 message GetProblemRequest {
-	required uint32 problem_id = 1;
+	required uint64 problem_id = 1;
 }
 message GetProblemInfoResponse {
  	required Problem info = 1;
@@ -50,24 +50,24 @@ message GetProblemStatementResponse {
 }
 
 message Message { // questions and announcements are the same
-	required uint32 id = 1;
+	required uint64 id = 1;
 	required string subject = 2;
-	optional uint32 problem_id = 3;
+	optional uint64 problem_id = 3;
 	required string text = 4;
 	optional string from = 5;
 	optional string to = 6;
 	required common.Timestamp sent_at = 7;
 }
 message GetAnnouncementListRequest {
-	optional uint32 problem_id = 1;
+	optional uint64 problem_id = 1;
 }
 message GetAnnouncementListResponse {
 	repeated Message announcements = 1;
 }
 
 message GetQuestionListRequest {
-	optional uint32 problem_id = 1;
-	optional uint32 user_id = 2;
+	optional uint64 problem_id = 1;
+	optional uint64 user_id = 2;
 }
 message GetQuestionListResponse {
 	repeated Message questions = 1;

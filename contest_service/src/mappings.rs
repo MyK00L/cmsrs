@@ -198,7 +198,7 @@ pub mod problem {
 
     #[derive(Default, Clone)]
     pub struct Problem {
-        id: u32,
+        id: u64,
         name: String,
         long_name: String,
     }
@@ -226,7 +226,7 @@ pub mod problem {
         fn from(mongo_record: Document) -> Self {
             ProblemData(
                 Problem {
-                    id: mongo_record.get_i32("_id").unwrap_or_default() as u32,
+                    id: mongo_record.get_i64("_id").unwrap_or_default() as u64,
                     name: mongo_record.get_str("name").unwrap_or_default().to_owned(),
                     long_name: mongo_record
                         .get_str("longName")
