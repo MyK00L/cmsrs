@@ -1,11 +1,29 @@
 use failure::{format_err, Error};
 use futures::lock::Mutex;
-use protos::{common::{Duration, ProgrammingLanguage, Resources, Score, Source, Timestamp}, evaluation::{compilation_result, testcase_result::Outcome, CompilationResult, TestcaseResult}, scoring, service::{evaluation::{EvaluationFile, GetProblemEvaluationFileRequest, GetProblemRequest, GetProblemResponse, GetProblemTestcasesResponse, GetTestcaseRequest, GetUpdateInfoRequest, GetUpdateInfoResponse, MockEvaluation, Problem, Testcase, evaluation_client::EvaluationClient, evaluation_file, evaluation_server::Evaluation, problem}, worker::{
+use protos::{
+    common::{Duration, ProgrammingLanguage, Resources, Score, Source, Timestamp},
+    evaluation::{compilation_result, testcase_result::Outcome, CompilationResult, TestcaseResult},
+    scoring,
+    service::{
+        evaluation::{
+            evaluation_client::EvaluationClient, evaluation_file, evaluation_server::Evaluation,
+            problem, EvaluationFile, GetProblemEvaluationFileRequest, GetProblemRequest,
+            GetProblemResponse, GetProblemTestcasesResponse, GetTestcaseRequest,
+            GetUpdateInfoRequest, GetUpdateInfoResponse, MockEvaluation, Problem, Testcase,
+        },
+        worker::{
             worker_server::{Worker, WorkerServer},
             EvaluateSubmissionRequest, EvaluateSubmissionResponse, UpdateSourceRequest,
             UpdateSourceResponse, UpdateTestcaseRequest, UpdateTestcaseResponse,
-        }}};
-use std::{collections::HashMap, path::PathBuf, sync::Arc, thread::{sleep, spawn}};
+        },
+    },
+};
+use std::{
+    collections::HashMap,
+    path::PathBuf,
+    sync::Arc,
+    thread::{sleep, spawn},
+};
 use tabox::{
     configuration::SandboxConfiguration, result::SandboxExecutionResult, SandboxImplementation,
 };
@@ -60,22 +78,32 @@ impl From<GetUpdateInfoResponse> for EvaluationFileStatus {
     fn from(update_info: GetUpdateInfoResponse) -> Self {
         let mut status = EvaluationFileStatus {
             testcases: vec![],
-            checkers: vec![]
+            checkers: vec![],
         };
-        update_info.problems
-            .iter()
-            .for_each(|problem_info| {
-                for subtask in &problem_info.subtasks {
-                    for testcase in &subtask.testcases {
-                        let most_recest_update = 
-                            timestamp_max(&testcase.input_last_update, &testcase.output_last_update);
-                        status.testcases.push((problem_info.problem_id, testcase.testcase_id, most_recest_update.clone()));
-                    }
+        update_info.problems.iter().for_each(|problem_info| {
+            for subtask in &problem_info.subtasks {
+                for testcase in &subtask.testcases {
+                    let most_recest_update =
+                        timestamp_max(&testcase.input_last_update, &testcase.output_last_update);
+                    status.testcases.push((
+                        problem_info.problem_id,
+                        testcase.testcase_id,
+                        most_recest_update.clone(),
+                    ));
                 }
+            }
 
-                status.checkers.push((problem_info.problem_id, evaluation_file::Type::Checker, problem_info.checker_last_update.clone()));
-                status.checkers.push((problem_info.problem_id, evaluation_file::Type::Interactor, problem_info.interactor_last_update.clone()));
-            });
+            status.checkers.push((
+                problem_info.problem_id,
+                evaluation_file::Type::Checker,
+                problem_info.checker_last_update.clone(),
+            ));
+            status.checkers.push((
+                problem_info.problem_id,
+                evaluation_file::Type::Interactor,
+                problem_info.interactor_last_update.clone(),
+            ));
+        });
         status
     }
 }
@@ -134,7 +162,8 @@ async fn diff_and_update_status(
             .testcases
             .insert((problem_id, testcase_id), actual_timestamp.clone());
 
-        if old_timestamp.is_none() || timestamp_cmp(&old_timestamp.unwrap(), &actual_timestamp) < 0 {
+        if old_timestamp.is_none() || timestamp_cmp(&old_timestamp.unwrap(), &actual_timestamp) < 0
+        {
             // pull updated testcase
             let testcase = pull_testcase(evaluation_service, problem_id, testcase_id).await;
             // save testcase
@@ -161,7 +190,8 @@ async fn diff_and_update_status(
             .checkers
             .insert((problem_id, checker_type), actual_timestamp.clone());
 
-        if old_timestamp.is_none() || timestamp_cmp(&old_timestamp.unwrap(), &actual_timestamp) < 0 {
+        if old_timestamp.is_none() || timestamp_cmp(&old_timestamp.unwrap(), &actual_timestamp) < 0
+        {
             // pull updated checker
             let checker = pull_checker(evaluation_service, problem_id, checker_type).await;
             // compile checker in sandbox
@@ -169,7 +199,10 @@ async fn diff_and_update_status(
                 get_checker_compilation_config(problem_id, checker.r#type(), checker.source)
                     .expect("Unable to get checker compilation configuration.");
             let sandbox_res = run_sandbox(config).expect("Failed to run sandbox.");
-            assert!(sandbox_res.status.success(), "checker compilation must succeed");
+            assert!(
+                sandbox_res.status.success(),
+                "checker compilation must succeed"
+            );
             // success is good
         }
     }
@@ -187,18 +220,19 @@ async fn pull_join_handler_action(
 
         // pull status
         let res_actual_status = evaluation_service
-            .get_update_info(Request::new(GetUpdateInfoRequest{}))
+            .get_update_info(Request::new(GetUpdateInfoRequest {}))
             .await
             .map(|response| EvaluationFileStatus::from(response.into_inner()));
 
         match res_actual_status {
             Ok(actual_status) => {
                 // diff and update
-                diff_and_update_status(&mut evaluation_service, &wrapped_status, actual_status).await;
-            },
+                diff_and_update_status(&mut evaluation_service, &wrapped_status, actual_status)
+                    .await;
+            }
             Err(e) => {
                 println!("An error occurred while pulling the update info: {:?}", e);
-            } 
+            }
         }
     }
 }
