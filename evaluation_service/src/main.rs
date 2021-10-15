@@ -570,6 +570,12 @@ impl Evaluation for EvaluationService {
         }
         Ok(Response::new(SetProblemEvaluationFileResponse {}))
     }
+    async fn get_update_info(
+        &self,
+        _request: Request<GetUpdateInfoRequest>,
+    ) -> Result<Response<GetUpdateInfoResponse>, Status> {
+        unimplemented!();
+    }
 }
 
 #[tokio::main]
