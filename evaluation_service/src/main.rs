@@ -16,6 +16,7 @@ const INPUT_FILE_NAME: &str = "input";
 const OUTPUT_FILE_NAME: &str = "output";
 const IO_EXTENSION: &str = "txt";
 const PROBLEM_METADATA_FILE_NAME: &str = "metadata";
+const PROBLEM_UPDATE_FILE_NAME: &str = "updates";
 
 fn internal_error<T>(e: T) -> Status
 where
@@ -57,6 +58,43 @@ impl EvaluationService {
                     not_found_io_error(&format!("Problem not found [id: {}]", problem_id))
                 })
             })
+    }
+    async fn get_problem_update_file(&self, problem_id: u64) -> Result<ProblemUpdateInfo, Status> {
+        self.get_problem_folder_from_id(problem_id)
+            .map_err(internal_error)
+            .and_then(|path| {
+                self.storage
+                    .search_item(
+                        Some(&path),
+                        PROBLEM_UPDATE_FILE_NAME,
+                        Some(SERIALIZED_EXTENSION),
+                    )
+                    .map_err(internal_error)
+            })
+            .and_then(|op| {
+                op.ok_or_else(|| {
+                    not_found_error(format!("Problem updates not found [id: {}]", problem_id))
+                })
+            })
+            .and_then(|path| {
+                self.storage
+                    .read_file_object(&path)
+                    .map_err(|err| internal_error(err.as_ref()))
+            })
+    }
+    async fn save_problem_update_file(&self, info: ProblemUpdateInfo) -> Result<(), Status> {
+        let path = self
+            .get_problem_folder_from_id(info.problem_id)
+            .map_err(internal_error)?;
+        self.storage
+            .save_file_object(
+                Some(&path),
+                PROBLEM_UPDATE_FILE_NAME,
+                SERIALIZED_EXTENSION,
+                info,
+            )
+            .map_err(internal_error)?;
+        Ok(())
     }
 }
 
