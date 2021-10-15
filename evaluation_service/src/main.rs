@@ -676,7 +676,23 @@ impl Evaluation for EvaluationService {
         &self,
         _request: Request<GetUpdateInfoRequest>,
     ) -> Result<Response<GetUpdateInfoResponse>, Status> {
-        unimplemented!();
+        let mut problems: Vec<ProblemUpdateInfo> = vec![];
+        for entry in self.storage.iterate_folder(PROBLEMS_FOLDER_NAME, None)? {
+            let problem_path = self
+                .storage
+                .search_item(
+                    Some(&entry?.path()),
+                    PROBLEM_UPDATE_FILE_NAME,
+                    Some(SERIALIZED_EXTENSION),
+                )?
+                .ok_or_else(|| not_found_error("Problem update metadata not found"))?;
+            let p: ProblemUpdateInfo = self
+                .storage
+                .read_file_object(&problem_path)
+                .map_err(|err| internal_error(err.as_ref()))?;
+            problems.push(p);
+        }
+        Ok(Response::new(GetUpdateInfoResponse { problems }))
     }
 }
 
