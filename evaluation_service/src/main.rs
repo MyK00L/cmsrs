@@ -182,6 +182,7 @@ impl Evaluation for EvaluationService {
         }))
     }
 
+    // NOTE: cannot update file related stuff with this request or everything will burn
     async fn set_contest(
         &self,
         request: Request<SetContestRequest>,
@@ -229,6 +230,10 @@ impl Evaluation for EvaluationService {
             // Create folder for evaluation files
             self.storage
                 .add_folder(EVALUATION_FILES_FOLDER_NAME, Some(&p_path))?;
+
+            let mut update_info = self.load_problem_update_file(p.id).ok().unwrap_or_default();
+            update_info.problem_id = p.id;
+            self.save_problem_update_file(update_info)?;
         }
         Ok(Response::new(SetContestResponse {}))
     }
