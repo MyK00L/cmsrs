@@ -83,7 +83,8 @@ pub mod service {
         (get_problem_testcases,GetProblemTestcasesRequest,GetProblemTestcasesResponse),
         (set_testcase,SetTestcaseRequest,SetTestcaseResponse),
         (get_problem_evaluation_file,GetProblemEvaluationFileRequest,GetProblemEvaluationFileResponse),
-        (set_problem_evaluation_file,SetProblemEvaluationFileRequest,SetProblemEvaluationFileResponse)
+        (set_problem_evaluation_file,SetProblemEvaluationFileRequest,SetProblemEvaluationFileResponse),
+        (get_update_info,GetUpdateInfoRequest,GetUpdateInfoResponse)
         );
     }
     pub mod submission {
