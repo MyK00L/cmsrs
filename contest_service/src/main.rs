@@ -1,3 +1,4 @@
+#![feature(async_closure)]
 use futures::stream::StreamExt;
 use std::convert::TryFrom;
 
@@ -13,6 +14,7 @@ use tonic::{transport::*, Request, Response, Status};
 
 mod mappings;
 
+mod mongo_schema;
 #[cfg(test)]
 mod tests;
 
@@ -33,9 +35,9 @@ pub struct ContestService {
 
 impl ContestService {
     async fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        Ok(Self {
-            db_client: Client::with_options(ClientOptions::parse(CONNECTION_STRING).await?)?,
-        })
+        let db_client = Client::with_options(ClientOptions::parse(CONNECTION_STRING).await?)?;
+        mongo_schema::init_contest_service_db(db_client.database("contestdb")).await?;
+        Ok(Self { db_client })
     }
 
     /// Do not call this function, call get_*_collection or get_contest_metadata instead
@@ -114,16 +116,31 @@ impl Contest for ContestService {
         &self,
         _request: Request<GetContestMetadataRequest>,
     ) -> Result<Response<GetContestMetadataResponse>, Status> {
-        self.get_contest_metadata()
+        let metadata = self
+            .get_contest_metadata()
             .await
             .map(|contest_metadata_doc| {
                 mappings::contest::ContestMetadata::from(contest_metadata_doc).into()
-            })
+            })?;
+        let problems = self
+            .get_problems_collection()
+            .find(None, None)
+            .await
+            .map_err(internal_error)?
+            .filter_map(async move |x| x.ok())
+            .map(mappings::problem::ProblemData::from)
+            .map(|x| x.get_problem().into())
+            .collect()
+            .await;
+        Ok(Response::new(GetContestMetadataResponse {
+            metadata,
+            problems,
+        }))
     }
-    async fn get_problem(
+    async fn get_problem_info(
         &self,
         request: Request<GetProblemRequest>,
-    ) -> Result<Response<GetProblemResponse>, Status> {
+    ) -> Result<Response<GetProblemInfoResponse>, Status> {
         let problem_id = request.into_inner().problem_id;
         self.get_problems_collection()
             .find_one(doc! {"_id": problem_id as i64}, None)
@@ -131,13 +148,31 @@ impl Contest for ContestService {
             .map_err(internal_error)?
             .map(mappings::problem::ProblemData::from)
             .map(|x| {
-                Response::new(GetProblemResponse {
+                Response::new(GetProblemInfoResponse {
                     info: x.get_problem().into(),
+                })
+            })
+            .ok_or_else(|| Status::not_found("Problem not found"))
+    }
+
+    async fn get_problem_statement(
+        &self,
+        request: Request<GetProblemRequest>,
+    ) -> Result<Response<GetProblemStatementResponse>, Status> {
+        let problem_id = request.into_inner().problem_id;
+        self.get_problems_collection()
+            .find_one(doc! {"_id": problem_id as i64}, None)
+            .await
+            .map_err(internal_error)?
+            .map(mappings::problem::ProblemData::from)
+            .map(|x| {
+                Response::new(GetProblemStatementResponse {
                     statement: x.get_statement(),
                 })
             })
-            .ok_or_else(|| Status::internal("Problem not found"))
+            .ok_or_else(|| Status::not_found("Problem not found"))
     }
+
     async fn get_announcement_list(
         &self,
         _request: Request<GetAnnouncementListRequest>,
@@ -214,26 +249,22 @@ impl Contest for ContestService {
         request: Request<SetProblemRequest>,
     ) -> Result<Response<SetProblemResponse>, Status> {
         let problem_data_from_req = request.into_inner();
-        if let Some(p) = problem_data_from_req.info {
-            if let Some(bin) = problem_data_from_req.statement {
-                let problem_data: mappings::problem::ProblemData = (p.into(), bin).into();
+        let problem_data: mappings::problem::ProblemData = (
+            problem_data_from_req.info.into(),
+            problem_data_from_req.statement,
+        )
+            .into();
 
-                let document: Document = problem_data.into();
-                self.get_problems_collection()
-                    .update_one(
-                        doc! { "_id": document.get_i32("_id").unwrap() },
-                        doc! { "$set": document },
-                        UpdateOptions::builder().upsert(true).build(),
-                    )
-                    .await
-                    .map_err(internal_error)
-                    .map(|_| Response::new(SetProblemResponse {}))
-            } else {
-                Err(Status::invalid_argument("Missing required parameter"))
-            }
-        } else {
-            Err(Status::invalid_argument("Missing required parameter"))
-        }
+        let document: Document = problem_data.into();
+        self.get_problems_collection()
+            .update_one(
+                doc! { "_id": document.get_i64("_id").unwrap() },
+                doc! { "$set": document },
+                UpdateOptions::builder().upsert(true).build(),
+            )
+            .await
+            .map_err(internal_error)
+            .map(|_| Response::new(SetProblemResponse {}))
     }
     async fn add_message(
         &self,
@@ -250,6 +281,45 @@ impl Contest for ContestService {
         .await
         .map_err(internal_error)?;
         Ok(Response::new(AddMessageResponse {}))
+    }
+
+    async fn update_problem_info(
+        &self,
+        request: Request<UpdateProblemInfoRequest>,
+    ) -> Result<Response<SetProblemResponse>, Status> {
+        let problem_data_from_req = request.into_inner();
+        let problem_data: mappings::problem::Problem = problem_data_from_req.info.into();
+        self.get_problems_collection()
+            .update_one(
+                doc! { "_id": problem_data.get_id() },
+                doc! { "$set": doc!{"name": problem_data.name, "longName": problem_data.long_name} },
+                UpdateOptions::builder().build(),
+            )
+            .await
+            .map_err(internal_error)
+            .map(|_| Response::new(SetProblemResponse {}))
+    }
+
+    async fn update_problem_statement(
+        &self,
+        request: Request<UpdateProblemStatementRequest>,
+    ) -> Result<Response<SetProblemResponse>, Status> {
+        let problem_data_from_req = request.into_inner();
+        let problem_statement = problem_data_from_req.statement;
+        let problem_id = problem_data_from_req.problem_id;
+
+        self.get_problems_collection()
+            .update_one(
+                doc! { "_id": problem_id as i64 },
+                doc! { "$set": doc!{"statement": mongodb::bson::Binary {
+                    subtype: mongodb::bson::spec::BinarySubtype::Generic,
+                    bytes: problem_statement,
+                }} },
+                UpdateOptions::builder().build(),
+            )
+            .await
+            .map_err(internal_error)
+            .map(|_| Response::new(SetProblemResponse {}))
     }
 }
 

@@ -1,56 +1,53 @@
 version: "3.3"
 
 services:
-  #contest_service_db:
-  #  image: mongo:4.4.8
-  #  restart: always
-  #  environment:
-  #    MONGO_INITDB_ROOT_USERNAME: root
-  #    MONGO_INITDB_ROOT_PASSWORD: example
-  #    MONGO_INITDB_DATABASE: contestdb
-  #  volumes:
-  #    - ./contest_service/db/init.js:/docker-entrypoint-initdb.d/init.js
-  #    # - contest_service_db_volume:/data/db
-  #  ports: 
-  #    - 27017:27017
-  #contest_service:
-  #  build:
-  #    context: .
-  #    dockerfile: ./contest_service/Dockerfile
-  #  ports: 
-  #    - 50051:50051
-  #  depends_on: 
-  #    - contest_service_db
-  #
-  #evaluation_service:
-  #  build:
-  #    context: .
-  #    dockerfile: ./evaluation_service/Dockerfile
-  #  ports: 
-  #    - 50051:50051
+  contest_service_db:
+    image: mongo:4.4.8 #mongo:5.0.0
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+      MONGO_INITDB_DATABASE: contestdb
+    # volumes:
+    #   - contest_service_db_volume:/data/db
+    ports:
+      - 27017:27017
+  contest_service:
+    build:
+      context: .
+      dockerfile: ./contest_service/Dockerfile
+    ports:
+      - 50051:50051
+    depends_on:
+      - contest_service_db
 
-  #submission_service_db:
-  #  image: mongo
-  #  restart: always
-  #  environment:
-  #    MONGO_INITDB_ROOT_USERNAME: root
-  #    MONGO_INITDB_ROOT_PASSWORD: example
-  #    MONGO_INITDB_DATABASE: submissionsdb
-  #  # volumes:
-  #    # - ./submission_service/db/init.js:/docker-entrypoint-initdb.d/init.js
-  #    # - submission_service_db_volume:/data/db
-  #  ports: 
-  #    - 27020:27017
-  #submission_service:
-  #  build:
-  #    context: .
-  #    dockerfile: ./submission_service/Dockerfile
-  #  ports: 
-  #    - 50055:50051
-  #  depends_on: 
-  #    - submission_service_db
-  #    - worker_service
+  evaluation_service:
+    build:
+      context: .
+      dockerfile: ./evaluation_service/Dockerfile
+    ports:
+      - 50052:50051
 
+  submission_service_db:
+    image: mongo
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+      MONGO_INITDB_DATABASE: submissionsdb
+    # volumes:
+      # - ./submission_service/db/init.js:/docker-entrypoint-initdb.d/init.js
+      # - submission_service_db_volume:/data/db
+    ports:
+      - 27020:27017
+  submission_service:
+    build:
+      context: .
+      dockerfile: ./submission_service/Dockerfile
+    ports:
+      - 50055:50051
+    depends_on:
+      - submission_service_db
   worker_service:
     privileged: true
     build:
@@ -60,6 +57,6 @@ services:
       - "127.0.0.1:50051:50051"
 
 
-#volumes:
-#  contest_service_db_volume:
-#  submission_service_db_volume: # what for?
+volumes:
+  contest_service_db_volume:
+  submission_service_db_volume: # what for?
