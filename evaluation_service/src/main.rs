@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 use protos::service::evaluation::{evaluation_server::*, *};
 use protos::utils::*;
+use std::time::SystemTime;
 use tonic::{transport::*, Request, Response, Status};
 use utils::storage::FsStorageHelper;
 
@@ -59,7 +60,7 @@ impl EvaluationService {
                 })
             })
     }
-    async fn get_problem_update_file(&self, problem_id: u64) -> Result<ProblemUpdateInfo, Status> {
+    fn load_problem_update_file(&self, problem_id: u64) -> Result<ProblemUpdateInfo, Status> {
         self.get_problem_folder_from_id(problem_id)
             .map_err(internal_error)
             .and_then(|path| {
@@ -82,7 +83,7 @@ impl EvaluationService {
                     .map_err(|err| internal_error(err.as_ref()))
             })
     }
-    async fn save_problem_update_file(&self, info: ProblemUpdateInfo) -> Result<(), Status> {
+    fn save_problem_update_file(&self, info: ProblemUpdateInfo) -> Result<(), Status> {
         let path = self
             .get_problem_folder_from_id(info.problem_id)
             .map_err(internal_error)?;
@@ -424,6 +425,20 @@ impl Evaluation for EvaluationService {
                     .storage
                     .add_folder(&tc.id.to_string(), Some(&testcases_path))?;
 
+                let mut update_info = self.load_problem_update_file(problem_id)?;
+                update_info
+                    .subtasks
+                    .iter_mut()
+                    .find(|x| x.subtask_id == subtask_id)
+                    .ok_or_else(|| internal_error("subtask not found in update info"))?
+                    .testcases
+                    .push(TestcaseUpdateInfo {
+                        testcase_id: tc.id,
+                        input_last_update: SystemTime::now().into(),
+                        output_last_update: SystemTime::now().into(),
+                    });
+                self.save_problem_update_file(update_info)?;
+
                 if tc.input.is_some() {
                     self.storage.save_file(
                         Some(&tc_path),
@@ -464,6 +479,19 @@ impl Evaluation for EvaluationService {
                         tc.id
                     )));
                 }
+                let mut update_info = self.load_problem_update_file(problem_id)?;
+                let tcu = update_info
+                    .subtasks
+                    .iter_mut()
+                    .find(|x| x.subtask_id == subtask_id)
+                    .ok_or_else(|| internal_error("subtask not found in update info"))?
+                    .testcases
+                    .iter_mut()
+                    .find(|x| x.testcase_id == tc.id)
+                    .ok_or_else(|| internal_error("testcase not found in update info"))?;
+                tcu.input_last_update = SystemTime::now().into();
+                tcu.output_last_update = SystemTime::now().into();
+                self.save_problem_update_file(update_info)?;
             }
             set_testcase_request::Command::DeleteTestcaseId(tc_id) => {
                 // Delete from problem metadata
@@ -521,6 +549,22 @@ impl Evaluation for EvaluationService {
                         tc_id
                     )));
                 }
+
+                let mut update_info = self.load_problem_update_file(problem_id)?;
+                let subtask = update_info
+                    .subtasks
+                    .iter_mut()
+                    .find(|x| x.subtask_id == subtask_id)
+                    .ok_or_else(|| internal_error("subtask not found in update info"))?;
+                let index = subtask
+                    .testcases
+                    .iter()
+                    .position(|t| t.testcase_id == tc_id)
+                    .ok_or_else(|| {
+                        not_found_error(format!("Testcase not found [id: {}]", tc_id))
+                    })?;
+                subtask.testcases.remove(index);
+                self.save_problem_update_file(update_info)?;
             }
         };
         Ok(Response::new(SetTestcaseResponse {}))
@@ -584,6 +628,16 @@ impl Evaluation for EvaluationService {
                         ef,
                     )
                     .map_err(internal_error)?;
+                let mut update_info = self.load_problem_update_file(problem_id)?;
+                match file_type {
+                    evaluation_file::Type::Checker => {
+                        update_info.checker_last_update = SystemTime::now().into();
+                    }
+                    evaluation_file::Type::Interactor => {
+                        update_info.interactor_last_update = SystemTime::now().into();
+                    }
+                }
+                self.save_problem_update_file(update_info)?;
             }
             set_problem_evaluation_file_request::Command::UpdateEvaluationFile(ef) => {
                 let file_type = evaluation_file::Type::from_i32(ef.r#type).ok_or_else(|| {
@@ -604,6 +658,16 @@ impl Evaluation for EvaluationService {
                         ef,
                     )
                     .map_err(internal_error)?;
+                let mut update_info = self.load_problem_update_file(problem_id)?;
+                match file_type {
+                    evaluation_file::Type::Checker => {
+                        update_info.checker_last_update = SystemTime::now().into();
+                    }
+                    evaluation_file::Type::Interactor => {
+                        update_info.interactor_last_update = SystemTime::now().into();
+                    }
+                }
+                self.save_problem_update_file(update_info)?;
             }
         }
         Ok(Response::new(SetProblemEvaluationFileResponse {}))
