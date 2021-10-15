@@ -1,29 +1,11 @@
 use failure::{format_err, Error};
 use futures::lock::Mutex;
-use protos::{
-    common::{Duration, ProgrammingLanguage, Resources, Score, Source, Timestamp},
-    evaluation::{compilation_result, testcase_result::Outcome, CompilationResult, TestcaseResult},
-    scoring,
-    service::{
-        evaluation::{
-            evaluation_client::EvaluationClient, evaluation_file, evaluation_server::Evaluation,
-            problem, EvaluationFile, GetProblemEvaluationFileRequest, GetProblemRequest,
-            GetProblemResponse, GetProblemTestcasesResponse, GetTestcaseRequest, MockEvaluation,
-            Problem, Testcase,
-        },
-        worker::{
+use protos::{common::{Duration, ProgrammingLanguage, Resources, Score, Source, Timestamp}, evaluation::{compilation_result, testcase_result::Outcome, CompilationResult, TestcaseResult}, scoring, service::{evaluation::{EvaluationFile, GetProblemEvaluationFileRequest, GetProblemRequest, GetProblemResponse, GetProblemTestcasesResponse, GetTestcaseRequest, GetUpdateInfoRequest, GetUpdateInfoResponse, MockEvaluation, Problem, Testcase, evaluation_client::EvaluationClient, evaluation_file, evaluation_server::Evaluation, problem}, worker::{
             worker_server::{Worker, WorkerServer},
             EvaluateSubmissionRequest, EvaluateSubmissionResponse, UpdateSourceRequest,
             UpdateSourceResponse, UpdateTestcaseRequest, UpdateTestcaseResponse,
-        },
-    },
-};
-use std::{
-    collections::HashMap,
-    path::PathBuf,
-    sync::Arc,
-    thread::{sleep, spawn},
-};
+        }}};
+use std::{collections::HashMap, path::PathBuf, sync::Arc, thread::{sleep, spawn}};
 use tabox::{
     configuration::SandboxConfiguration, result::SandboxExecutionResult, SandboxImplementation,
 };
@@ -34,11 +16,19 @@ use tonic::{transport::Server, Request, Response, Status};
 mod configurations;
 use configurations::*;
 
-fn timestamp_cmp(a: Timestamp, b: Timestamp) -> i64 {
+fn timestamp_cmp(a: &Timestamp, b: &Timestamp) -> i64 {
     if a.secs == b.secs {
         (a.nanos as i64) - (b.nanos as i64)
     } else {
         (a.secs as i64) - (b.secs as i64)
+    }
+}
+
+fn timestamp_max<'a>(a: &'a Timestamp, b: &'a Timestamp) -> &'a Timestamp {
+    if timestamp_cmp(a, b) < 0 {
+        b
+    } else {
+        a
     }
 }
 
@@ -64,6 +54,30 @@ struct EvaluationFileStatus {
     // vectors of id and correspondent timestamp
     testcases: Vec<(ProblemId, TestcaseId, Timestamp)>,
     checkers: Vec<(ProblemId, evaluation_file::Type, Timestamp)>,
+}
+
+impl From<GetUpdateInfoResponse> for EvaluationFileStatus {
+    fn from(update_info: GetUpdateInfoResponse) -> Self {
+        let mut status = EvaluationFileStatus {
+            testcases: vec![],
+            checkers: vec![]
+        };
+        update_info.problems
+            .iter()
+            .for_each(|problem_info| {
+                for subtask in &problem_info.subtasks {
+                    for testcase in &subtask.testcases {
+                        let most_recest_update = 
+                            timestamp_max(&testcase.input_last_update, &testcase.output_last_update);
+                        status.testcases.push((problem_info.problem_id, testcase.testcase_id, most_recest_update.clone()));
+                    }
+                }
+
+                status.checkers.push((problem_info.problem_id, evaluation_file::Type::Checker, problem_info.checker_last_update.clone()));
+                status.checkers.push((problem_info.problem_id, evaluation_file::Type::Interactor, problem_info.interactor_last_update.clone()));
+            });
+        status
+    }
 }
 
 pub struct WorkerService {
@@ -120,7 +134,7 @@ async fn diff_and_update_status(
             .testcases
             .insert((problem_id, testcase_id), actual_timestamp.clone());
 
-        if old_timestamp.is_none() || timestamp_cmp(old_timestamp.unwrap(), actual_timestamp) < 0 {
+        if old_timestamp.is_none() || timestamp_cmp(&old_timestamp.unwrap(), &actual_timestamp) < 0 {
             // pull updated testcase
             let testcase = pull_testcase(evaluation_service, problem_id, testcase_id).await;
             // save testcase
@@ -147,7 +161,7 @@ async fn diff_and_update_status(
             .checkers
             .insert((problem_id, checker_type), actual_timestamp.clone());
 
-        if old_timestamp.is_none() || timestamp_cmp(old_timestamp.unwrap(), actual_timestamp) < 0 {
+        if old_timestamp.is_none() || timestamp_cmp(&old_timestamp.unwrap(), &actual_timestamp) < 0 {
             // pull updated checker
             let checker = pull_checker(evaluation_service, problem_id, checker_type).await;
             // compile checker in sandbox
@@ -171,14 +185,21 @@ async fn pull_join_handler_action(
         // sleep 30 secs
         sleep(std::time::Duration::new(30, 0));
 
-        // pull status. TODO actually do the pull
-        let actual_status = EvaluationFileStatus {
-            testcases: vec![],
-            checkers: vec![],
-        };
+        // pull status
+        let res_actual_status = evaluation_service
+            .get_update_info(Request::new(GetUpdateInfoRequest{}))
+            .await
+            .map(|response| EvaluationFileStatus::from(response.into_inner()));
 
-        // diff and update
-        diff_and_update_status(&mut evaluation_service, &wrapped_status, actual_status).await;
+        match res_actual_status {
+            Ok(actual_status) => {
+                // diff and update
+                diff_and_update_status(&mut evaluation_service, &wrapped_status, actual_status).await;
+            },
+            Err(e) => {
+                println!("An error occurred while pulling the update info: {:?}", e);
+            } 
+        }
     }
 }
 
@@ -445,8 +466,6 @@ impl Worker for WorkerService {
         &self,
         _request: Request<UpdateSourceRequest>,
     ) -> Result<Response<UpdateSourceResponse>, Status> {
-        // compile the source code of the checker inside a sandbox and
-        // save the result into the directory tmp/tabox/checkers
         todo!()
     }
 }

@@ -47,7 +47,7 @@ message TestcaseUpdateInfo {
 }
 message SubtaskUpdateInfo {
     required uint64 subtask_id = 1;
-		repeated TestcaseUpdateInfo testcases = 2;
+	repeated TestcaseUpdateInfo testcases = 2;
 }
 message ProblemUpdateInfo {
 		required uint64 problem_id = 1;
