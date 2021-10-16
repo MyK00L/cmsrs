@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 use protos::service::evaluation::{evaluation_server::*, *};
 use protos::utils::*;
+use std::time::SystemTime;
 use tonic::{transport::*, Request, Response, Status};
 use utils::storage::FsStorageHelper;
 
@@ -16,6 +17,7 @@ const INPUT_FILE_NAME: &str = "input";
 const OUTPUT_FILE_NAME: &str = "output";
 const IO_EXTENSION: &str = "txt";
 const PROBLEM_METADATA_FILE_NAME: &str = "metadata";
+const PROBLEM_UPDATE_FILE_NAME: &str = "updates";
 
 fn internal_error<T>(e: T) -> Status
 where
@@ -57,6 +59,43 @@ impl EvaluationService {
                     not_found_io_error(&format!("Problem not found [id: {}]", problem_id))
                 })
             })
+    }
+    fn load_problem_update_file(&self, problem_id: u64) -> Result<ProblemUpdateInfo, Status> {
+        self.get_problem_folder_from_id(problem_id)
+            .map_err(internal_error)
+            .and_then(|path| {
+                self.storage
+                    .search_item(
+                        Some(&path),
+                        PROBLEM_UPDATE_FILE_NAME,
+                        Some(SERIALIZED_EXTENSION),
+                    )
+                    .map_err(internal_error)
+            })
+            .and_then(|op| {
+                op.ok_or_else(|| {
+                    not_found_error(format!("Problem updates not found [id: {}]", problem_id))
+                })
+            })
+            .and_then(|path| {
+                self.storage
+                    .read_file_object(&path)
+                    .map_err(|err| internal_error(err.as_ref()))
+            })
+    }
+    fn save_problem_update_file(&self, info: ProblemUpdateInfo) -> Result<(), Status> {
+        let path = self
+            .get_problem_folder_from_id(info.problem_id)
+            .map_err(internal_error)?;
+        self.storage
+            .save_file_object(
+                Some(&path),
+                PROBLEM_UPDATE_FILE_NAME,
+                SERIALIZED_EXTENSION,
+                info,
+            )
+            .map_err(internal_error)?;
+        Ok(())
     }
 }
 
@@ -143,6 +182,7 @@ impl Evaluation for EvaluationService {
         }))
     }
 
+    // NOTE: cannot update file related stuff with this request or everything will burn
     async fn set_contest(
         &self,
         request: Request<SetContestRequest>,
@@ -190,6 +230,10 @@ impl Evaluation for EvaluationService {
             // Create folder for evaluation files
             self.storage
                 .add_folder(EVALUATION_FILES_FOLDER_NAME, Some(&p_path))?;
+
+            let mut update_info = self.load_problem_update_file(p.id).ok().unwrap_or_default();
+            update_info.problem_id = p.id;
+            self.save_problem_update_file(update_info)?;
         }
         Ok(Response::new(SetContestResponse {}))
     }
@@ -386,6 +430,20 @@ impl Evaluation for EvaluationService {
                     .storage
                     .add_folder(&tc.id.to_string(), Some(&testcases_path))?;
 
+                let mut update_info = self.load_problem_update_file(problem_id)?;
+                update_info
+                    .subtasks
+                    .iter_mut()
+                    .find(|x| x.subtask_id == subtask_id)
+                    .ok_or_else(|| internal_error("subtask not found in update info"))?
+                    .testcases
+                    .push(TestcaseUpdateInfo {
+                        testcase_id: tc.id,
+                        input_last_update: SystemTime::now().into(),
+                        output_last_update: SystemTime::now().into(),
+                    });
+                self.save_problem_update_file(update_info)?;
+
                 if tc.input.is_some() {
                     self.storage.save_file(
                         Some(&tc_path),
@@ -426,6 +484,19 @@ impl Evaluation for EvaluationService {
                         tc.id
                     )));
                 }
+                let mut update_info = self.load_problem_update_file(problem_id)?;
+                let tcu = update_info
+                    .subtasks
+                    .iter_mut()
+                    .find(|x| x.subtask_id == subtask_id)
+                    .ok_or_else(|| internal_error("subtask not found in update info"))?
+                    .testcases
+                    .iter_mut()
+                    .find(|x| x.testcase_id == tc.id)
+                    .ok_or_else(|| internal_error("testcase not found in update info"))?;
+                tcu.input_last_update = SystemTime::now().into();
+                tcu.output_last_update = SystemTime::now().into();
+                self.save_problem_update_file(update_info)?;
             }
             set_testcase_request::Command::DeleteTestcaseId(tc_id) => {
                 // Delete from problem metadata
@@ -483,6 +554,22 @@ impl Evaluation for EvaluationService {
                         tc_id
                     )));
                 }
+
+                let mut update_info = self.load_problem_update_file(problem_id)?;
+                let subtask = update_info
+                    .subtasks
+                    .iter_mut()
+                    .find(|x| x.subtask_id == subtask_id)
+                    .ok_or_else(|| internal_error("subtask not found in update info"))?;
+                let index = subtask
+                    .testcases
+                    .iter()
+                    .position(|t| t.testcase_id == tc_id)
+                    .ok_or_else(|| {
+                        not_found_error(format!("Testcase not found [id: {}]", tc_id))
+                    })?;
+                subtask.testcases.remove(index);
+                self.save_problem_update_file(update_info)?;
             }
         };
         Ok(Response::new(SetTestcaseResponse {}))
@@ -546,6 +633,16 @@ impl Evaluation for EvaluationService {
                         ef,
                     )
                     .map_err(internal_error)?;
+                let mut update_info = self.load_problem_update_file(problem_id)?;
+                match file_type {
+                    evaluation_file::Type::Checker => {
+                        update_info.checker_last_update = SystemTime::now().into();
+                    }
+                    evaluation_file::Type::Interactor => {
+                        update_info.interactor_last_update = SystemTime::now().into();
+                    }
+                }
+                self.save_problem_update_file(update_info)?;
             }
             set_problem_evaluation_file_request::Command::UpdateEvaluationFile(ef) => {
                 let file_type = evaluation_file::Type::from_i32(ef.r#type).ok_or_else(|| {
@@ -566,6 +663,16 @@ impl Evaluation for EvaluationService {
                         ef,
                     )
                     .map_err(internal_error)?;
+                let mut update_info = self.load_problem_update_file(problem_id)?;
+                match file_type {
+                    evaluation_file::Type::Checker => {
+                        update_info.checker_last_update = SystemTime::now().into();
+                    }
+                    evaluation_file::Type::Interactor => {
+                        update_info.interactor_last_update = SystemTime::now().into();
+                    }
+                }
+                self.save_problem_update_file(update_info)?;
             }
         }
         Ok(Response::new(SetProblemEvaluationFileResponse {}))
@@ -574,7 +681,23 @@ impl Evaluation for EvaluationService {
         &self,
         _request: Request<GetUpdateInfoRequest>,
     ) -> Result<Response<GetUpdateInfoResponse>, Status> {
-        unimplemented!();
+        let mut problems: Vec<ProblemUpdateInfo> = vec![];
+        for entry in self.storage.iterate_folder(PROBLEMS_FOLDER_NAME, None)? {
+            let problem_path = self
+                .storage
+                .search_item(
+                    Some(&entry?.path()),
+                    PROBLEM_UPDATE_FILE_NAME,
+                    Some(SERIALIZED_EXTENSION),
+                )?
+                .ok_or_else(|| not_found_error("Problem update metadata not found"))?;
+            let p: ProblemUpdateInfo = self
+                .storage
+                .read_file_object(&problem_path)
+                .map_err(|err| internal_error(err.as_ref()))?;
+            problems.push(p);
+        }
+        Ok(Response::new(GetUpdateInfoResponse { problems }))
     }
 }
 
