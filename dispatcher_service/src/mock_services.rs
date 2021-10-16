@@ -64,6 +64,7 @@ fn mock_evaluation_init(mock_evaluation_server: &mut MockEvaluation) {
     });
 }
 
+#[allow(dead_code)]
 fn mock_worker_init(mock_worker_server: &mut MockWorker) {
     mock_worker_server.evaluate_submission_set(worker::EvaluateSubmissionResponse {
         compilation_result: CompilationResult {
@@ -105,6 +106,7 @@ pub fn get_mock_evaluation() -> MockEvaluation {
     mock
 }
 
+#[allow(dead_code)]
 pub fn get_mock_worker() -> MockWorker {
     let mut mock = MockWorker::default();
     mock_worker_init(&mut mock);

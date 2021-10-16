@@ -131,7 +131,7 @@ fn subtask_data_to_db_obj(subtask_data: &SubtaskResult) -> Bson {
         "testcases":
             subtask_data.testcase_results
                 .iter()
-                .map(|testcase_data| testcase_data_to_db_obj(testcase_data))
+                .map(testcase_data_to_db_obj)
                 .collect::<Bson>()
     })
 }
