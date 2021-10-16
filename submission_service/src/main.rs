@@ -102,8 +102,7 @@ async fn init_contest_service_db(db: Database) -> Result<(), Box<dyn std::error:
                                     */
                                 },
                                 "timeNs": { "bsonType": "long" },
-                                "memoryB": { "bsonType": "long" },
-                                "error": { "bsonType": "string" }
+                                "memoryB": { "bsonType": "long" }
                             }
                         }, // EvaluationResult.compilation_result
                         "evaluation": {

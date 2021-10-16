@@ -48,6 +48,13 @@ services:
       - 50055:50051
     depends_on:
       - submission_service_db
+  worker_service:
+    privileged: true
+    build:
+      context: .
+      dockerfile: ./worker_service/Dockerfile
+    ports: 
+      - "127.0.0.1:50051:50051"
 
 
 volumes:
