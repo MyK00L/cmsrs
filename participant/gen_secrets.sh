@@ -10,5 +10,4 @@ openssl req -newkey rsa:2048 \
     -subj "/C=IT/ST=/L=/O=/OU=/CN=/emailAddress="
 # replace rocket secret
 secret_key="\"$(openssl rand -base64 32)\""
-sed -i "s/^secret_key.*/secret_key=$secret_key/" Rocket.toml
-
+perl -pi -e 's/^secret_key.*/secret_key='$secret_key'/' Rocket.toml
