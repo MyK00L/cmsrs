@@ -293,7 +293,7 @@ impl Contest for ContestService {
             .update_one(
                 doc! { "_id": problem_data.get_id() },
                 doc! { "$set": doc!{"name": problem_data.name, "longName": problem_data.long_name} },
-                UpdateOptions::builder().build(),
+                UpdateOptions::builder().upsert(true).build(),
             )
             .await
             .map_err(internal_error)
