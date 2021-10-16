@@ -1,7 +1,7 @@
 use failure::{format_err, Error};
 use futures::lock::Mutex;
 use protos::{
-    common::{Duration, ProgrammingLanguage, Resources, Score, Source, Timestamp},
+    common::{Duration, ProgrammingLanguage, Resources, Score, Timestamp},
     evaluation::{compilation_result, testcase_result::Outcome, CompilationResult, TestcaseResult},
     scoring,
     service::{
@@ -231,7 +231,7 @@ async fn pull_join_handler_action(
                     .await;
             }
             Err(e) => {
-                println!("An error occurred while pulling the update info: {:?}", e);
+                eprintln!("An error occurred while pulling the update info: {:?}", e);
             }
         }
     }
@@ -303,18 +303,18 @@ impl Worker for WorkerService {
         let compilation_config =
             get_compilation_config(problem_metadata.clone(), request_inner.source)
                 .map_err(|e| Status::aborted(e.to_string()))?;
-        println!("Compilation config: {:?}", compilation_config);
+        eprintln!("Compilation config: {:?}", compilation_config);
 
         let compilation_res =
             run_sandbox(compilation_config.clone()).map_err(|e| Status::aborted(e.to_string()))?; // problems with sandbox
 
-        println!(
+        eprintln!(
             "Compilation successfull? {}, exit status {:?}",
             compilation_res.status.success(),
             compilation_res.status
         );
 
-        println!(
+        eprintln!(
             "{}",
             std::fs::read_to_string(PathBuf::from("/tmp/tabox/compilation/stderr.txt"))
                 .expect("cannot read")
@@ -355,7 +355,7 @@ impl Worker for WorkerService {
             testcase_results: vec![], // yet to be evaluated
         };
 
-        println!(
+        eprintln!(
             "Executable exists? {}",
             PathBuf::from(join_path_str(
                 PathBuf::from("/tmp/tabox/compilation"),
@@ -364,7 +364,7 @@ impl Worker for WorkerService {
             .exists()
         );
 
-        println!(
+        eprintln!(
             "Compilation directory exists? {}",
             PathBuf::from("/tmp/tabox/compilation").exists()
         );
@@ -391,7 +391,7 @@ impl Worker for WorkerService {
                 std::fs::copy(testcase_dir.join("output.txt"), output_file_path.clone())
                     .expect("Failed to copy the testcase input into the working directory.");
 
-                println!("Running the execution in the sandbox");
+                eprintln!("Running the execution in the sandbox");
 
                 let execution_res = run_sandbox(exec_config.clone())
                     .map_err(|e| {
@@ -399,23 +399,23 @@ impl Worker for WorkerService {
                     })
                     .unwrap();
 
-                println!("Execution in the sandbox terminated");
+                eprintln!("Execution in the sandbox terminated");
 
-                println!(
+                eprintln!(
                     "Execution directory exists? {}",
                     PathBuf::from("/tmp/tabox/execution").exists()
                 );
-                println!(
+                eprintln!(
                     "Execution successfull? {}, exit status {:?} {:?}",
                     execution_res.status.success(),
                     execution_res.status,
                     execution_res.status.signal_name()
                 );
-                println!(
+                eprintln!(
                     "content of stdin.txt: \"{}\"",
                     std::fs::read_to_string(input_file_path.clone()).expect("cannot read")
                 );
-                println!(
+                eprintln!(
                     "content of stdout.txt: \"{}\"",
                     std::fs::read_to_string(output_file_path.clone()).expect("cannot read")
                 );
@@ -445,7 +445,7 @@ impl Worker for WorkerService {
                     };
                 }
 
-                println!("Successfull!");
+                eprintln!("Successfull!");
 
                 let checker_exec_config = get_checker_execution_config(
                     problem_metadata.clone(),
@@ -551,38 +551,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let _pull_thread_handler =
         spawn(move || pull_join_handler_action(evaluation_service_copy, status_copy));
-
-    let request = EvaluateSubmissionRequest {
-        problem_id: 1,
-        source: Source {
-            lang: ProgrammingLanguage::Cpp as i32,
-            code: "#include<iostream>\nint main() { int x; std::cin >> x; std::cout << \"Hey there! \" << x << \" is a great number\"; return 0; }".as_bytes().to_vec()
-            // code: "#include<iostream>\nint main() { std::cout << \"Hey there!\"; return 0; }".as_bytes().to_vec()
-            // lang: ProgrammingLanguage::Rust as i32,
-            // code: "fn main() { println!(\"Hey there!\"); }".as_bytes().to_vec()
-        },
-    };
-    println!("Request is:\n\n{:?}\n\n", request.clone());
-    println!(
-        "{:?}",
-        worker_service
-            .evaluate_submission(Request::new(request))
-            .await?
-            .into_inner()
-    );
-    println!(
-        "Compilation directory exists? {}",
-        PathBuf::from("/tmp/tabox/compilation").exists()
-    );
-    println!(
-        "Execution directory exists? {}",
-        PathBuf::from("/tmp/tabox/execution").exists()
-    );
-    println!(
-        "Checker directory exists? {}",
-        PathBuf::from("/tmp/tabox/checker").exists()
-    );
-    println!("Finished hardcoded example");
 
     println!("Starting a worker server");
     Server::builder()
