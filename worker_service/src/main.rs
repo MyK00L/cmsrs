@@ -29,7 +29,6 @@ use tabox::{
 };
 use tabox::{result::ResourceUsage, Sandbox};
 use tonic::{transport::Server, Request, Response, Status};
-use utils::scoring_lib::score_with_bool;
 
 #[path = "./configurations.rs"]
 mod configurations;

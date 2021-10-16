@@ -1,5 +1,5 @@
 use protos::{
-    common::{self, Resources},
+    common::{self, Resources, Score},
     evaluation::{compilation_result, testcase_result::Outcome, CompilationResult, TestcaseResult},
     scoring::{self},
     service::{
@@ -9,7 +9,6 @@ use protos::{
 };
 use rand::seq::SliceRandom;
 use rand::thread_rng;
-use utils::scoring_lib::score_with_bool;
 
 const NUM_OF_SUBTASKS: u64 = 5;
 const NUM_OF_TESTCASES_PER_SUBTASK: u64 = 5;
@@ -19,7 +18,7 @@ fn generate_min_subtask_scoring(subtask_num: u64) -> protos::service::evaluation
         id: 0u64,
         scoring: scoring::Subtask {
             method: scoring::subtask::Method::Min as i32,
-            max_score: 20f64,
+            max_score: Score { score: 20f64 },
         },
         testcases_id: {
             let mut testcase_ids = Vec::with_capacity(NUM_OF_TESTCASES_PER_SUBTASK as usize);
@@ -83,7 +82,7 @@ fn mock_worker_init(mock_worker_server: &mut MockWorker) {
             for i in 0..NUM_OF_TESTCASES_PER_SUBTASK * NUM_OF_SUBTASKS {
                 testcase_results.push(TestcaseResult {
                     outcome: Outcome::Ok as i32,
-                    score: score_with_bool(true),
+                    score: Score { score: 1f64 },
                     used_resources: Resources {
                         time: common::Duration {
                             secs: 0u64,

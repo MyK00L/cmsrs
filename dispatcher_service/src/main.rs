@@ -1,6 +1,6 @@
 use protos::{
+    common::Score,
     evaluation::{compilation_result, EvaluationResult, SubtaskResult, TestcaseResult},
-    scoring::OneOfScore,
     service::{
         dispatcher::{
             self,
@@ -80,7 +80,7 @@ async fn group_testcases(
                 .iter()
                 .map(|testcase_id| map_id_to_testcase_result[testcase_id].to_owned())
                 .collect(),
-            score: OneOfScore::default(),
+            score: Score { score: 0f64 },
             id: subtask.id,
         })
         .collect())
@@ -109,7 +109,7 @@ async fn worker_to_dispatcher_response(
             } else {
                 vec![]
             },
-            score: OneOfScore::default(),
+            score: Score { score: 0f64 },
         },
     })
 }
