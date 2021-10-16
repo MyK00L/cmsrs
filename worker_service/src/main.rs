@@ -199,11 +199,9 @@ async fn diff_and_update_status(
                 get_checker_compilation_config(problem_id, checker.r#type(), checker.source)
                     .expect("Unable to get checker compilation configuration.");
             let sandbox_res = run_sandbox(config).expect("Failed to run sandbox.");
-            assert!(
-                sandbox_res.status.success(),
-                "checker compilation must succeed"
-            );
-            // success is good
+            if !sandbox_res.status.success() {
+                eprintln!("checker compilation must succeed");
+            }
         }
     }
 }
@@ -303,22 +301,27 @@ impl Worker for WorkerService {
         let compilation_config =
             get_compilation_config(problem_metadata.clone(), request_inner.source)
                 .map_err(|e| Status::aborted(e.to_string()))?;
-        eprintln!("Compilation config: {:?}", compilation_config);
+
+        if cfg!(debug_assertions) {
+            eprintln!("Compilation config: {:?}", compilation_config);
+        }
 
         let compilation_res =
             run_sandbox(compilation_config.clone()).map_err(|e| Status::aborted(e.to_string()))?; // problems with sandbox
 
-        eprintln!(
-            "Compilation successfull? {}, exit status {:?}",
-            compilation_res.status.success(),
-            compilation_res.status
-        );
+        if cfg!(debug_assertions) {
+            eprintln!(
+                "Compilation successfull? {}, exit status {:?}",
+                compilation_res.status.success(),
+                compilation_res.status
+            );
 
-        eprintln!(
-            "{}",
-            std::fs::read_to_string(PathBuf::from("/tmp/tabox/compilation/stderr.txt"))
-                .expect("cannot read")
-        );
+            eprintln!(
+                "{}",
+                std::fs::read_to_string(PathBuf::from("/tmp/tabox/compilation/stderr.txt"))
+                    .expect("cannot read")
+            );
+        }
 
         if !compilation_res.status.success() {
             // unsuccessfull compilation
@@ -355,19 +358,21 @@ impl Worker for WorkerService {
             testcase_results: vec![], // yet to be evaluated
         };
 
-        eprintln!(
-            "Executable exists? {}",
-            PathBuf::from(join_path_str(
-                PathBuf::from("/tmp/tabox/compilation"),
-                EXECUTABLE_NAME.to_string(),
-            ))
-            .exists()
-        );
+        if cfg!(debug_assertions) {
+            eprintln!(
+                "Compilation directory exists? {}",
+                PathBuf::from("/tmp/tabox/compilation").exists()
+            );
 
-        eprintln!(
-            "Compilation directory exists? {}",
-            PathBuf::from("/tmp/tabox/compilation").exists()
-        );
+            eprintln!(
+                "Executable exists? {}",
+                PathBuf::from(join_path_str(
+                    PathBuf::from("/tmp/tabox/compilation"),
+                    EXECUTABLE_NAME.to_string(),
+                ))
+                .exists()
+            );
+        }
 
         let input_file_path = PathBuf::from("/tmp/tabox/execution/stdin.txt");
         let output_file_path = PathBuf::from("/tmp/tabox/execution/stdout.txt");
@@ -391,7 +396,9 @@ impl Worker for WorkerService {
                 std::fs::copy(testcase_dir.join("output.txt"), output_file_path.clone())
                     .expect("Failed to copy the testcase input into the working directory.");
 
-                eprintln!("Running the execution in the sandbox");
+                if cfg!(debug_assertions) {
+                    eprintln!("Running the execution in the sandbox");
+                }
 
                 let execution_res = run_sandbox(exec_config.clone())
                     .map_err(|e| {
@@ -399,26 +406,28 @@ impl Worker for WorkerService {
                     })
                     .unwrap();
 
-                eprintln!("Execution in the sandbox terminated");
+                if cfg!(debug_assertions) {
+                    eprintln!("Execution in the sandbox terminated");
 
-                eprintln!(
-                    "Execution directory exists? {}",
-                    PathBuf::from("/tmp/tabox/execution").exists()
-                );
-                eprintln!(
-                    "Execution successfull? {}, exit status {:?} {:?}",
-                    execution_res.status.success(),
-                    execution_res.status,
-                    execution_res.status.signal_name()
-                );
-                eprintln!(
-                    "content of stdin.txt: \"{}\"",
-                    std::fs::read_to_string(input_file_path.clone()).expect("cannot read")
-                );
-                eprintln!(
-                    "content of stdout.txt: \"{}\"",
-                    std::fs::read_to_string(output_file_path.clone()).expect("cannot read")
-                );
+                    eprintln!(
+                        "Execution directory exists? {}",
+                        PathBuf::from("/tmp/tabox/execution").exists()
+                    );
+                    eprintln!(
+                        "Execution successfull? {}, exit status {:?} {:?}",
+                        execution_res.status.success(),
+                        execution_res.status,
+                        execution_res.status.signal_name()
+                    );
+                    eprintln!(
+                        "content of stdin.txt: \"{}\"",
+                        std::fs::read_to_string(input_file_path.clone()).expect("cannot read")
+                    );
+                    eprintln!(
+                        "content of stdout.txt: \"{}\"",
+                        std::fs::read_to_string(output_file_path.clone()).expect("cannot read")
+                    );
+                }
 
                 if !execution_res.status.success() {
                     let is_mle = exec_config.memory_limit.map_or(false, |memory_limit| {
@@ -445,7 +454,9 @@ impl Worker for WorkerService {
                     };
                 }
 
-                eprintln!("Successfull!");
+                if cfg!(debug_assertions) {
+                    eprintln!("Successfull!");
+                }
 
                 let checker_exec_config = get_checker_execution_config(
                     problem_metadata.clone(),
