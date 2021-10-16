@@ -240,6 +240,7 @@ fn rocket() -> _ {
                 forms::login,
                 forms::set_evaluation_file,
                 forms::add_testcase,
+                forms::set_statement,
                 forms::get_evaluation_file,
                 forms::get_testcase,
             ],

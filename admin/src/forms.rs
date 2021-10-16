@@ -224,7 +224,7 @@ pub async fn add_testcase(
         )),
     }
 }
-/*
+
 #[derive(FromForm)]
 pub struct SetStatement<'v> {
     problem_id: u64,
@@ -235,13 +235,26 @@ pub async fn set_statement(
     data: Form<Strict<SetStatement<'_>>>,
     contest_client: &State<ContestClient>,
 ) -> Result<Redirect, status::Custom<String>> {
-    let contest_client = contest_client.inner().clone();
+    let mut contest_client = contest_client.inner().clone();
     let mut file = std::fs::File::open(data.file.path().unwrap()).unwrap();
-    let mut raw = Vec::<u8>::new();
-    file.read_to_end(&mut raw).unwrap();
-    todo!(); // wait for problem metadata and file separation on client service
+    let mut statement = Vec::<u8>::new();
+    file.read_to_end(&mut statement).unwrap();
+    let req = contest::UpdateProblemStatementRequest {
+        problem_id: data.problem_id,
+        statement,
+    };
+    match contest_client
+        .update_problem_statement(tonic::Request::new(req))
+        .await
+    {
+        Ok(_) => Ok(Redirect::to("/problem_files")),
+        Err(err) => Err(status::Custom(
+            Status::InternalServerError,
+            format!("Error in rpc request:\n{:?}", err),
+        )),
+    }
 }
-*/
+
 #[get("/form/get_evaluation_file/<problem_id>/<file_type>")]
 pub async fn get_evaluation_file(
     problem_id: u64,
