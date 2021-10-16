@@ -35,6 +35,8 @@ pub async fn update_contest(
 
     let user_req = contest::SetContestMetadataRequest::from(contest.clone());
 
+    let problem_reqs = Vec::<contest::UpdateProblemInfoRequest>::from(contest.clone());
+
     let evaluation_req = evaluation::SetContestRequest::from(contest);
 
     let (contest_response, evaluation_response) = future::join(
@@ -42,13 +44,34 @@ pub async fn update_contest(
         evaluation_client.set_contest(tonic::Request::new(evaluation_req)),
     )
     .await;
+
     match contest_response.ok().zip(evaluation_response.ok()) {
-        Some(_) => Ok(Redirect::to("/contest")),
-        None => Err(status::Custom(
-            Status::InternalServerError,
-            String::from("Error in sending requests :("),
-        )),
+        Some(_) => {}
+        None => {
+            return Err(status::Custom(
+                Status::InternalServerError,
+                String::from("Error in sending requests :("),
+            ));
+        }
     }
+
+    for i in problem_reqs {
+        match contest_client
+            .update_problem_info(tonic::Request::new(i))
+            .await
+            .ok()
+        {
+            // TODO: batch
+            Some(_) => {}
+            None => {
+                return Err(status::Custom(
+                    Status::InternalServerError,
+                    String::from("Error in sending requests :("),
+                ));
+            }
+        }
+    }
+    Ok(Redirect::to("/contest"))
 }
 
 #[derive(FromForm)]

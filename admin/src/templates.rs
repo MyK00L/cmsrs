@@ -436,6 +436,11 @@ impl From<Problem> for contest::Problem {
         }
     }
 }
+impl From<Problem> for contest::UpdateProblemInfoRequest {
+    fn from(p: Problem) -> Self {
+        Self { info: p.into() }
+    }
+}
 
 #[derive(Serialize, FromForm, Debug, Clone)]
 #[serde(crate = "rocket::serde")]
@@ -607,12 +612,16 @@ impl From<ContestTemplate> for contest::SetContestMetadataRequest {
                     .ok()
                     .map(|t| SystemTime::from(t).into()),
             },
-            problems: contest
-                .problems
-                .into_iter()
-                .map(contest::Problem::from)
-                .collect(),
         }
+    }
+}
+impl From<ContestTemplate> for Vec<contest::UpdateProblemInfoRequest> {
+    fn from(contest: ContestTemplate) -> Self {
+        contest
+            .problems
+            .into_iter()
+            .map(contest::UpdateProblemInfoRequest::from)
+            .collect()
     }
 }
 impl From<ContestTemplate> for evaluation::SetContestRequest {
