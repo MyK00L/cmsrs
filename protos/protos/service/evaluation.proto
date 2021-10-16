@@ -40,6 +40,26 @@ message Contest {
 
 // Communication messages for large files (keep as few as possible)
 
+message TestcaseUpdateInfo {
+    required uint64 testcase_id = 1;
+    required common.Timestamp input_last_update = 2;
+    required common.Timestamp output_last_update = 3;
+}
+message SubtaskUpdateInfo {
+    required uint64 subtask_id = 1;
+		repeated TestcaseUpdateInfo testcases = 2;
+}
+message ProblemUpdateInfo {
+		required uint64 problem_id = 1;
+		repeated SubtaskUpdateInfo subtasks = 2;
+		required common.Timestamp checker_last_update = 3;
+		required common.Timestamp interactor_last_update = 4;
+}
+message GetUpdateInfoRequest {}
+message GetUpdateInfoResponse {
+    repeated ProblemUpdateInfo problems = 1;
+}
+
 message Testcase {
     required uint64 id = 1;
     optional bytes input = 2;
@@ -138,4 +158,5 @@ service Evaluation {
         returns (GetProblemEvaluationFileResponse);
     rpc set_problem_evaluation_file(SetProblemEvaluationFileRequest)
         returns (SetProblemEvaluationFileResponse);
+    rpc get_update_info(GetUpdateInfoRequest) returns (GetUpdateInfoResponse);
 }

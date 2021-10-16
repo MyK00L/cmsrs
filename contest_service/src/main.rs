@@ -14,6 +14,7 @@ use tonic::{transport::*, Request, Response, Status};
 
 mod mappings;
 
+mod mongo_schema;
 #[cfg(test)]
 mod tests;
 
@@ -34,9 +35,9 @@ pub struct ContestService {
 
 impl ContestService {
     async fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        Ok(Self {
-            db_client: Client::with_options(ClientOptions::parse(CONNECTION_STRING).await?)?,
-        })
+        let db_client = Client::with_options(ClientOptions::parse(CONNECTION_STRING).await?)?;
+        mongo_schema::init_contest_service_db(db_client.database("contestdb")).await?;
+        Ok(Self { db_client })
     }
 
     /// Do not call this function, call get_*_collection or get_contest_metadata instead
@@ -292,7 +293,7 @@ impl Contest for ContestService {
             .update_one(
                 doc! { "_id": problem_data.get_id() },
                 doc! { "$set": doc!{"name": problem_data.name, "longName": problem_data.long_name} },
-                UpdateOptions::builder().build(),
+                UpdateOptions::builder().upsert(true).build(),
             )
             .await
             .map_err(internal_error)
