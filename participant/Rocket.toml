@@ -1,5 +1,6 @@
 [default]
 secret_key=""
+address="0.0.0.0"
 
 [default.tls]
 certs="certs/certificate.pem"
