@@ -1,0 +1,7 @@
+[default]
+secret_key=""
+
+[default.tls]
+certs="certs/certificate.pem"
+key="certs/key.pem"
+
