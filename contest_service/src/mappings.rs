@@ -1,8 +1,6 @@
 use std::convert::TryFrom;
 
 use mongodb::bson::Document;
-use protos::service::contest::GetContestMetadataResponse;
-use tonic::Response;
 
 #[derive(Debug)]
 pub enum MappingError {
@@ -40,16 +38,14 @@ pub mod contest {
             }
         }
     }
-    impl From<ContestMetadata> for Response<GetContestMetadataResponse> {
+    impl From<ContestMetadata> for protos::service::contest::ContestMetadata {
         fn from(md: ContestMetadata) -> Self {
-            Response::new(GetContestMetadataResponse {
-                metadata: protos::service::contest::ContestMetadata {
-                    name: md.name,
-                    description: md.description,
-                    start_time: md.start_time.map(protos::common::Timestamp::from),
-                    end_time: md.end_time.map(protos::common::Timestamp::from),
-                },
-            })
+            protos::service::contest::ContestMetadata {
+                name: md.name,
+                description: md.description,
+                start_time: md.start_time.map(protos::common::Timestamp::from),
+                end_time: md.end_time.map(protos::common::Timestamp::from),
+            }
         }
     }
 
@@ -199,8 +195,14 @@ pub mod problem {
     #[derive(Default, Clone)]
     pub struct Problem {
         id: u64,
-        name: String,
-        long_name: String,
+        pub name: String,
+        pub long_name: String,
+    }
+
+    impl Problem {
+        pub fn get_id(&self) -> i64 {
+            self.id as i64
+        }
     }
 
     impl From<protos::service::contest::Problem> for Problem {
@@ -278,7 +280,7 @@ pub mod user {
     #[derive(Clone)]
     pub struct User {
         username: String,
-        name: String,
+        fullname: String,
         password: Password,
     }
 
@@ -316,7 +318,7 @@ pub mod user {
         fn from(record: Document) -> Self {
             Self {
                 username: record.get_str("_id").unwrap().to_owned(),
-                name: record.get_str("fullName").unwrap().to_owned(),
+                fullname: record.get_str("fullname").unwrap().to_owned(),
                 // Here I assume that the password stored in the DB are hashed, since I hash them before insertion
                 password: Password::Hashed(record.get_str("password").unwrap().to_owned()),
             }
@@ -326,7 +328,7 @@ pub mod user {
         fn from(pb: protos::service::contest::SetUserRequest) -> Self {
             Self {
                 username: pb.username,
-                name: pb.fullname,
+                fullname: pb.fullname,
                 password: Password::Clear(pb.password),
             }
         }
@@ -337,7 +339,7 @@ pub mod user {
             u.hash_password().expect("Could not hash password");
             let mut result = Document::new();
             result.insert("_id", u.username);
-            result.insert("longName", u.name);
+            result.insert("fullname", u.fullname);
             result.insert(
                 "password",
                 {
@@ -355,7 +357,7 @@ pub mod user {
         fn from(u: User) -> Self {
             Self::Success(protos::service::contest::auth_user_response::Success {
                 username: u.username,
-                fullname: u.name,
+                fullname: u.fullname,
             })
         }
     }

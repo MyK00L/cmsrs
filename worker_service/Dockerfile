@@ -1,7 +1,22 @@
 FROM rustlang/rust:nightly as base
+
+# TODO: might not be needed.
+# Prepare user id and group id for user running the sandbox process(es).
+ARG UID=1000
+ARG GID=1000
+
+# Drop root privileges for user running the sandbox process(es).
+RUN groupadd -g $GID user && useradd -m -g $GID -u $UID user
+
 WORKDIR /src 
 COPY protos protos
-COPY utils utils
+# install the compilers needed 
+# NB: rustc is already in the base image
+RUN apt-get update && \
+    apt-get install gcc
+# finished installation of compilers
+# package required by tabox 
+RUN apt-get install -y libseccomp-dev 
 WORKDIR /src/server
 COPY worker_service/dummy.rs .
 COPY worker_service/Cargo.toml .
