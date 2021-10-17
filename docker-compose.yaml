@@ -49,6 +49,13 @@ services:
     depends_on:
       - submission_service_db
 
+  participant_web_server:
+    build:
+      context: .
+      dockerfile: ./participant/Dockerfile
+    ports:
+      - 8000:80
+
   dispatcher_service:
     build:
       context: .

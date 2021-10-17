@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+		<title>{{contest.name}} - {% block title %}{% endblock title %}</title>
+		{% block scripts %}{% endblock scripts %}
+		{% if contest.start_time and contest.end_time %}
+		<script>
+			"use strict";
+			const start_time = new Date({{contest.start_time}}).getTime();
+			const end_time = new Date({{contest.end_time}}).getTime();
+		</script>
+		<script src="/scripts/timer.js"></script>
+		{% endif %}
+	</head>
+	<body onload="start_timer()">
+		<nav>
+			<a href="/api/logout" onclick="return confirm('Are you sure you want to log out?')">logout</a>
+			| <a href="/questions">questions</a>
+			{% if running_contest %}
+			{% for problem in running_contest.problems %}
+				| <a href="/problem/{{problem.id}}">{{problem.name}}</a>
+			{% endfor %}
+			{% endif %}
+		</nav>
+		<p id="timer"></p>
+		<main>
+			{% block content %}{% endblock content %}
+		</main>
+	</body>
+</html>

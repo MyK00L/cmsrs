@@ -1,0 +1,36 @@
+{% extends "base" %}
+{% block title %}Announcements and Questions{% endblock title %}
+{% block content %}
+<div>
+	<p>New Question:</p>
+	<form action="/api/post_question" method="post" enctype="multipart/form-data">
+		<label>Subject <input type="text" name="subject" required></label><br/>
+		<label>Problem
+			<select name="problem">
+				<option>None</option>
+				{% if running_contest %}
+				{% for problem in running_contest.problems %}
+				<option value={{problem.id}}>{{problem.name}}</option>
+				{% endfor %}
+				{% endif %}
+			</select>
+		</label><br/>
+		<label>Text <textarea name="text" required></textarea></label><br/>
+		<input type="submit" value="send"/>
+	</form>
+</div>
+
+
+{% for message in messages %}
+<hr/>
+<div>
+	{% if message.is_question %}
+	<p>Question</p>
+	{% else %}
+	<p>Announcement</p>
+	{% endif %}
+	<p>{{message.subject}}</p>
+	<p>{{message.text}}</p>
+</div>
+{% endfor %}
+{% endblock content %}
