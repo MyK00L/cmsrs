@@ -45,7 +45,7 @@ services:
       context: .
       dockerfile: ./submission_service/Dockerfile
     ports:
-      - 50055:50051
+      - 50053:50051
     depends_on:
       - submission_service_db
 
@@ -56,7 +56,32 @@ services:
     ports:
       - 8000:80
 
+  dispatcher_service:
+    build:
+      context: .
+      dockerfile: ./dispatcher_service/Dockerfile
+    ports: 
+      - "127.0.0.1:50056:50051"
+    depends_on: 
+      - worker_service_1
+      - worker_service_2
 
-volumes:
-  contest_service_db_volume:
-  submission_service_db_volume: # what for?
+  worker_service_1:
+    privileged: true
+    build:
+      context: .
+      dockerfile: ./worker_service/Dockerfile
+    ports: 
+      - "127.0.0.1:50058:50051"
+  
+  worker_service_2:
+    privileged: true
+    build:
+      context: .
+      dockerfile: ./worker_service/Dockerfile
+    ports: 
+      - "127.0.0.1:50059:50051"
+
+# volumes:
+#   contest_service_db_volume:
+#   submission_service_db_volume:
