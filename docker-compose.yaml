@@ -49,6 +49,12 @@ services:
     depends_on:
       - submission_service_db
 
+  admin_web_server:
+    build:
+      context: .
+      dockerfile: ./admin/Dockerfile
+    ports:
+      - 8001:80
 
 volumes:
   contest_service_db_volume:
