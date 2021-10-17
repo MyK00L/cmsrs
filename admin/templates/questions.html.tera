@@ -1,0 +1,30 @@
+{% extends "base" %}
+{% block title %}Questions{% endblock title %}
+{% block content %}
+<h2>Announcement</h2>
+<form action="/form/reply" method="post" enctype="multipart/form-data">
+	<label>Subject <input type="text" name="subject" required></label><br>
+	<label>User <input type="text" name="user"></label><br>
+	<label>Broadcast <input type="checkbox" checked="checked" name="broadcast"></label><br>
+	<!--<input type="number" name="problem_id">-->
+	<label>Text <textarea name="text" required></textarea></label><br>
+	<input type="submit" value="send">
+</form>
+<hr>
+<h2>Questions</h2>
+{% for question in questions %}
+<hr>
+<p>{{question.subject}} - {{question.time}}</p>
+<p>{{question.text | escape | linebreaksbr | safe}}</p>
+<form action="/form/reply" method="post" enctype="multipart/form-data">
+	<input type="hidden" name="user" value="{{question.user}}">
+	{% if question.problem_id %}
+	<input type="hidden" name="problem_id" value="{{question.problem_id}}">
+	{% endif %}
+	<label>Subject <input type="text" name="subject" required></label><br>
+	<label>Text <textarea name="text" required></textarea></label><br>
+	<label>Broadcast <input type="checkbox" name="broadcast"></label><br>
+	<input type="submit" value="send">
+</form>
+{% endfor %}
+{% endblock content %}

@@ -1,0 +1,76 @@
+{% extends "base" %}
+{% block title %}Problem files{% endblock title %}
+{% block content %}
+{% for problem in problems %}
+<details>
+	<summary>{{problem.name}}</summary>
+
+	<details>
+		<summary>Checker</summary>
+		<a href="/form/get_evaluation_file/{{problem.id}}/Checker">download</a>
+		<form action="/form/set_evaluation_file" method="post" enctype="multipart/form-data">
+			<input type="hidden" name="problem_id" value="{{problem.id}}" readonly required>
+			<input type="hidden" name="file_type" value="Checker" readonly required>
+			<label>File <input type="file" name="file"><br></label>
+			<label>Language
+				<select name="language">
+					<option value="None">None</option>
+					<option value="Rust">Rust</option>
+					<option value="Cpp">Cpp</option>
+				</select>
+			</label>
+			<input type="submit" value="upload">
+		</form>
+	</details>
+
+	<details>
+		<summary>Interactor</summary>
+		<a href="/form/get_evaluation_file/{{problem.id}}/Interactor">download</a>
+		<form action="/form/set_evaluation_file" method="post" enctype="multipart/form-data">
+			<input type="hidden" name="problem_id" value="{{problem.id}}" readonly required>
+			<input type="hidden" name="file_type" value="Interactor" readonly required>
+			<label>File <input type="file" name="file"><br></label>
+			<label>Language
+				<select name="language">
+					<option value="None">None</option>
+					<option value="Rust">Rust</option>
+					<option value="Cpp">Cpp</option>
+				</select>
+			</label>
+			<input type="submit" value="upload">
+		</form>
+	</details>
+
+	<details>
+		<summary>Statement</summary>
+		<a href="/form/get_statement/{{problem.id}}">download</a>
+		<form action="/form/set_statement" method="post" enctype="multipart/form-data">
+			<input type="hidden" name="problem_id" value="{{problem.id}}" readonly required>
+			<label>File <input type="file" name="file"><br></label>
+			<input type="submit" value="upload">
+		</form>
+	</details>
+
+	<details>
+		<summary>Testcases</summary>
+		{% for subtask in problem.subtasks %}
+		<details>
+			<summary>subtask {{loop.index0}}</summary>
+			<form action="/form/add_testcase" method="post" enctype="multipart/form-data">
+				<input type="hidden" name="problem_id" value="{{problem.id}}" readonly required>
+				<input type="hidden" name="subtask_id" value="{{subtask.id}}" readonly required>
+				<label>New testcase <input type="file" name="file"><br></label>
+				<input type="submit" value="upload">
+			</form>
+
+			{% for testcase in subtask.testcases %}
+			<p>testcase {{testcase}} <a href="/form/get_testcase/{{problem.id}}/{{subtask.id}}/{{testcase}}">download</a> <a href="/form/remove_testcase/{{problem.id}}/{{subtask.id}}/{{testcase}}">remove</a></p>
+			{% endfor %}
+		</details>
+		{% endfor %}
+	</details>
+
+</details>
+{% endfor %}
+<hr>
+{% endblock content %}

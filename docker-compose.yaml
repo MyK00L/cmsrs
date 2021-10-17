@@ -49,6 +49,13 @@ services:
     depends_on:
       - submission_service_db
 
+  admin_web_server:
+    build:
+      context: .
+      dockerfile: ./admin/Dockerfile
+    ports:
+      - 8001:80
+
   participant_web_server:
     build:
       context: .
@@ -71,9 +78,9 @@ services:
     build:
       context: .
       dockerfile: ./worker_service/Dockerfile
-    ports: 
+    ports:
       - "127.0.0.1:50058:50051"
-  
+
   worker_service_2:
     privileged: true
     build:

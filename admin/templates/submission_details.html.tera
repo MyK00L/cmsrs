@@ -1,0 +1,25 @@
+{% extends "base" %}
+{% block title %}Submission details{% endblock title %}
+{% block content %}
+<hr>
+<p>state: {{state}}</p>
+<p>user: {{user}}</p>
+<p>problem: {{problem_id}}</p>
+<p>lang: {{lang}}</p>
+<textarea readonly="readonly">{{code}}</textarea>
+{% if evaluation %}
+<p>compilation: {{evaluation.compilation.outcome}} {{evaluation.compilation.resources.nanos}}ns {{evaluation.compilation.resources.bytes}}b {{evaluation.compilation.error}}</p>
+<p>{{evaluation.score}}</p>
+<details>
+	<summary>testcases</summary>
+	{% for sr in evaluation.subtask_results %}
+	<details>
+		<summary>Subtask {{loop.index}}: {{sr.score}}</summary>
+		{% for tr in sr.testcase_results %}
+		<p>{{tr.outcome}} {{tr.score}} {{tr.resources.nanos}}ns {{tr.resources.bytes}}b</p>
+		{% endfor %}
+	</details>
+	{% endfor %}
+</details>
+{% endif %}
+{% endblock content %}

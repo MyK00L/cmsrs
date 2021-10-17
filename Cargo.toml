@@ -4,6 +4,7 @@ members = [
     "protos",
     "contest_service",
     "evaluation_service",
+    "admin",
     "rpctest-client",
     "rpctest-server",
     "submission_service",
@@ -11,3 +12,4 @@ members = [
     "dispatcher_service",
     "worker_service"
 ]
+
