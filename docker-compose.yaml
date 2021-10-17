@@ -54,7 +54,7 @@ services:
       context: .
       dockerfile: ./participant/Dockerfile
     ports:
-      - 8000:8000
+      - 8000:80
 
 
 volumes:
