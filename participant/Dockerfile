@@ -15,4 +15,5 @@ COPY participant .
 RUN ./rem_secrets.sh && ./gen_secrets.sh
 RUN cargo build
 ENV ROCKET_PORT=80
-ENTRYPOINT ["/src/server/target/debug/participant", "--features", "mock"]
+# Add "--features", "mock" to the entrypoint list to use mock versions of other services.
+ENTRYPOINT ["/src/server/target/debug/participant"]
