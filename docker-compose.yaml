@@ -56,6 +56,13 @@ services:
     ports:
       - 8001:80
 
+  participant_web_server:
+    build:
+      context: .
+      dockerfile: ./participant/Dockerfile
+    ports:
+      - 8000:80
+
   dispatcher_service:
     build:
       context: .

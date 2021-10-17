@@ -1,0 +1,9 @@
+[default]
+secret_key=""
+address="0.0.0.0"
+
+# TODO: re-enable tls after fixed.
+# [default.tls]
+# certs="certs/certificate.pem"
+# key="certs/key.pem"
+
