@@ -152,7 +152,9 @@ pub mod utils {
             Service::DISPATCHER => "http://dispatcher_service:50051",
             Service::EVALUATION => "http://evaluation_service:50051",
             Service::SUBMISSION => "http://submission_service:50051",
-            Service::WORKER => panic!("rpc servers for workers are hardcoded in the dispatcher service"),
+            Service::WORKER => {
+                panic!("rpc servers for workers are hardcoded in the dispatcher service")
+            }
             Service::TEST => "http://rpc-server:50051",
         }
     }
