@@ -1,8 +1,6 @@
 name: CI
 
-# TODO: readd after rust fixed issues that make CI always fail.
-#on: [push, pull_request]
-on: []
+on: [push, pull_request]
 
 jobs:
   lint:
@@ -13,7 +11,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: nightly
+          toolchain: nightly-2021-10-05
           override: true
           components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v1
@@ -37,7 +35,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: nightly
+          toolchain: nightly-2021-10-05
           override: true
           components: rustfmt
       - uses: Swatinem/rust-cache@v1
