@@ -14,12 +14,20 @@ pub mod contest {
     use std::convert::TryInto;
 
     use super::*;
-    #[derive(Default)]
     pub struct ContestMetadata {
         name: String,
         description: String,
         start_time: Option<std::time::SystemTime>,
         end_time: Option<std::time::SystemTime>,
+    }
+    impl Default for ContestMetadata {
+        fn default() -> Self {
+            Self {
+                name: String::from("contest"),
+                description: String::from("no description"),
+                ..Default::default()
+            }
+        }
     }
     impl From<Document> for ContestMetadata {
         fn from(value: Document) -> Self {

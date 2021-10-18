@@ -1,6 +1,6 @@
 use mongodb::{
-    bson::{doc,Document},
-    options::{CreateCollectionOptions, ValidationAction, ValidationLevel, UpdateOptions},
+    bson::{doc, Document},
+    options::{CreateCollectionOptions, UpdateOptions, ValidationAction, ValidationLevel},
     Database,
 };
 
@@ -121,11 +121,13 @@ pub async fn init_contest_service_db(db: Database) -> Result<(), Box<dyn std::er
     .await?;
 
     let metadata = crate::mappings::contest::ContestMetadata::default();
-    db.collection::<Document>("contest_metadata").update_one(
-        doc! {},
-        doc! { "$set": Document::from(metadata) },
-        UpdateOptions::builder().upsert(true).build(),
-    ).await?;
+    db.collection::<Document>("contest_metadata")
+        .update_one(
+            doc! {},
+            doc! { "$set": Document::from(metadata) },
+            UpdateOptions::builder().upsert(true).build(),
+        )
+        .await?;
 
     Ok(())
 }
