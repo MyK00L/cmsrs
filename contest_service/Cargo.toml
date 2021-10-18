@@ -13,7 +13,7 @@ tonic = "0.5"
 protos = { path = "../protos" }
 utils = { path = "../utils" }
 tokio = { version = "1.9", features = ["macros", "rt-multi-thread"] }
-mongodb = "2.0.0-beta.3"
+mongodb = "2.0"
 argon2 = "0.2"
 rand_core = { version = "0.6", features = ["std"] }
 futures = "0.3"

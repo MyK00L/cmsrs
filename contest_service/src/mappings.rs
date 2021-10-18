@@ -14,6 +14,7 @@ pub mod contest {
     use std::convert::TryInto;
 
     use super::*;
+    #[derive(Default)]
     pub struct ContestMetadata {
         name: String,
         description: String,
