@@ -1,1 +1,9 @@
-.gitignore
+**/target
+**/Cargo.lock
+**/certs
+**/Dockerfile
+**/docker-compose.yaml
+**/README.md
+
+# macOs stuff
+.DS_Store
