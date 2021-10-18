@@ -6,7 +6,7 @@ WORKDIR /src/server
 COPY admin/dummy.rs .
 COPY admin/Cargo.toml .
 RUN rustup component add rustfmt
-
+RUN rustup default nightly-2021-10-05
 RUN sed -i 's#src/main.rs#dummy.rs#' Cargo.toml
 RUN cargo build
 RUN sed -i 's#dummy.rs#src/main.rs#' Cargo.toml
