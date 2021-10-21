@@ -571,6 +571,7 @@ impl ContestTemplate {
                 .get_contest(tonic::Request::new(evaluation::GetContestRequest::default())),
         )
         .await;
+        /*
         let user_contest = match user_contest_response {
             Ok(response) => response.into_inner(),
             Err(err) => {
@@ -588,7 +589,16 @@ impl ContestTemplate {
                     format!("Error in rpc request:\n{:?}", err),
                 ));
             }
-        };
+        };*/
+        // this is not very good, I should check if the error is that it does not exist
+        let user_contest = user_contest_response
+            .ok()
+            .map(|x| x.into_inner())
+            .unwrap_or_default();
+        let evaluation_contest = evaluation_contest_response
+            .ok()
+            .map(|x| x.into_inner())
+            .unwrap_or_default();
         Ok(Self::new(evaluation_contest, user_contest))
     }
     pub fn gen_ids_if_none(&mut self) {

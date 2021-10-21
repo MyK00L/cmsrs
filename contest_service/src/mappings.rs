@@ -25,7 +25,8 @@ pub mod contest {
             Self {
                 name: String::from("contest"),
                 description: String::from("no description"),
-                ..Default::default()
+                start_time: None,
+                end_time: None,
             }
         }
     }
@@ -34,16 +35,14 @@ pub mod contest {
             Self {
                 name: value.get("name").unwrap().to_string(),
                 description: value.get("description").unwrap().to_string(),
-                start_time: value.get("startTime").map(|x| {
-                    x.as_timestamp()
-                        .map(utils::mongo::timestamp_to_systime)
-                        .unwrap()
-                }),
-                end_time: value.get("endTime").map(|x| {
-                    x.as_timestamp()
-                        .map(utils::mongo::timestamp_to_systime)
-                        .unwrap()
-                }),
+                start_time: value
+                    .get("startTime")
+                    .map(|x| x.as_timestamp().map(utils::mongo::timestamp_to_systime))
+                    .flatten(),
+                end_time: value
+                    .get("endTime")
+                    .map(|x| x.as_timestamp().map(utils::mongo::timestamp_to_systime))
+                    .flatten(),
             }
         }
     }
