@@ -555,7 +555,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Print stacktraces useful to debug sandbox failures.
     std::env::set_var("RUST_BACKTRACE", "1");
 
-    let addr: _ = "127.0.0.1:50051".parse()?;
+    let addr: _ = "0.0.0.0:50051".parse()?;
     let worker_service = WorkerService::new().await?;
     let status_copy = Arc::clone(&worker_service.status);
     let evaluation_service_copy = worker_service.evaluation_service.clone();

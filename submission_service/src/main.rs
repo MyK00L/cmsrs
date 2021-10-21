@@ -1,4 +1,5 @@
 #![recursion_limit = "256"]
+use futures::TryStreamExt;
 
 use core::panic;
 
@@ -168,7 +169,18 @@ pub struct SubmissionService {
 impl SubmissionService {
     async fn new() -> Result<Self, Box<dyn std::error::Error>> {
         let db_client = Client::with_options(ClientOptions::parse(CONNECTION_STRING).await?)?;
-        init_contest_service_db(db_client.database("submissionsdb")).await?;
+        let db_already_present = db_client
+            .database("submissionsdb")
+            .list_collections(None, None)
+            .await?
+            .try_next()
+            .await
+            .ok()
+            .flatten()
+            .is_some();
+        if !db_already_present {
+            init_contest_service_db(db_client.database("submissionsdb")).await?;
+        }
         Ok(Self { db_client })
     }
 

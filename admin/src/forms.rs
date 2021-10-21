@@ -45,12 +45,21 @@ pub async fn update_contest(
     )
     .await;
 
-    match contest_response.ok().zip(evaluation_response.ok()) {
-        Some(_) => {}
-        None => {
+    match contest_response {
+        Ok(_) => {}
+        Err(err) => {
             return Err(status::Custom(
                 Status::InternalServerError,
-                String::from("Error in sending requests :("),
+                format!("Error in sending requests :(\n{:?}\n)", err),
+            ));
+        }
+    }
+    match evaluation_response {
+        Ok(_) => {}
+        Err(err) => {
+            return Err(status::Custom(
+                Status::InternalServerError,
+                format!("Error in sending requests :(\n{:?}\n)", err),
             ));
         }
     }
@@ -59,14 +68,13 @@ pub async fn update_contest(
         match contest_client
             .update_problem_info(tonic::Request::new(i))
             .await
-            .ok()
         {
             // TODO: batch
-            Some(_) => {}
-            None => {
+            Ok(_) => {}
+            Err(err) => {
                 return Err(status::Custom(
                     Status::InternalServerError,
-                    String::from("Error in sending requests :("),
+                    format!("Error in sending requests :(\n{:?}\n)", err),
                 ));
             }
         }

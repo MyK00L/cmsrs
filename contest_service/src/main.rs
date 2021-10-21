@@ -1,5 +1,5 @@
 #![feature(async_closure)]
-use futures::stream::StreamExt;
+use futures::stream::{StreamExt, TryStreamExt};
 use std::convert::TryFrom;
 
 use mappings::chat::Message;
@@ -36,7 +36,18 @@ pub struct ContestService {
 impl ContestService {
     async fn new() -> Result<Self, Box<dyn std::error::Error>> {
         let db_client = Client::with_options(ClientOptions::parse(CONNECTION_STRING).await?)?;
-        mongo_schema::init_contest_service_db(db_client.database("contestdb")).await?;
+        let db_already_present = db_client
+            .database("contestdb")
+            .list_collections(None, None)
+            .await?
+            .try_next()
+            .await
+            .ok()
+            .flatten()
+            .is_some();
+        if !db_already_present {
+            mongo_schema::init_contest_service_db(db_client.database("contestdb")).await?;
+        }
         Ok(Self { db_client })
     }
 

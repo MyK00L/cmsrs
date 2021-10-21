@@ -20,21 +20,29 @@ pub mod contest {
         start_time: Option<std::time::SystemTime>,
         end_time: Option<std::time::SystemTime>,
     }
+    impl Default for ContestMetadata {
+        fn default() -> Self {
+            Self {
+                name: String::from("contest"),
+                description: String::from("no description"),
+                start_time: None,
+                end_time: None,
+            }
+        }
+    }
     impl From<Document> for ContestMetadata {
         fn from(value: Document) -> Self {
             Self {
                 name: value.get("name").unwrap().to_string(),
                 description: value.get("description").unwrap().to_string(),
-                start_time: value.get("startTime").map(|x| {
-                    x.as_timestamp()
-                        .map(utils::mongo::timestamp_to_systime)
-                        .unwrap()
-                }),
-                end_time: value.get("endTime").map(|x| {
-                    x.as_timestamp()
-                        .map(utils::mongo::timestamp_to_systime)
-                        .unwrap()
-                }),
+                start_time: value
+                    .get("startTime")
+                    .map(|x| x.as_timestamp().map(utils::mongo::timestamp_to_systime))
+                    .flatten(),
+                end_time: value
+                    .get("endTime")
+                    .map(|x| x.as_timestamp().map(utils::mongo::timestamp_to_systime))
+                    .flatten(),
             }
         }
     }
