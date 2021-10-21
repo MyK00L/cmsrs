@@ -243,10 +243,10 @@ pub mod problem {
                         .unwrap_or_default()
                         .to_owned(),
                 },
-                mongo_record
-                    .get_binary_generic("statement")
-                    .unwrap()
-                    .clone(),
+                match mongo_record.get_binary_generic("statement") {
+                    Ok(x) => x.to_owned(),
+                    Err(_) => vec![],
+                },
             )
         }
     }
