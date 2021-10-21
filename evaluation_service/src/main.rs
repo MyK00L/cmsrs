@@ -431,6 +431,18 @@ impl Evaluation for EvaluationService {
                     .add_folder(&tc.id.to_string(), Some(&testcases_path))?;
 
                 let mut update_info = self.load_problem_update_file(problem_id)?;
+                if update_info
+                    .subtasks
+                    .iter_mut()
+                    .find(|x| x.subtask_id == subtask_id)
+                    .is_none()
+                {
+                    // dirty fix, TODO: fix all these shenanigans
+                    update_info.subtasks.push(SubtaskUpdateInfo {
+                        subtask_id,
+                        testcases: vec![],
+                    });
+                }
                 update_info
                     .subtasks
                     .iter_mut()
