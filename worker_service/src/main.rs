@@ -16,7 +16,8 @@ use protos::{
             EvaluateSubmissionRequest, EvaluateSubmissionResponse, UpdateSourceRequest,
             UpdateSourceResponse, UpdateTestcaseRequest, UpdateTestcaseResponse,
         },
-    }, utils::{get_local_address, get_remote_address},
+    },
+    utils::{get_local_address, get_remote_address},
 };
 use std::{
     collections::HashMap,
@@ -237,7 +238,9 @@ async fn pull_join_handler_action(
 
 impl WorkerService {
     async fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let evaluation_service = EvaluationClient::connect(get_remote_address(protos::utils::Service::EVALUATION)).await?;
+        let evaluation_service =
+            EvaluationClient::connect(get_remote_address(protos::utils::Service::EVALUATION))
+                .await?;
 
         Ok(WorkerService {
             status: Arc::new(Mutex::new(FileStatus::new())),
@@ -556,7 +559,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::env::set_var("RUST_BACKTRACE", "1");
 
     println!("Initialise address");
-    let addr: _ = get_local_address(protos::utils::Service::WORKER).parse()?; 
+    let addr: _ = get_local_address(protos::utils::Service::WORKER).parse()?;
     println!("Address initialised to {:?}", addr);
     println!("Creating worker service...");
     let worker_service = WorkerService::new().await?;
