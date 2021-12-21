@@ -16,7 +16,7 @@ use protos::{
             EvaluateSubmissionRequest, EvaluateSubmissionResponse, UpdateSourceRequest,
             UpdateSourceResponse, UpdateTestcaseRequest, UpdateTestcaseResponse,
         },
-    },
+    }, utils::{get_local_address, get_remote_address},
 };
 use std::{
     collections::HashMap,
@@ -237,7 +237,7 @@ async fn pull_join_handler_action(
 
 impl WorkerService {
     async fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let evaluation_service = EvaluationClient::connect("http://[::1]:50051").await?;
+        let evaluation_service = EvaluationClient::connect(get_remote_address(protos::utils::Service::EVALUATION)).await?;
 
         Ok(WorkerService {
             status: Arc::new(Mutex::new(FileStatus::new())),
@@ -555,13 +555,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Print stacktraces useful to debug sandbox failures.
     std::env::set_var("RUST_BACKTRACE", "1");
 
-    let addr: _ = "0.0.0.0:50051".parse()?;
+    println!("Initialise address");
+    let addr: _ = get_local_address(protos::utils::Service::WORKER).parse()?; 
+    println!("Address initialised to {:?}", addr);
+    println!("Creating worker service...");
     let worker_service = WorkerService::new().await?;
+    println!("Created worker service");
+    println!("Spawning the thread to automatically pull updates about testcases/checkers...");
     let status_copy = Arc::clone(&worker_service.status);
     let evaluation_service_copy = worker_service.evaluation_service.clone();
 
     let _pull_thread_handler =
         spawn(move || pull_join_handler_action(evaluation_service_copy, status_copy));
+    println!("Spawned thread");
 
     println!("Starting a worker server");
     Server::builder()
