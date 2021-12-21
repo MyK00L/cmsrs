@@ -1,7 +1,7 @@
 ### build base ###
 FROM rust:1.55.0-slim AS chef
 USER root
-RUN rustup default nightly-2021-10-05
+RUN rustup default nightly-2021-11-29
 RUN rustup component add rustfmt
 RUN cargo install cargo-chef
 RUN apt-get update && apt-get install libseccomp-dev lld -y
